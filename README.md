@@ -20,7 +20,7 @@ Bài tập nhằm mục đích kiểm tra khả năng nghiên cứu và tích h�
 - Khi hệ thống mới khởi động: còi chip cần kêu 2 lần (50ms ON, 100ms OFF) để báo hiệu là mạch bắt đầu hoạt động
 
 ## Tính năng cần có
-- Cảm biến: khi có tín hiệu từ cảm biến thì bộ đếm của mạch tăng 01 đơn vị
+- Cảm biến: khi có tín hiệu từ cảm biến thì bộ đếm của mạch tăng 01 đơn vị và còi chip kêu 01 lần
 - Module led 7 đoạn: mỗi 5 giây thì hiển thị giá trị bộ đếm, sau đó đến thời gian thực (hh:mm) (dấu 2 ), tuần tự theo chu kỳ
 - Module RFID: 
     - Có thể đọc/ghi/xoá/bảo mật thẻ thông qua đường vật lý CANBUS (tự đề xuất phương pháp - frame để làm điều này)
