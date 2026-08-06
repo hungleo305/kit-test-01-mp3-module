@@ -1,26 +1,30 @@
 #include "Rfid.h"
 
-#define CS_LOW()    (GPIOA->BRR = (1 << 15))
-#define CS_HIGH()   (GPIOA->BSRR = (1 << 15))
+#define CS_LOW()    do { \
+                        while (SPI1->SR & SPI_SR_BSY); \
+                        AFIO->MAPR |= AFIO_MAPR_SPI1_REMAP; \
+                        GPIOA->BRR = (1 << 15); \
+                    } while(0)
+#define CS_HIGH()   do { \
+                        while (SPI1->SR & SPI_SR_BSY); \
+                        GPIOA->BSRR = (1 << 15); \
+                    } while(0)
+
 #define RST_LOW()   (GPIOC->BRR = (1 << 14))
 #define RST_HIGH()  (GPIOC->BSRR = (1 << 14))
 
 void Rfid::init() {
-    // 1. C?p xung nh?p
     RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN | RCC_APB2ENR_IOPCEN | RCC_APB2ENR_AFIOEN | RCC_APB2ENR_SPI1EN;
     
-    // 2. Vô hi?u hóa JTAG và Remap SPI1
     AFIO->MAPR = (AFIO->MAPR & ~AFIO_MAPR_SWJ_CFG_Msk) | AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
     AFIO->MAPR |= AFIO_MAPR_SPI1_REMAP; 
     
-    // 3. C?u hình GPIO
-    GPIOA->CRH &= ~(0xF << 28); GPIOA->CRH |=  (0x3 << 28); // PA15 CS
-    GPIOC->CRH &= ~(0xF << 24); GPIOC->CRH |=  (0x3 << 24); // PC14 RST
-    GPIOB->CRL &= ~(0xF << 12 | 0xF << 20); GPIOB->CRL |=  (0xB << 12 | 0xB << 20); // PB3 SCK, PB5 MOSI
-    GPIOB->CRL &= ~(0xF << 16); GPIOB->CRL |=  (0x4 << 16); // PB4 MISO
-    GPIOB->CRH &= ~(0xF << 4);  GPIOB->CRH |=  (0x8 << 4); GPIOB->ODR |= (1 << 9); // PB9 IRQ
+    GPIOA->CRH &= ~(0xF << 28); GPIOA->CRH |=  (0x3 << 28);
+    GPIOC->CRH &= ~(0xF << 24); GPIOC->CRH |=  (0x3 << 24); 
+    GPIOB->CRL &= ~(0xF << 12 | 0xF << 20); GPIOB->CRL |=  (0xB << 12 | 0xB << 20); 
+    GPIOB->CRL &= ~(0xF << 16); GPIOB->CRL |=  (0x4 << 16); 
+    GPIOB->CRH &= ~(0xF << 4);  GPIOB->CRH |=  (0x8 << 4); GPIOB->ODR |= (1 << 9); 
     
-    // 4. C?u hình SPI1
     SPI1->CR1 = 0x0000;
     SPI1->CR1 |= SPI_CR1_MSTR | SPI_CR1_BR_1 | SPI_CR1_BR_0 | SPI_CR1_SSM | SPI_CR1_SSI; 
     SPI1->CR1 |= SPI_CR1_SPE; 
@@ -28,7 +32,6 @@ void Rfid::init() {
     CS_HIGH();
     RST_HIGH();
     
-    // 5. Kh?i t?o chip RC522
     resetPCD();
     writeRegister(MFRC522_REG_T_MODE, 0x8D);
     writeRegister(MFRC522_REG_T_PRESCALER, 0x3E);
@@ -40,8 +43,8 @@ void Rfid::init() {
 }
 
 void Rfid::resetPCD() {
-    writeRegister(MFRC522_REG_COMMAND, 0x0F); // L?nh SoftReset
-    for (volatile uint32_t i = 0; i < 10000; i++); // Ch? reset
+    writeRegister(MFRC522_REG_COMMAND, 0x0F); 
+    for (volatile uint32_t i = 0; i < 10000; i++); 
 }
 
 void Rfid::antennaOn() {
@@ -77,7 +80,7 @@ bool Rfid::readCardSerial(uint8_t* serial) {
         for (int i = 0; i < 4; i++) {
             check ^= serial[i];
         }
-        if (check != serial[4]) return false; // Sai checksum
+        if (check != serial[4]) return false; 
         return true;
     }
     return false;
@@ -104,7 +107,7 @@ uint8_t Rfid::toCard(uint8_t command, uint8_t* sendData, uint8_t sendLen, uint8_
         setBitMask(MFRC522_REG_BIT_FRAMING, 0x80);
     }
 
-    i = 2000;
+    i = 200;
     do {
         n = readRegister(MFRC522_REG_COM_IRQ);
         i--;
@@ -132,9 +135,14 @@ uint8_t Rfid::toCard(uint8_t command, uint8_t* sendData, uint8_t sendLen, uint8_
 }
 
 uint8_t Rfid::spiTransfer(uint8_t data) {
-    while (!(SPI1->SR & SPI_SR_TXE));
+    uint32_t timeout = 500;
+    
+    while (!(SPI1->SR & SPI_SR_TXE) && --timeout);
     SPI1->DR = data;
-    while (!(SPI1->SR & SPI_SR_RXNE));
+    
+    timeout = 500;
+    while (!(SPI1->SR & SPI_SR_RXNE) && --timeout);
+    
     return SPI1->DR;
 }
 

@@ -1140,7 +1140,7 @@
                 <group>
                     <name>App</name>
                     <file>
-                        <name>$PROJ_DIR$\..\FATFS\App\fatfs.c</name>
+                        <name>$PROJ_DIR$\..\FATFS\App\fatfs.cpp</name>
                     </file>
                 </group>
                 <group>

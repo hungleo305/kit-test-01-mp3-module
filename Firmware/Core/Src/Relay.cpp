@@ -2,21 +2,20 @@
 
 void Relay::init() {
     RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
+    GPIOC->CRL &= ~(0xF << 28);    
+    GPIOC->CRL |=  (0x3 << 28);    
 
-    GPIOC->CRL &= ~(0xF << 16);    
-    GPIOC->CRL |=  (0x3 << 16);     
-
-    off();                      
+    off();
 }
 
 void Relay::on() {
-    GPIOC->BRR = (1 << 4);         
+    GPIOC->BSRR = (1 << 7);         
 }
 
 void Relay::off() {
-    GPIOC->BSRR  = (1 << 4);         
+    GPIOC->BRR  = (1 << 7);         
 }
 
 void Relay::toggle() {
-    GPIOC->ODR ^= (1 << 4);
+    GPIOC->ODR ^= (1 << 7);
 }

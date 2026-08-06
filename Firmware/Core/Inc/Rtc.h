@@ -10,7 +10,10 @@ public:
     void getTime(uint8_t &hour, uint8_t &minute, uint8_t &second);
     
 private:
-    bool waitForLastTask();
+    uint8_t decToBcd(uint8_t val);
+    uint8_t bcdToDec(uint8_t val);
+    void i2cWrite(uint8_t reg, uint8_t data);
+    uint8_t i2cRead(uint8_t reg);
 };
 
 #endif

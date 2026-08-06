@@ -23,10 +23,17 @@ void Led7Segment::init() {
 }
 
 void Led7Segment::clockPulse() {
-    GPIOC->BSRR = (1 << CLOCK_PIN); 
-    __NOP(); __NOP(); 
-    GPIOC->BRR = (1 << CLOCK_PIN);  
-    __NOP(); __NOP();
+    if (GPIOC->ODR & (1 << CLOCK_PIN)) {
+        GPIOC->BRR = (1 << CLOCK_PIN);   
+        __NOP(); __NOP();
+        GPIOC->BSRR = (1 << CLOCK_PIN);  
+        __NOP(); __NOP(); 
+    } else {
+        GPIOC->BSRR = (1 << CLOCK_PIN);  
+        __NOP(); __NOP(); 
+        GPIOC->BRR = (1 << CLOCK_PIN);   
+        __NOP(); __NOP(); 
+    }
 }
 
 void Led7Segment::sendBit(uint8_t bit) {
@@ -35,7 +42,8 @@ void Led7Segment::sendBit(uint8_t bit) {
     } else {
         GPIOC->BRR = (1 << DATA_PIN);  
     }
-    __NOP(); __NOP();
+    __NOP(); 
+    
     clockPulse(); 
 }
 
@@ -44,6 +52,7 @@ void Led7Segment::sendByte(uint8_t data) {
         sendBit((data >> i) & 0x01);
     }
 }
+
 void Led7Segment::latch() {
     GPIOC->BSRR = (1 << STROBE_PIN); 
     __NOP(); __NOP(); 

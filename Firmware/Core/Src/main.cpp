@@ -30,6 +30,7 @@
 #include "Rtc.h"
 #include "Rfid.h"
 #include "Relay.h"
+#include "ff.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -60,7 +61,21 @@ Led7Segment dp;
 Rtc rtc;
 Rfid rfid;
 Relay relay;
+
 uint8_t currentCardUID[5];
+const uint8_t MASTER_CARDS[3][5] = {
+    {0xC1, 0xB8, 0x97, 0x19, 0xF7}, //the reset dem
+    {0x05, 0xB5, 0x08, 0x6D, 0xD5}, // the bat relay
+    {0x80, 0xE8, 0x0F, 0x25, 0x42}  // the dao relay
+};
+const int NUM_CARDS = 3;
+
+// dua bien the sd ra bien toan cuc de chong tran stack
+FATFS fs;       
+FIL fil;        
+FRESULT fres;   
+UINT bytesWrote;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -83,7 +98,6 @@ static void MX_SPI1_Init(void);
   */
 int main(void)
 {
-
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
@@ -109,6 +123,7 @@ int main(void)
   MX_CAN_Init();
   MX_SPI1_Init();
   MX_FATFS_Init();
+  
   /* USER CODE BEGIN 2 */
   ledOb.init();
   cb.init();
@@ -117,8 +132,24 @@ int main(void)
   buzzer.init();
   rfid.init();
   relay.init();
-  buzzer.beep(2, 50, 100);
-  rtc.setTime(17,31,30);
+  
+  //rtc.setTime(16, 17 ,50);
+  
+  fres = f_mount(&fs, "", 1); 
+  if (fres == FR_OK) {
+      fres = f_open(&fil, "TEST.TXT", FA_CREATE_ALWAYS | FA_WRITE);
+      if (fres == FR_OK) {
+          char myData[] = "Xin chao, STM32 da ghi thanh cong vao the 2GB!\n";
+          f_write(&fil, myData, sizeof(myData) - 1, &bytesWrote);
+          f_close(&fil); 
+          buzzer.beep(1, 1000, 0); 
+      } else {
+          buzzer.beep(2, 200, 200); 
+      }
+  } else {
+      buzzer.beep(3, 200, 200); 
+  }
+
   HAL_Delay(50);
   
   dp.setColon(false);
@@ -130,6 +161,11 @@ int main(void)
   bool isShowingTime = false;
   uint16_t lastDisplayValue = 0xFFFF;
   bool lastBlinkState = false;
+  
+  uint32_t lastRtcRead = 0;
+  uint32_t lastCardRead = 0;
+  uint16_t timeValue = 0;
+  
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -164,57 +200,80 @@ int main(void)
     //4:hien thi led
     if (isShowingTime)
     {
-      uint8_t h, m, s;
-      rtc.getTime(h, m, s);
-      uint16_t timeValue = (h * 100) + m; 
+      if (currentTick - lastRtcRead >= 1000 || lastRtcRead == 0) {
+          uint8_t h, m, s;
+          rtc.getTime(h, m, s);
+          timeValue = (h * 100) + m; 
+          lastRtcRead = currentTick;
+      }
       
-      bool currentBlinkState = (currentTick % 1000) < 500;
+      bool currentBlinkState = true;
 
       if ((timeValue != lastDisplayValue) || (currentBlinkState != lastBlinkState)) {
           dp.setColon(currentBlinkState);     
-          dp.setValue(timeValue);         
-          dp.update();                    
-           
-            lastDisplayValue = timeValue;
-            lastBlinkState = currentBlinkState;
-        }
+          dp.setValue(timeValue);    
+          dp.update();    
+          lastDisplayValue = timeValue;
+          lastBlinkState = currentBlinkState;
+      }
     }
     else
     {
       if (Sensor::productCount != lastDisplayValue) 
-        {
+      {
           dp.setColon(false);   
-          dp.setValue(Sensor::productCount);                        
+          dp.setValue(Sensor::productCount);    
           dp.update();
           lastDisplayValue = Sensor::productCount;
-        }
+      }
     }
     //5:check rfid
-    if (rfid.checkCard())
+    if (currentTick - lastCardRead >= 1000) 
     {
-        if (rfid.readCardSerial((uint8_t*)currentCardUID)) 
+        if (rfid.checkCard())
         {
-            if (currentCardUID[0] == 0xC1 && currentCardUID[1] == 0xB8) 
+            if (rfid.readCardSerial((uint8_t*)currentCardUID)) 
             {
-                buzzer.beep(1, 100, 0);   
-                Sensor::productCount = 0; 
-     
-            }
-            else if (currentCardUID[0] == 0x05 && currentCardUID[1] == 0xB5) 
-            {
-                buzzer.beep(1, 100, 0); 
+              int authLevel = 0;
+              
+              for(int i = 0; i < NUM_CARDS; i++){
+                bool match = true;
+                for(int j = 0; j < 5; j++){
+                  if (currentCardUID[j] != MASTER_CARDS[i][j]){
+                      match = false;
+                      break;
+                  }
+                }
+                if (match) {
+                  authLevel = i + 1;
+                  break;
+                }
+              }
+              
+              if (authLevel == 1)
+              {
+                buzzer.beep(1,100,0);
+                Sensor::productCount = 0;
+                lastDisplayValue = 0xFFFF;
+              }else if(authLevel == 2)
+              {
+                buzzer.beep(1,100,0);
                 relay.on();
+                lastDisplayValue = 0xFFFF;
+              }else if(authLevel == 3)
+              {
+                buzzer.beep(1,100,0);
+                relay.toggle();
+                lastDisplayValue = 0xFFFF;
+              }else
+              {
+                buzzer.beep(3,100,100);
+              }
+              lastCardRead = currentTick; 
             }
-            else 
-            {
-                buzzer.beep(3, 50, 50);
-            }
-            
-            HAL_Delay(1000);
         }
     }
   }
-    
   /* USER CODE END 3 */
 }
 
@@ -264,7 +323,6 @@ void SystemClock_Config(void)
   */
 static void MX_CAN_Init(void)
 {
-
   /* USER CODE BEGIN CAN_Init 0 */
 
   /* USER CODE END CAN_Init 0 */
@@ -291,7 +349,6 @@ static void MX_CAN_Init(void)
   /* USER CODE BEGIN CAN_Init 2 */
 
   /* USER CODE END CAN_Init 2 */
-
 }
 
 /**
@@ -301,7 +358,6 @@ static void MX_CAN_Init(void)
   */
 static void MX_SPI1_Init(void)
 {
-
   /* USER CODE BEGIN SPI1_Init 0 */
 
   /* USER CODE END SPI1_Init 0 */
@@ -317,7 +373,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256; 
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -329,7 +385,6 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
-
 }
 
 /**
@@ -348,7 +403,25 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE(); // Bat Clock cho Port B
 
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  // Cau hinh chan PC8 (CS the nho)
+  GPIO_InitStruct.Pin = GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW; 
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
+  
+  // Cau hinh chan PB1 
+  GPIO_InitStruct.Pin = GPIO_PIN_1;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
+  
   /* USER CODE END MX_GPIO_Init_2 */
 }
 

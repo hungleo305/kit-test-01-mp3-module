@@ -3,7 +3,6 @@
 
 #include "stm32f1xx.h"
 
-// --- Các thanh ghi co b?n c?a RC522 ---
 #define MFRC522_REG_COMMAND       0x01
 #define MFRC522_REG_COM_IRQ       0x04
 #define MFRC522_REG_ERROR         0x06
@@ -22,11 +21,11 @@
 #define MFRC522_REG_STATUS2       0x08
 #define MFRC522_REG_COLL          0x0E
 
-// --- T?p l?nh RC522 ---
+
 #define PCD_IDLE                  0x00
 #define PCD_TRANSCEIVE            0x0C
-#define PICC_REQIDL               0x26 // L?nh tìm th?
-#define PICC_ANTICOLL             0x93 // L?nh d?c UID (Ch?ng va ch?m)
+#define PICC_REQIDL               0x26 
+#define PICC_ANTICOLL             0x93 
 
 class Rfid {
 public:
