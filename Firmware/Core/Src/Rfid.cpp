@@ -43,7 +43,7 @@ void Rfid::init() {
 }
 
 void Rfid::resetPCD() {
-    writeRegister(MFRC522_REG_COMMAND, 0x0F); 
+    writeRegister(MFRC522_REG_COMMAND, PCD_SOFTRESET); 
     for (volatile uint32_t i = 0; i < 10000; i++); 
 }
 
@@ -60,7 +60,7 @@ bool Rfid::checkCard() {
     uint32_t backLen;
     writeRegister(MFRC522_REG_BIT_FRAMING, 0x07);
     uint8_t status = toCard(PCD_TRANSCEIVE, &reqMode, 1, backData, &backLen);
-    return (status == 1 && backLen == 0x10);
+    return (status == STATUS_OK && backLen == 0x10);
 }
 
 bool Rfid::readCardSerial(uint8_t* serial) {
@@ -75,7 +75,7 @@ bool Rfid::readCardSerial(uint8_t* serial) {
     
     status = toCard(PCD_TRANSCEIVE, serial, 2, serial, &unLen);
     
-    if (status == 1) {
+    if (status == STATUS_OK) {
         uint8_t check = 0;
         for (int i = 0; i < 4; i++) {
             check ^= serial[i];
@@ -87,7 +87,7 @@ bool Rfid::readCardSerial(uint8_t* serial) {
 }
 
 uint8_t Rfid::toCard(uint8_t command, uint8_t* sendData, uint8_t sendLen, uint8_t* backData, uint32_t* backLen) {
-    uint8_t status = 0;
+    uint8_t status = STATUS_ERROR;
     uint8_t irqEn = 0x77;
     uint8_t waitIRq = 0x30;
     uint8_t lastBits;
@@ -107,7 +107,7 @@ uint8_t Rfid::toCard(uint8_t command, uint8_t* sendData, uint8_t sendLen, uint8_
         setBitMask(MFRC522_REG_BIT_FRAMING, 0x80);
     }
 
-    i = 200;
+    i = 2000; 
     do {
         n = readRegister(MFRC522_REG_COM_IRQ);
         i--;
@@ -116,8 +116,8 @@ uint8_t Rfid::toCard(uint8_t command, uint8_t* sendData, uint8_t sendLen, uint8_
     clearBitMask(MFRC522_REG_BIT_FRAMING, 0x80);
     if (i != 0) {
         if (!(readRegister(MFRC522_REG_ERROR) & 0x1B)) {
-            status = 1;
-            if (n & irqEn & 0x01) status = 0;
+            status = STATUS_OK;
+            if (n & irqEn & 0x01) status = STATUS_ERROR;
             if (command == PCD_TRANSCEIVE) {
                 n = readRegister(MFRC522_REG_FIFO_LEVEL);
                 lastBits = readRegister(MFRC522_REG_CONTROL) & 0x07;
@@ -129,20 +129,18 @@ uint8_t Rfid::toCard(uint8_t command, uint8_t* sendData, uint8_t sendLen, uint8_
                     backData[i] = readRegister(MFRC522_REG_FIFO_DATA);
                 }
             }
-        } else { status = 0; }
+        } else { status = STATUS_ERROR; }
     }
     return status;
 }
 
 uint8_t Rfid::spiTransfer(uint8_t data) {
     uint32_t timeout = 500;
-    
     while (!(SPI1->SR & SPI_SR_TXE) && --timeout);
     SPI1->DR = data;
     
     timeout = 500;
     while (!(SPI1->SR & SPI_SR_RXNE) && --timeout);
-    
     return SPI1->DR;
 }
 
@@ -169,4 +167,122 @@ void Rfid::setBitMask(uint8_t reg, uint8_t mask) {
 void Rfid::clearBitMask(uint8_t reg, uint8_t mask) {
     uint8_t tmp = readRegister(reg);
     writeRegister(reg, tmp & (~mask));
+}
+
+//bao mat
+
+void Rfid::calculateCRC(uint8_t *data, uint8_t length, uint8_t *result) {
+    writeRegister(MFRC522_REG_COMMAND, PCD_IDLE);
+    clearBitMask(MFRC522_REG_DIV_IRQ, 0x04);
+    setBitMask(MFRC522_REG_FIFO_LEVEL, 0x80);
+    
+    for (uint8_t i = 0; i < length; i++) {
+        writeRegister(MFRC522_REG_FIFO_DATA, data[i]);
+    }
+    writeRegister(MFRC522_REG_COMMAND, PCD_CALCCRC);
+    
+    uint32_t i = 0xFF;
+    uint8_t n;
+    do {
+        n = readRegister(MFRC522_REG_DIV_IRQ);
+        i--;
+    } while ((i != 0) && !(n & 0x04));
+    
+    result[0] = readRegister(MFRC522_REG_CRC_RESULT_L);
+    result[1] = readRegister(MFRC522_REG_CRC_RESULT_M);
+}
+
+uint8_t Rfid::PCD_Authenticate(uint8_t command, uint8_t blockAddr, uint8_t *key, uint8_t *uid) {
+    uint8_t sendData[12];
+    sendData[0] = command;
+    sendData[1] = blockAddr;
+    for (uint8_t i = 0; i < 6; i++) sendData[2 + i] = key[i];
+    for (uint8_t i = 0; i < 4; i++) sendData[8 + i] = uid[i];
+    
+    uint32_t backLen = 0;
+    uint8_t status = toCard(PCD_AUTHENT, sendData, 12, sendData, &backLen);
+    
+    if ((readRegister(MFRC522_REG_STATUS2) & 0x08) == 0) {
+        status = STATUS_ERROR;
+    }
+    return status;
+}
+
+uint8_t Rfid::MIFARE_Read(uint8_t blockAddr, uint8_t *buffer, uint8_t *bufferSize) {
+    uint8_t sendData[4];
+    sendData[0] = PICC_CMD_MF_READ;
+    sendData[1] = blockAddr;
+    calculateCRC(sendData, 2, &sendData[2]);
+    
+    uint32_t backLen = 0;
+    uint8_t status = toCard(PCD_TRANSCEIVE, sendData, 4, buffer, &backLen);
+    
+    if (status == STATUS_OK && backLen >= 128) {
+        *bufferSize = 16;
+        return STATUS_OK;
+    }
+    return STATUS_ERROR;
+}
+
+uint8_t Rfid::MIFARE_Write(uint8_t blockAddr, uint8_t *buffer, uint8_t bufferSize) {
+    uint8_t sendData[18];
+    sendData[0] = PICC_CMD_MF_WRITE;
+    sendData[1] = blockAddr;
+    calculateCRC(sendData, 2, &sendData[2]);
+    
+    uint32_t backLen = 0;
+    uint8_t status = toCard(PCD_TRANSCEIVE, sendData, 4, sendData, &backLen);
+    
+    if (status != STATUS_OK || (backLen != 4) || ((sendData[0] & 0x0F) != 0x0A)) {
+        return STATUS_ERROR;
+    }
+    for (uint8_t i = 0; i < 16; i++) {
+        sendData[i] = buffer[i];
+    }
+    calculateCRC(sendData, 16, &sendData[16]);
+    status = toCard(PCD_TRANSCEIVE, sendData, 18, sendData, &backLen);
+    
+    if (status != STATUS_OK || (backLen != 4) || ((sendData[0] & 0x0F) != 0x0A)) {
+        return STATUS_ERROR;
+    }
+    return STATUS_OK;
+}
+
+void Rfid::PICC_HaltA() {
+    uint8_t sendData[4];
+    sendData[0] = PICC_CMD_HALT;
+    sendData[1] = 0;
+    calculateCRC(sendData, 2, &sendData[2]);
+    
+    uint32_t backLen = 0;
+    toCard(PCD_TRANSCEIVE, sendData, 4, sendData, &backLen);
+}
+
+void Rfid::PCD_StopCrypto1() {
+    clearBitMask(MFRC522_REG_STATUS2, 0x08);
+}
+uint8_t Rfid::selectTag(uint8_t* serial) {
+    uint8_t status;
+    uint8_t size;
+    uint32_t recvBits;
+    uint8_t buffer[9]; 
+
+    buffer[0] = PICC_ANTICOLL; 
+    buffer[1] = 0x70;        
+    buffer[2] = serial[0];     
+    buffer[3] = serial[1];
+    buffer[4] = serial[2];
+    buffer[5] = serial[3];
+    buffer[6] = serial[4]; 
+    
+    calculateCRC(buffer, 7, &buffer[7]);
+    
+    status = toCard(PCD_TRANSCEIVE, buffer, 9, buffer, &recvBits);
+    
+    if ((status == STATUS_OK) && (recvBits == 0x18)) {
+        size = buffer[0];
+        return size; 
+    } else {
+        return 0; 
+    }
 }

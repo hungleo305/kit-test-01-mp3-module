@@ -3,6 +3,7 @@
 
 #include "main.h"
 #include <stdint.h>
+#include "Relay.h"
 
 class Led7Segment {
 private:
@@ -19,6 +20,9 @@ public:
     void setValue(uint16_t val);
     void setColon(bool state);
     void update();
+    void blank();     
+    
+    void restore();
 };
 
 #endif

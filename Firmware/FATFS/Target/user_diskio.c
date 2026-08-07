@@ -11,7 +11,6 @@
 #include "ff_gen_drv.h"
 #include "stm32f1xx_hal.h"
 
-/* --- C?U HÌNH CHÂN (CHU?N 100% THEO M?CH C?A B?N) --- */
 #define SD_CS_PORT GPIOC
 #define SD_CS_PIN  GPIO_PIN_8
 #define SD_CLK_PORT  GPIOA
@@ -31,30 +30,25 @@
 
 static volatile DSTATUS Stat = STA_NOINIT;
 
-/* Kh?i t?o dè chân GPIO thành Software SPI */
 static void SD_GPIO_Init(void) {
     GPIO_InitTypeDef GPIO_InitStruct = {0};
     __HAL_RCC_GPIOA_CLK_ENABLE();
     
-    // CLK và MOSI làm Output (d?y tín hi?u)
     GPIO_InitStruct.Pin = SD_CLK_PIN | SD_MOSI_PIN;
     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
     
-    // MISO làm Input (nh?n tín hi?u)
     GPIO_InitStruct.Pin = SD_MISO_PIN;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
     GPIO_InitStruct.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 }
 
-/* T?o tr? nano-giây d? vuông v?n xung nh?p */
 static void SPI_Delay(void) {
     for(volatile int i=0; i<10; i++); 
 }
 
-/* Ð?y 1 Byte di */
 static void SPI_TxByte(uint8_t data) {
     for (uint8_t i = 0; i < 8; i++) {
         if (data & 0x80) SD_MOSI_HIGH();
@@ -67,7 +61,6 @@ static void SPI_TxByte(uint8_t data) {
     }
 }
 
-/* Nh?n 1 Byte v? */
 static uint8_t SPI_RxByte(void) {
     uint8_t data = 0;
     SD_MOSI_HIGH(); 
@@ -113,7 +106,6 @@ static uint8_t SD_SendCmd(uint8_t cmd, uint32_t arg) {
     return res;
 }
 
-/* KHAI BÁO C?U TRÚC DRIVER CHO FATFS */
 DSTATUS USER_initialize (BYTE pdrv);
 DSTATUS USER_status (BYTE pdrv);
 DRESULT USER_read (BYTE pdrv, BYTE *buff, DWORD sector, UINT count);
@@ -137,16 +129,13 @@ Diskio_drvTypeDef  USER_Driver =
 #endif 
 };
 
-/* CÁC HÀM GIAO TI?P V?I THU VI?N FATFS */
 DSTATUS USER_initialize (BYTE pdrv) {
     uint16_t i;
     SD_GPIO_Init();
     
-    // Y?u t? quy?t d?nh: Ch? ?n d?nh di?n áp cho th? cu
     SD_CS_HIGH();
     HAL_Delay(100); 
     
-    // G?i 100 byte (800 xung clock) d? dánh th?c thay vì 10
     for (i = 0; i < 100; i++) SPI_TxByte(0xFF);
     
     if (SD_SendCmd(0, 0) == 1) {
@@ -170,7 +159,6 @@ DRESULT USER_read (BYTE pdrv, BYTE *buff, DWORD sector, UINT count) {
     DRESULT res = RES_ERROR;
     if (Stat & STA_NOINIT) return RES_NOTRDY;
     
-    // Ðánh d?a ch? theo Byte cho th? <= 2GB (SDSC)
     sector *= 512; 
     
     while (count > 0) {
@@ -195,8 +183,7 @@ read_fail:
 DRESULT USER_write (BYTE pdrv, const BYTE *buff, DWORD sector, UINT count) {
     DRESULT res = RES_ERROR;
     if (Stat & STA_NOINIT) return RES_NOTRDY;
-    
-    // Ðánh d?a ch? theo Byte cho th? <= 2GB (SDSC)
+
     sector *= 512;
     
     while (count > 0) {

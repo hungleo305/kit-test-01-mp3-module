@@ -90,3 +90,12 @@ void Rtc::getTime(uint8_t &hour, uint8_t &minute, uint8_t &second) {
     minute = bcdToDec(i2cRead(0x01));
     hour   = bcdToDec(i2cRead(0x02) & 0x3F);
 }
+bool Rtc::isTimeLost() {
+    uint8_t secReg = i2cRead(0x00);
+    
+    if (secReg & 0x80) {
+        return true;
+    }
+    
+    return false;
+}

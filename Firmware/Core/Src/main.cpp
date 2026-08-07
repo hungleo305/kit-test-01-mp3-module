@@ -22,6 +22,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <string.h>
 #include "SystemTimer.h"
 #include "Led.h"
 #include "Buzzer.h"
@@ -30,6 +31,7 @@
 #include "Rtc.h"
 #include "Rfid.h"
 #include "Relay.h"
+#include "Mp3.h"
 #include "ff.h"
 /* USER CODE END Includes */
 
@@ -52,7 +54,7 @@
 CAN_HandleTypeDef hcan;
 
 SPI_HandleTypeDef hspi1;
-
+SPI_HandleTypeDef hspi2;
 /* USER CODE BEGIN PV */
 Led ledOb;
 Buzzer buzzer;
@@ -63,14 +65,7 @@ Rfid rfid;
 Relay relay;
 
 uint8_t currentCardUID[5];
-const uint8_t MASTER_CARDS[3][5] = {
-    {0xC1, 0xB8, 0x97, 0x19, 0xF7}, //the reset dem
-    {0x05, 0xB5, 0x08, 0x6D, 0xD5}, // the bat relay
-    {0x80, 0xE8, 0x0F, 0x25, 0x42}  // the dao relay
-};
-const int NUM_CARDS = 3;
 
-// dua bien the sd ra bien toan cuc de chong tran stack
 FATFS fs;       
 FIL fil;        
 FRESULT fres;   
@@ -83,6 +78,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_SPI2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -122,6 +118,7 @@ int main(void)
   MX_GPIO_Init();
   MX_CAN_Init();
   MX_SPI1_Init();
+  MX_SPI2_Init();
   MX_FATFS_Init();
   
   /* USER CODE BEGIN 2 */
@@ -132,25 +129,20 @@ int main(void)
   buzzer.init();
   rfid.init();
   relay.init();
+  mp3.init();
   
-  //rtc.setTime(16, 17 ,50);
-  
-  fres = f_mount(&fs, "", 1); 
-  if (fres == FR_OK) {
-      fres = f_open(&fil, "TEST.TXT", FA_CREATE_ALWAYS | FA_WRITE);
-      if (fres == FR_OK) {
-          char myData[] = "Xin chao, STM32 da ghi thanh cong vao the 2GB!\n";
-          f_write(&fil, myData, sizeof(myData) - 1, &bytesWrote);
-          f_close(&fil); 
-          buzzer.beep(1, 1000, 0); 
-      } else {
-          buzzer.beep(2, 200, 200); 
-      }
-  } else {
-      buzzer.beep(3, 200, 200); 
+  buzzer.beep(2, 50, 100);
+  fres = f_mount(&fs, "", 1);
+  if (fres != FR_OK) {
+      buzzer.beep(5, 100, 100);
   }
 
-  HAL_Delay(50);
+  if (rtc.isTimeLost()) {
+  
+      buzzer.beep(10, 50, 50); 
+      
+      //rtc.setTime(11, 7, 20); 
+  }
   
   dp.setColon(false);
   dp.setValue(0);
@@ -178,6 +170,8 @@ int main(void)
     uint32_t currentTick = SystemTimer::getTick();
     
     buzzer.update();
+    mp3.process();
+    
     //1:nhay led chu ki 100ms
     if (currentTick - lastLednhay >= 100)
     {
@@ -227,52 +221,59 @@ int main(void)
           lastDisplayValue = Sensor::productCount;
       }
     }
-    //5:check rfid
-    if (currentTick - lastCardRead >= 1000) 
-    {
-        if (rfid.checkCard())
-        {
-            if (rfid.readCardSerial((uint8_t*)currentCardUID)) 
-            {
-              int authLevel = 0;
-              
-              for(int i = 0; i < NUM_CARDS; i++){
-                bool match = true;
-                for(int j = 0; j < 5; j++){
-                  if (currentCardUID[j] != MASTER_CARDS[i][j]){
-                      match = false;
-                      break;
-                  }
+//5: doc du lieu the
+    if (currentTick - lastCardRead >= 1000) {
+        uint8_t currentKeyA[6] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
+
+        if (rfid.checkCard()) {
+            if (rfid.readCardSerial((uint8_t*)currentCardUID)) {
+                if (rfid.selectTag((uint8_t*)currentCardUID) > 0) {
+                    
+                    uint8_t blockAddr = 4;
+                    uint8_t status = rfid.PCD_Authenticate(PICC_CMD_MF_AUTH_KEY_A, blockAddr, currentKeyA, (uint8_t*)currentCardUID);
+                    
+                    if (status == STATUS_OK) {
+                        uint8_t readData[18] = {0}; 
+                        uint8_t size = sizeof(readData);
+                        status = rfid.MIFARE_Read(blockAddr, readData, &size);
+                        
+                        if (status == STATUS_OK) {
+                            if (strncmp((char*)readData, "RESET_DEM", 9) == 0) {
+                                mp3.play("RESET.MP3");
+                                buzzer.beep(1,50,0);
+                                Sensor::productCount = 0;
+                                lastDisplayValue = 0xFFFF;
+                            }
+                            else if (strncmp((char*)readData, "BAT_RELAY", 9) == 0) {
+                                mp3.play("BAT.MP3");
+                                buzzer.beep(1,50,0);
+                                relay.on();
+                                dp.update();
+                            }
+                            else if (strncmp((char*)readData, "DAO_RELAY", 9) == 0) {
+                                mp3.play("DAO.MP3");
+                                buzzer.beep(1,50,0);
+                                relay.toggle();
+                                dp.update();
+                            }
+                            else {
+                                buzzer.beep(3, 100, 100); 
+                            }
+                        } else {
+                            buzzer.beep(4, 50, 50); 
+                        }
+                    } else {
+                        buzzer.beep(5, 50, 50); 
+                    }
                 }
-                if (match) {
-                  authLevel = i + 1;
-                  break;
-                }
-              }
-              
-              if (authLevel == 1)
-              {
-                buzzer.beep(1,100,0);
-                Sensor::productCount = 0;
-                lastDisplayValue = 0xFFFF;
-              }else if(authLevel == 2)
-              {
-                buzzer.beep(1,100,0);
-                relay.on();
-                lastDisplayValue = 0xFFFF;
-              }else if(authLevel == 3)
-              {
-                buzzer.beep(1,100,0);
-                relay.toggle();
-                lastDisplayValue = 0xFFFF;
-              }else
-              {
-                buzzer.beep(3,100,100);
-              }
-              lastCardRead = currentTick; 
+                rfid.PICC_HaltA();
+                rfid.PCD_StopCrypto1();
+                
+                lastCardRead = currentTick; 
             }
         }
     }
+   
   }
   /* USER CODE END 3 */
 }
@@ -373,7 +374,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_256; 
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8; 
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -385,6 +386,51 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
+}
+/**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI2_Init(void)
+{
+  /* 1. Bat xung nhip cho SPI2 va GPIOB */
+  __HAL_RCC_SPI2_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /* 2. Cau hinh chan GPIO cho SPI2
+     PB13     ------> SPI2_SCK
+     PB14     ------> SPI2_MISO
+     PB15     ------> SPI2_MOSI
+  */
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  GPIO_InitStruct.Pin = GPIO_PIN_13 | GPIO_PIN_15;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  GPIO_InitStruct.Pin = GPIO_PIN_14;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /* 3. Cau hinh thong so SPI2 */
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32; // TOI UU TOC DO TRUYEN DE NGHE NHAC KHONG BI GIAT
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
 }
 
 /**
@@ -404,11 +450,11 @@ static void MX_GPIO_Init(void)
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
   __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE(); // Bat Clock cho Port B
+  __HAL_RCC_GPIOB_CLK_ENABLE(); 
 
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
-  // Cau hinh chan PC8 (CS the nho)
+  // Cau hinh chan PC8
   GPIO_InitStruct.Pin = GPIO_PIN_8;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
@@ -422,6 +468,43 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
   
+  //Cau hinh PA4 (Active Low cho module MIX2018A)
+  GPIO_InitStruct.Pin = GPIO_PIN_4;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
+  
+  //vs1011e
+  // 1. Chan PA0 (XRESET - Output)
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  
+  // 2. Chan PA1 (DREQ - Input)
+  GPIO_InitStruct.Pin = GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  
+  // 3. Chan PB12 (XDCS - Output) - Ðã s?a theo k?t qu? dò m?ch
+  GPIO_InitStruct.Pin = GPIO_PIN_12;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  
+  // 4. Chan PC3 (XCS - Output) - Ðã s?a theo k?t qu? dò m?ch
+  GPIO_InitStruct.Pin = GPIO_PIN_3;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  // Set mac dinh cho chip MP3
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET);
   /* USER CODE END MX_GPIO_Init_2 */
 }
 

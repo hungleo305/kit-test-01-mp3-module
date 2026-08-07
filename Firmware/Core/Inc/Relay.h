@@ -4,11 +4,15 @@
 #include "stm32f1xx.h"
 
 class Relay {
+private:
+    bool state;          
+
 public:
     void init();
     void on();
     void off();
-    void toggle(); 
+    void toggle();
+    bool isOn();        
 };
 
 #endif

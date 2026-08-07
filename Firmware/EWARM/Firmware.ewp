@@ -1084,6 +1084,12 @@
                     <name>$PROJ_DIR$\..\Core\Inc\Buzzer.h</name>
                 </file>
                 <file>
+                    <name>$PROJ_DIR$\..\Core\Src\CanBus.cpp</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\Core\Inc\CanBus.h</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\..\Core\Src\Led.cpp</name>
                 </file>
                 <file>
@@ -1097,6 +1103,12 @@
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\Core\Src\main.cpp</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\Core\Src\Mp3.cpp</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\Core\Inc\Mp3.h</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\Core\Src\Relay.cpp</name>
