@@ -33,6 +33,7 @@
 #include "Relay.h"
 #include "Mp3.h"
 #include "ff.h"
+#include "CanBus.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -64,7 +65,22 @@ Rtc rtc;
 Rfid rfid;
 Relay relay;
 
+extern Mp3 mp3;
+
+extern CAN_HandleTypeDef hcan;
+CanBus myCan(&hcan);
+
+uint16_t targetCount = 10;
+bool isTargetReached = false;
+uint32_t lastCanSendTick = 0;
 uint8_t currentCardUID[5];
+
+//can+rfid
+uint8_t cardUpdate = 0; //0 binh thuong, 1: cho doi tinh nang, 2: cho xoa the, 3: cho doi key
+uint8_t newCardUpdate=0; //1: reset, 2: bat relay, 3:dao relay
+uint8_t newCardKey[6] = {0};//luu mat khau moi 
+uint8_t tempKey[6]={0}; //mat khau cu cua the la
+bool isTempKeyReady = false;
 
 FATFS fs;       
 FIL fil;        
@@ -120,7 +136,7 @@ int main(void)
   MX_SPI1_Init();
   MX_SPI2_Init();
   MX_FATFS_Init();
-  
+  MX_CAN_Init();
   /* USER CODE BEGIN 2 */
   ledOb.init();
   cb.init();
@@ -130,7 +146,7 @@ int main(void)
   rfid.init();
   relay.init();
   mp3.init();
-  
+  myCan.init();
   buzzer.beep(2, 50, 100);
   fres = f_mount(&fs, "", 1);
   if (fres != FR_OK) {
@@ -184,6 +200,11 @@ int main(void)
       buzzer.beep(1, 50, 0);
       Sensor ::isDetected =false;
     }
+      Sensor ::isDetected =false;
+      if(Sensor::productCount >= targetCount && !isTargetReached){
+        isTargetReached = true;
+        mp3.play("DAT.MP3");
+      }
     //3:doi mode led
     if (currentTick - lastDisplayToggle >= 5000)
     {
@@ -227,44 +248,103 @@ int main(void)
 
         if (rfid.checkCard()) {
             if (rfid.readCardSerial((uint8_t*)currentCardUID)) {
-                if (rfid.selectTag((uint8_t*)currentCardUID) > 0) {
-                    
+                uint8_t readStatus = 0xFF; 
+                uint8_t readData[18] = {0};
+                
+                if (rfid.selectTag((uint8_t*)currentCardUID) > 0) {                    
                     uint8_t blockAddr = 4;
-                    uint8_t status = rfid.PCD_Authenticate(PICC_CMD_MF_AUTH_KEY_A, blockAddr, currentKeyA, (uint8_t*)currentCardUID);
+                    uint8_t trailerBlock = 7;
                     
+                    uint8_t status;
+                    
+                    //chon key
+                    if (isTempKeyReady) {
+                        status = rfid.PCD_Authenticate(0x60, blockAddr, tempKey, (uint8_t*)currentCardUID);
+                    } else {
+                        status = rfid.PCD_Authenticate(0x60, blockAddr, currentKeyA, (uint8_t*)currentCardUID);
+                    }
+                    //update the
                     if (status == STATUS_OK) {
-                        uint8_t readData[18] = {0}; 
-                        uint8_t size = sizeof(readData);
-                        status = rfid.MIFARE_Read(blockAddr, readData, &size);
-                        
-                        if (status == STATUS_OK) {
-                            if (strncmp((char*)readData, "RESET_DEM", 9) == 0) {
-                                mp3.play("RESET.MP3");
-                                buzzer.beep(1,50,0);
-                                Sensor::productCount = 0;
-                                lastDisplayValue = 0xFFFF;
+                        if (cardUpdate > 0) {
+                            if (cardUpdate == 1 || cardUpdate == 2) {
+                                //xoa the hoac ghi tinh nang
+                                uint8_t writeData[16] = {0};
+                                if (cardUpdate == 1) {
+                                    if (newCardUpdate == 1) strncpy((char*)writeData, "RESET_DEM", 9);
+                                    else if (newCardUpdate == 2) strncpy((char*)writeData, "BAT_RELAY", 9);
+                                    else if (newCardUpdate == 3) strncpy((char*)writeData, "DAO_RELAY", 9);
+                                }
+                                status = rfid.MIFARE_Write(blockAddr, writeData, 16);
+                                if (status == STATUS_OK) buzzer.beep(1, 500, 0); // Bíp dài thành công
+                                else buzzer.beep(4, 50, 50); // Loi ghi
                             }
-                            else if (strncmp((char*)readData, "BAT_RELAY", 9) == 0) {
-                                mp3.play("BAT.MP3");
-                                buzzer.beep(1,50,0);
-                                relay.on();
-                                dp.update();
+                            else if (cardUpdate == 3) {
+                                uint8_t trailerData[16] = {
+                                    newCardKey[0], newCardKey[1], newCardKey[2], newCardKey[3], newCardKey[4], newCardKey[5], 
+                                    0xFF, 0x07, 0x80, 0x69,
+                                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF  // Key B
+                                };
+                                status = rfid.MIFARE_Write(trailerBlock, trailerData, 16);
+                                if (status == STATUS_OK) buzzer.beep(1, 500, 0);
+                                else buzzer.beep(4, 50, 50);
                             }
-                            else if (strncmp((char*)readData, "DAO_RELAY", 9) == 0) {
-                                mp3.play("DAO.MP3");
-                                buzzer.beep(1,50,0);
-                                relay.toggle();
-                                dp.update();
+                            //don dep co
+                            cardUpdate = 0; 
+                            isTempKeyReady = false;
+                            readStatus = 0x00;
+                        } 
+                        else {
+                            uint8_t size = sizeof(readData);
+                            status = rfid.MIFARE_Read(blockAddr, readData, &size);
+                            
+                            if (status == STATUS_OK) {
+                                if (strncmp((char*)readData, "RESET_DEM", 9) == 0) {
+                                    mp3.play("RESET.MP3");
+                                    buzzer.beep(1,50,0);
+                                    Sensor::productCount = 0;
+                                    lastDisplayValue = 0xFFFF;
+                                    readStatus = 0x00;
+                                    isTargetReached = false;
+                                }
+                                else if (strncmp((char*)readData, "BAT_RELAY", 9) == 0) {
+                                    mp3.play("BAT.MP3");
+                                    buzzer.beep(1,50,0);
+                                    relay.on();
+                                    dp.update();
+                                    readStatus = 0x00;
+                                }
+                                else if (strncmp((char*)readData, "DAO_RELAY", 9) == 0) {
+                                    mp3.play("DAO.MP3");
+                                    buzzer.beep(1,50,0);
+                                    relay.toggle();
+                                    dp.update();
+                                    readStatus = 0x00;
+                                }
+                                else {
+                                    buzzer.beep(3, 100, 100);
+                                    readStatus = 0x01; //sai du lieu
+                                }
+                            } else {
+                                buzzer.beep(4, 50, 50);
+                                readStatus = 0x02; //ko doc duoc block
                             }
-                            else {
-                                buzzer.beep(3, 100, 100); 
-                            }
-                        } else {
-                            buzzer.beep(4, 50, 50); 
                         }
                     } else {
-                        buzzer.beep(5, 50, 50); 
+                        buzzer.beep(5, 50, 50);
+                        readStatus = 0x03; //sai mat khau
+                        cardUpdate = 0; 
+                        isTempKeyReady = false;
                     }
+                }
+                //Frame 0x101:uid + trang thai doc
+                uint8_t frame101[6];
+                memcpy(frame101, currentCardUID, 5);
+                frame101[5] = readStatus; 
+                myCan.sendFrame(0x101, frame101, 6);
+                
+                if (readStatus == 0x00 || readStatus == 0x01) {
+                    myCan.sendFrame(0x104, &readData[0], 8);
+                    myCan.sendFrame(0x105, &readData[8], 8);
                 }
                 rfid.PICC_HaltA();
                 rfid.PCD_StopCrypto1();
@@ -273,7 +353,33 @@ int main(void)
             }
         }
     }
-   
+    //6:gui du lieu can rtc vs cam bien
+    currentTick = SystemTimer::getTick();
+    
+    if(currentTick - lastCanSendTick >= 500){
+    
+      uint8_t frame102[4] = {0};
+      uint16_t currentCount = Sensor::productCount; 
+      uint16_t currentTarget = targetCount;
+      frame102[0] = (((currentCount / 1000) % 10) << 4) | ((currentCount / 100) % 10);
+      frame102[1] = (((currentCount / 10) % 10) << 4) | (currentCount % 10);
+      
+      frame102[2] = (((currentTarget / 1000) % 10) << 4) | ((currentTarget / 100) % 10);
+      frame102[3] = (((currentTarget / 10) % 10) << 4) | (currentTarget % 10);;
+      
+      myCan.sendFrame(0x102, frame102, 4);
+      
+      uint8_t h, m , s;
+      rtc.getTime(h, m,s);
+      
+      uint8_t frame103[3];
+      frame103[0] = ((h / 10) << 4) | (h % 10); 
+      frame103[1] = ((m / 10) << 4) | (m % 10); 
+      frame103[2] = ((s / 10) << 4) | (s % 10); 
+      
+      myCan.sendFrame(0x103, frame103, 3);
+      lastCanSendTick = currentTick;
+    }
   }
   /* USER CODE END 3 */
 }
@@ -332,11 +438,11 @@ static void MX_CAN_Init(void)
 
   /* USER CODE END CAN_Init 1 */
   hcan.Instance = CAN1;
-  hcan.Init.Prescaler = 16;
+  hcan.Init.Prescaler = 9;
   hcan.Init.Mode = CAN_MODE_NORMAL;
   hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
-  hcan.Init.TimeSeg1 = CAN_BS1_1TQ;
-  hcan.Init.TimeSeg2 = CAN_BS2_1TQ;
+  hcan.Init.TimeSeg1 = CAN_BS1_13TQ;
+  hcan.Init.TimeSeg2 = CAN_BS2_2TQ;
   hcan.Init.TimeTriggeredMode = DISABLE;
   hcan.Init.AutoBusOff = DISABLE;
   hcan.Init.AutoWakeUp = DISABLE;
@@ -394,15 +500,9 @@ static void MX_SPI1_Init(void)
   */
 static void MX_SPI2_Init(void)
 {
-  /* 1. Bat xung nhip cho SPI2 va GPIOB */
   __HAL_RCC_SPI2_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
-  /* 2. Cau hinh chan GPIO cho SPI2
-     PB13     ------> SPI2_SCK
-     PB14     ------> SPI2_MISO
-     PB15     ------> SPI2_MOSI
-  */
   GPIO_InitTypeDef GPIO_InitStruct = {0};
   GPIO_InitStruct.Pin = GPIO_PIN_13 | GPIO_PIN_15;
   GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
@@ -414,7 +514,6 @@ static void MX_SPI2_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /* 3. Cau hinh thong so SPI2 */
   hspi2.Instance = SPI2;
   hspi2.Init.Mode = SPI_MODE_MASTER;
   hspi2.Init.Direction = SPI_DIRECTION_2LINES;
@@ -422,7 +521,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32; // TOI UU TOC DO TRUYEN DE NGHE NHAC KHONG BI GIAT
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -468,7 +567,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
   
-  //Cau hinh PA4 (Active Low cho module MIX2018A)
+  //Cau hinh PA4
   GPIO_InitStruct.Pin = GPIO_PIN_4;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -489,13 +588,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
   
-  // 3. Chan PB12 (XDCS - Output) - Ðã s?a theo k?t qu? dò m?ch
+  // 3. Chan PB12 (XDCS - Output)
   GPIO_InitStruct.Pin = GPIO_PIN_12;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
   
-  // 4. Chan PC3 (XCS - Output) - Ðã s?a theo k?t qu? dò m?ch
+  // 4. Chan PC3 (XCS - Output)
   GPIO_InitStruct.Pin = GPIO_PIN_3;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
@@ -509,6 +608,87 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+extern "C" { 
+    bool isValidBCD(uint8_t bcd) {
+        return ((bcd >> 4) <= 9) && ((bcd & 0x0F) <= 9);
+    }
+
+    // 2. bcd-decimal
+    uint8_t BCD_to_Dec(uint8_t bcd) {
+        return ((bcd >> 4) * 10) + (bcd & 0x0F);
+    }
+
+    void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
+    {
+        uint32_t rxId;
+        uint8_t rxData[8];
+        uint8_t rxLen = 0;
+
+        if (myCan.readFrame(&rxId, rxData, &rxLen)) {
+          //0x201 target
+            if (rxId == 0x201) {
+                if (isValidBCD(rxData[0]) && isValidBCD(rxData[1])) {
+                    uint16_t val = (BCD_to_Dec(rxData[0]) * 100) + BCD_to_Dec(rxData[1]);
+
+                    if (val <= 9999) {
+                        targetCount = val;
+                        isTargetReached = false;
+                        buzzer.beep(1, 200, 0);
+                    }else buzzer.beep(3, 100, 100);
+                }else buzzer.beep(3, 100, 100);
+            }
+            //0x202 dem hien tai
+            else if (rxId == 0x202) {
+                if (isValidBCD(rxData[0]) && isValidBCD(rxData[1])) {
+                    uint16_t val = (BCD_to_Dec(rxData[0]) * 100) + BCD_to_Dec(rxData[1]);
+                    if (val <= 9999) {
+                        Sensor::productCount = val;
+                        isTargetReached = false;
+                        buzzer.beep(1, 200, 0);
+                    }else buzzer.beep(3, 100, 100);
+                }else buzzer.beep(3, 100, 100);
+            }
+            //0x203 time
+            else if (rxId == 0x203) {
+                if (isValidBCD(rxData[0]) && isValidBCD(rxData[1]) && isValidBCD(rxData[2])) {
+                    uint8_t h = BCD_to_Dec(rxData[0]);
+                    uint8_t m = BCD_to_Dec(rxData[1]);
+                    uint8_t s = BCD_to_Dec(rxData[2]);
+                    if (h <= 23 && m <= 59 && s <= 59) {
+                        rtc.setTime(h, m, s);
+                        buzzer.beep(1, 200, 0);
+                    }else buzzer.beep(3, 100, 100);
+                }else buzzer.beep(3, 100, 100);
+            }
+            //thay doi tinh nang
+            else if (rxId == 0x204){
+              if(rxData[0] >=1 && rxData[0]<=3){
+                cardUpdate = 1;
+                newCardUpdate = rxData[0];
+                buzzer.beep(2,50,50);
+              }else buzzer.beep(3,100,100);  
+            }
+            //0x205 xoa the,doi key
+            else if(rxId == 0x205){
+              if(rxData[0] == 0x00){ //xoa the
+                cardUpdate = 2;
+                buzzer.beep(2,50,50);
+              }
+              else if (rxData[0] == 0x01) {//doi key
+                cardUpdate = 3;
+                memcpy(newCardKey, &rxData[1],6);
+                buzzer.beep(2,50,50);
+              }
+              else buzzer.beep(3,100,100); 
+            }
+            else if (rxId == 0x206){
+              memcpy(tempKey, rxData,6);
+              isTempKeyReady = true;
+              buzzer.beep(2,50,50);
+            }
+        }
+    }
+}
 
 /* USER CODE END 4 */
 
