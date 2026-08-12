@@ -7,6 +7,14 @@
 
 class Led7Segment {
 private:
+    GPIO_TypeDef* dataPort;
+    uint16_t dataPin;
+    GPIO_TypeDef* clockPort;
+    uint16_t clockPin;
+    GPIO_TypeDef* strobePort;
+    uint16_t strobePin;
+    Relay* relay;
+    
     uint16_t displayValue;
     bool colonState;
 
@@ -16,13 +24,18 @@ private:
     void latch();
 
 public:
+    Led7Segment(GPIO_TypeDef* dataPort, uint16_t dataPin, 
+                GPIO_TypeDef* clockPort, uint16_t clockPin, 
+                GPIO_TypeDef* strobePort, uint16_t strobePin, 
+                Relay* relay);
     void init();
     void setValue(uint16_t val);
     void setColon(bool state);
     void update();
     void blank();     
-    
     void restore();
+    void turnOff();
+    void turnOn();
 };
 
 #endif

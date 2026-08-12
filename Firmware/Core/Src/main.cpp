@@ -57,15 +57,14 @@ CAN_HandleTypeDef hcan;
 SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
 /* USER CODE BEGIN PV */
-Led ledOb;
-Buzzer buzzer;
-Sensor cb;
-Led7Segment dp;
-Rtc rtc;
-Rfid rfid;
-Relay relay;
-
-extern Mp3 mp3;
+Led ledOb(GPIOB, 1<<2);
+Buzzer buzzer(GPIOC, 1<<15);
+Sensor cb(GPIOC, 1<<13);
+Relay relay(GPIOC, 1<<7);
+Led7Segment dp(GPIOC, 1<<5, GPIOC, 1<<7, GPIOC, 1<<6, &relay);
+Rtc rtc(I2C1, GPIOB, 1<<6, GPIOB, 1<<7);
+Rfid rfid(SPI1, GPIOA, 1<<15, GPIOC, 1<<14);
+Mp3 mp3(&hspi2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3, &buzzer);
 
 extern CAN_HandleTypeDef hcan;
 CanBus myCan(&hcan);
@@ -81,6 +80,9 @@ uint8_t newCardUpdate=0; //1: reset, 2: bat relay, 3:dao relay
 uint8_t newCardKey[6] = {0};//luu mat khau moi 
 uint8_t tempKey[6]={0}; //mat khau cu cua the la
 bool isTempKeyReady = false;
+
+uint32_t lastRelayToggleTime = 0;
+bool pendingDisplayRefresh = false;
 
 FATFS fs;       
 FIL fil;        
@@ -164,7 +166,7 @@ int main(void)
   dp.setValue(0);
   dp.update();
   
-  uint32_t lastLednhay = 0;
+  
   uint32_t lastDisplayToggle = 0;
   bool isShowingTime = false;
   uint16_t lastDisplayValue = 0xFFFF;
@@ -185,16 +187,17 @@ int main(void)
     /* USER CODE BEGIN 3 */
     uint32_t currentTick = SystemTimer::getTick();
     
+    if (pendingDisplayRefresh) {
+        if (currentTick - lastRelayToggleTime >= 20) {
+            dp.update();
+            pendingDisplayRefresh = false;
+        }
+    }
+    
     buzzer.update();
     mp3.process();
-    
-    //1:nhay led chu ki 100ms
-    if (currentTick - lastLednhay >= 100)
-    {
-      ledOb.toggle();
-      lastLednhay = currentTick;
-    }
-    //2:kiem tra cam bien
+
+    //1:kiem tra cam bien
     if (Sensor::isDetected)
     {
       buzzer.beep(1, 50, 0);
@@ -205,14 +208,14 @@ int main(void)
         isTargetReached = true;
         mp3.play("DAT.MP3");
       }
-    //3:doi mode led
+    //2:doi mode led
     if (currentTick - lastDisplayToggle >= 5000)
     {
       isShowingTime = !isShowingTime;   
       lastDisplayToggle = currentTick;  
       lastDisplayValue = 0xFFFF;        
     }
-    //4:hien thi led
+    //3:hien thi led
     if (isShowingTime)
     {
       if (currentTick - lastRtcRead >= 1000 || lastRtcRead == 0) {
@@ -242,7 +245,7 @@ int main(void)
           lastDisplayValue = Sensor::productCount;
       }
     }
-//5: doc du lieu the
+    //4: doc du lieu the
     if (currentTick - lastCardRead >= 1000) {
         uint8_t currentKeyA[6] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
 
@@ -275,7 +278,7 @@ int main(void)
                                     else if (newCardUpdate == 3) strncpy((char*)writeData, "DAO_RELAY", 9);
                                 }
                                 status = rfid.MIFARE_Write(blockAddr, writeData, 16);
-                                if (status == STATUS_OK) buzzer.beep(1, 500, 0); // Bíp dài thành công
+                                if (status == STATUS_OK) buzzer.beep(1, 500, 0); // Bp di thnh cng
                                 else buzzer.beep(4, 50, 50); // Loi ghi
                             }
                             else if (cardUpdate == 3) {
@@ -299,25 +302,29 @@ int main(void)
                             
                             if (status == STATUS_OK) {
                                 if (strncmp((char*)readData, "RESET_DEM", 9) == 0) {
-                                    mp3.play("RESET.MP3");
                                     buzzer.beep(1,50,0);
+                                    mp3.play("RESET.MP3");
                                     Sensor::productCount = 0;
                                     lastDisplayValue = 0xFFFF;
                                     readStatus = 0x00;
                                     isTargetReached = false;
                                 }
                                 else if (strncmp((char*)readData, "BAT_RELAY", 9) == 0) {
-                                    mp3.play("BAT.MP3");
                                     buzzer.beep(1,50,0);
+                                    mp3.play("BAT.MP3");
+                                    dp.turnOff();
                                     relay.on();
-                                    dp.update();
+                                    lastRelayToggleTime = currentTick;
+                                    pendingDisplayRefresh = true;
                                     readStatus = 0x00;
                                 }
                                 else if (strncmp((char*)readData, "DAO_RELAY", 9) == 0) {
-                                    mp3.play("DAO.MP3");
                                     buzzer.beep(1,50,0);
+                                    mp3.play("DAO.MP3");
+                                    dp.turnOff();
                                     relay.toggle();
-                                    dp.update();
+                                    lastRelayToggleTime = currentTick;
+                                    pendingDisplayRefresh = true;
                                     readStatus = 0x00;
                                 }
                                 else {
@@ -575,40 +582,23 @@ static void MX_GPIO_Init(void)
 
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
   
-  //vs1011e
-  // 1. Chan PA0 (XRESET - Output)
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-  
-  // 2. Chan PA1 (DREQ - Input)
-  GPIO_InitStruct.Pin = GPIO_PIN_1;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-  
-  // 3. Chan PB12 (XDCS - Output)
-  GPIO_InitStruct.Pin = GPIO_PIN_12;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-  
-  // 4. Chan PC3 (XCS - Output)
-  GPIO_InitStruct.Pin = GPIO_PIN_3;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  // Set mac dinh cho chip MP3
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET);
   /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
-extern "C" { 
+extern "C" {
+    void HAL_IncTick(void) {
+        uwTick += uwTickFreq;
+        
+        buzzer.update();
+        
+        static uint32_t lastLedNhay = 0;
+        if (uwTick - lastLedNhay >= 100) {
+            ledOb.toggle();
+            lastLedNhay = uwTick;
+        }
+    }
+    
     bool isValidBCD(uint8_t bcd) {
         return ((bcd >> 4) <= 9) && ((bcd & 0x0F) <= 9);
     }

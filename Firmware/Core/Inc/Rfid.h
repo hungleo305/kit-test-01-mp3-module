@@ -3,7 +3,7 @@
 
 #include "stm32f1xx.h"
 
-// --- CÁC THANH GHI (REGISTERS) ---
+// --- REGISTERS ---
 #define MFRC522_REG_COMMAND       0x01
 #define MFRC522_REG_COM_I_EN      0x02
 #define MFRC522_REG_DIV_I_EN      0x03
@@ -46,7 +46,30 @@
 #define STATUS_ERROR              0
 
 class Rfid {
+private:
+    SPI_TypeDef* spi;
+    GPIO_TypeDef* csPort;
+    uint16_t csPin;
+    GPIO_TypeDef* rstPort;
+    uint16_t rstPin;
+
+    void csLow();
+    void csHigh();
+    void rstLow();
+    void rstHigh();
+    uint8_t spiTransfer(uint8_t data);
+
+    void writeRegister(uint8_t addr, uint8_t val);
+    uint8_t readRegister(uint8_t addr);
+    void setBitMask(uint8_t reg, uint8_t mask);
+    void clearBitMask(uint8_t reg, uint8_t mask);
+    void antennaOn();
+    void resetPCD();
+    uint8_t toCard(uint8_t command, uint8_t* sendData, uint8_t sendLen, uint8_t* backData, uint32_t* backLen);
+    void calculateCRC(uint8_t *data, uint8_t length, uint8_t *result);
+
 public:
+    Rfid(SPI_TypeDef* spi, GPIO_TypeDef* csPort, uint16_t csPin, GPIO_TypeDef* rstPort, uint16_t rstPin);
     void init();
     bool checkCard();
     bool readCardSerial(uint8_t* serial);
@@ -56,18 +79,6 @@ public:
     uint8_t MIFARE_Write(uint8_t blockAddr, uint8_t *buffer, uint8_t bufferSize);
     void PICC_HaltA();
     void PCD_StopCrypto1();
-
-private:
-    uint8_t spiTransfer(uint8_t data);
-    void writeRegister(uint8_t addr, uint8_t val);
-    uint8_t readRegister(uint8_t addr);
-    void setBitMask(uint8_t reg, uint8_t mask);
-    void clearBitMask(uint8_t reg, uint8_t mask);
-    void antennaOn();
-    void resetPCD();
-    uint8_t toCard(uint8_t command, uint8_t* sendData, uint8_t sendLen, uint8_t* backData, uint32_t* backLen);
-    
-    void calculateCRC(uint8_t *data, uint8_t length, uint8_t *result);
 };
 
 #endif

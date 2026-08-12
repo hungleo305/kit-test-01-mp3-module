@@ -1,36 +1,71 @@
 #include "Rfid.h"
 
-#define CS_LOW()    do { \
-                        while (SPI1->SR & SPI_SR_BSY); \
-                        AFIO->MAPR |= AFIO_MAPR_SPI1_REMAP; \
-                        GPIOA->BRR = (1 << 15); \
-                    } while(0)
-#define CS_HIGH()   do { \
-                        while (SPI1->SR & SPI_SR_BSY); \
-                        GPIOA->BSRR = (1 << 15); \
-                    } while(0)
+Rfid::Rfid(SPI_TypeDef* spi, GPIO_TypeDef* csPort, uint16_t csPin, GPIO_TypeDef* rstPort, uint16_t rstPin)
+    : spi(spi), csPort(csPort), csPin(csPin), rstPort(rstPort), rstPin(rstPin) {}
 
-#define RST_LOW()   (GPIOC->BRR = (1 << 14))
-#define RST_HIGH()  (GPIOC->BSRR = (1 << 14))
+void Rfid::csLow() {
+    while (spi->SR & SPI_SR_BSY);
+    if (spi == SPI1) AFIO->MAPR |= AFIO_MAPR_SPI1_REMAP;
+    csPort->BRR = csPin;
+}
+
+void Rfid::csHigh() {
+    while (spi->SR & SPI_SR_BSY);
+    csPort->BSRR = csPin;
+}
+
+void Rfid::rstLow() {
+    rstPort->BRR = rstPin;
+}
+
+void Rfid::rstHigh() {
+    rstPort->BSRR = rstPin;
+}
 
 void Rfid::init() {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_IOPBEN | RCC_APB2ENR_IOPCEN | RCC_APB2ENR_AFIOEN | RCC_APB2ENR_SPI1EN;
+    if (csPort == GPIOA || rstPort == GPIOA) RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
+    if (csPort == GPIOB || rstPort == GPIOB) RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
+    if (csPort == GPIOC || rstPort == GPIOC) RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
+    if (csPort == GPIOD || rstPort == GPIOD) RCC->APB2ENR |= RCC_APB2ENR_IOPDEN;
     
-    AFIO->MAPR = (AFIO->MAPR & ~AFIO_MAPR_SWJ_CFG_Msk) | AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
-    AFIO->MAPR |= AFIO_MAPR_SPI1_REMAP; 
+    RCC->APB2ENR |= RCC_APB2ENR_AFIOEN;
     
-    GPIOA->CRH &= ~(0xF << 28); GPIOA->CRH |=  (0x3 << 28);
-    GPIOC->CRH &= ~(0xF << 24); GPIOC->CRH |=  (0x3 << 24); 
-    GPIOB->CRL &= ~(0xF << 12 | 0xF << 20); GPIOB->CRL |=  (0xB << 12 | 0xB << 20); 
-    GPIOB->CRL &= ~(0xF << 16); GPIOB->CRL |=  (0x4 << 16); 
-    GPIOB->CRH &= ~(0xF << 4);  GPIOB->CRH |=  (0x8 << 4); GPIOB->ODR |= (1 << 9); 
+    if (spi == SPI1) RCC->APB2ENR |= RCC_APB2ENR_SPI1EN;
+    else if (spi == SPI2) RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
     
-    SPI1->CR1 = 0x0000;
-    SPI1->CR1 |= SPI_CR1_MSTR | SPI_CR1_BR_1 | SPI_CR1_BR_0 | SPI_CR1_SSM | SPI_CR1_SSI; 
-    SPI1->CR1 |= SPI_CR1_SPE; 
+    if (spi == SPI1) {
+        RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
+        AFIO->MAPR = (AFIO->MAPR & ~AFIO_MAPR_SWJ_CFG_Msk) | AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
+        AFIO->MAPR |= AFIO_MAPR_SPI1_REMAP; 
+        
+        GPIOB->CRL &= ~(0xF << 12 | 0xF << 20); GPIOB->CRL |=  (0xB << 12 | 0xB << 20); 
+        GPIOB->CRL &= ~(0xF << 16); GPIOB->CRL |=  (0x4 << 16); 
+        
+        GPIOB->CRH &= ~(0xF << 4);  GPIOB->CRH |=  (0x8 << 4); GPIOB->ODR |= (1 << 9); 
+    }
     
-    CS_HIGH();
-    RST_HIGH();
+    GPIO_TypeDef* ports[] = {csPort, rstPort};
+    uint16_t pins[] = {csPin, rstPin};
+    
+    for (int i = 0; i < 2; i++) {
+        uint32_t pinIndex = 0;
+        while (!(pins[i] & (1 << pinIndex))) pinIndex++;
+
+        if (pinIndex < 8) {
+            ports[i]->CRL &= ~(0xF << (pinIndex * 4));
+            ports[i]->CRL |= (0x3 << (pinIndex * 4)); 
+        } else {
+            ports[i]->CRH &= ~(0xF << ((pinIndex - 8) * 4));
+            ports[i]->CRH |= (0x3 << ((pinIndex - 8) * 4));
+        }
+    }
+    
+    spi->CR1 = 0x0000;
+    spi->CR1 |= SPI_CR1_MSTR | SPI_CR1_BR_1 | SPI_CR1_BR_0 | SPI_CR1_SSM | SPI_CR1_SSI; 
+    spi->CR1 |= SPI_CR1_SPE; 
+    
+    csHigh();
+    rstHigh();
     
     resetPCD();
     writeRegister(MFRC522_REG_T_MODE, 0x8D);
@@ -136,26 +171,26 @@ uint8_t Rfid::toCard(uint8_t command, uint8_t* sendData, uint8_t sendLen, uint8_
 
 uint8_t Rfid::spiTransfer(uint8_t data) {
     uint32_t timeout = 500;
-    while (!(SPI1->SR & SPI_SR_TXE) && --timeout);
-    SPI1->DR = data;
+    while (!(spi->SR & SPI_SR_TXE) && --timeout);
+    spi->DR = data;
     
     timeout = 500;
-    while (!(SPI1->SR & SPI_SR_RXNE) && --timeout);
-    return SPI1->DR;
+    while (!(spi->SR & SPI_SR_RXNE) && --timeout);
+    return spi->DR;
 }
 
 void Rfid::writeRegister(uint8_t addr, uint8_t val) {
-    CS_LOW();
+    csLow();
     spiTransfer((addr << 1) & 0x7E);
     spiTransfer(val);
-    CS_HIGH();
+    csHigh();
 }
 
 uint8_t Rfid::readRegister(uint8_t addr) {
-    CS_LOW();
+    csLow();
     spiTransfer(((addr << 1) & 0x7E) | 0x80);
     uint8_t val = spiTransfer(0x00);
-    CS_HIGH();
+    csHigh();
     return val;
 }
 

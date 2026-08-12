@@ -124,7 +124,7 @@ static uint8_t SD_SendCmd(uint8_t cmd, uint32_t arg) {
     if (cmd == 8) n = 0x87; 
     SPI_TxByte(n);
 
-    n = 10;
+    n = 100;
     do { res = SPI_RxByte(); } while ((res & 0x80) && --n);
     return res;
 }
@@ -162,19 +162,31 @@ Diskio_drvTypeDef  USER_Driver =
   * @retval DSTATUS: Operation status
   */
 DSTATUS USER_initialize (
-	BYTE pdrv           /* Physical drive nmuber to identify the drive */
+	BYTE pdrv           
+/* Physical drive nmuber to identify the drive */
 )
 {
   /* USER CODE BEGIN INIT */
+    Stat = STA_NOINIT;
     uint16_t i;
     SD_GPIO_Init();
     
     SD_CS_HIGH();
-    HAL_Delay(100); 
+    HAL_Delay(500); 
     
     for (i = 0; i < 100; i++) SPI_TxByte(0xFF);
     
-    if (SD_SendCmd(0, 0) == 1) {
+    uint8_t cmd0_res = 0xFF;
+    for (int retry = 0; retry < 50; retry++) {
+        cmd0_res = SD_SendCmd(0, 0);
+        if (cmd0_res == 1) break;
+        HAL_Delay(10);
+    }
+    
+    if (cmd0_res == 1) {
+        if (SD_SendCmd(8, 0x1AA) == 1) {
+            for (i = 0; i < 4; i++) SPI_RxByte(); 
+        }
         uint32_t tickstart = HAL_GetTick();
         do {
             SD_SendCmd(55, 0); 

@@ -1,48 +1,75 @@
 #include "Led7Segment.h"
-extern Relay relay;
+
 const uint8_t SEG_ACTUAL_NORMAL[10] = {0x77, 0x11, 0xB6, 0xB3, 0xD1, 0xE3, 0xE7, 0x31, 0xF7, 0xF3};
 const uint8_t SEG_ACTUAL_DIGIT3[10] = {0x77, 0x44, 0xB6, 0xE6, 0xC5, 0xE3, 0xF3, 0x46, 0xF7, 0xE7};
 
-#define DATA_PIN    5
-#define CLOCK_PIN   7  
-#define STROBE_PIN  6  
+Led7Segment::Led7Segment(GPIO_TypeDef* dataPort, uint16_t dataPin, 
+                         GPIO_TypeDef* clockPort, uint16_t clockPin, 
+                         GPIO_TypeDef* strobePort, uint16_t strobePin, 
+                         Relay* relay) 
+    : dataPort(dataPort), dataPin(dataPin), 
+      clockPort(clockPort), clockPin(clockPin), 
+      strobePort(strobePort), strobePin(strobePin), 
+      relay(relay) {}
 
 void Led7Segment::init() {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
+    if (dataPort == GPIOA || clockPort == GPIOA || strobePort == GPIOA) RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
+    if (dataPort == GPIOB || clockPort == GPIOB || strobePort == GPIOB) RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
+    if (dataPort == GPIOC || clockPort == GPIOC || strobePort == GPIOC) RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
+    if (dataPort == GPIOD || clockPort == GPIOD || strobePort == GPIOD) RCC->APB2ENR |= RCC_APB2ENR_IOPDEN;
     
-    GPIOC->CRL &= ~((0x0F << (DATA_PIN * 4)) | 
-                    (0x0F << (CLOCK_PIN * 4)) | 
-                      (0x0F << (STROBE_PIN * 4))); 
-    GPIOC->CRL |=  ((0x03 << (DATA_PIN * 4)) | 
-                    (0x03 << (CLOCK_PIN * 4)) | 
-                      (0x03 << (STROBE_PIN * 4))); 
-    
-    GPIOC->BRR = (1 << DATA_PIN) | (1 << CLOCK_PIN) | (1 << STROBE_PIN);
+    GPIO_TypeDef* ports[] = {dataPort, clockPort, strobePort};
+    uint16_t pins[] = {dataPin, clockPin, strobePin};
+
+    for(int i = 0; i < 3; i++) {
+        uint32_t pinIndex = 0;
+        while (!(pins[i] & (1 << pinIndex))) pinIndex++;
+
+        if (pinIndex < 8) {
+            ports[i]->CRL &= ~(0xF << (pinIndex * 4));
+            ports[i]->CRL |= (0x3 << (pinIndex * 4)); 
+        } else {
+            ports[i]->CRH &= ~(0xF << ((pinIndex - 8) * 4));
+            ports[i]->CRH |= (0x3 << ((pinIndex - 8) * 4));
+        }
+        ports[i]->BRR = pins[i];
+    }
     
     displayValue = 0;
     colonState = false;
     
     for(int i = 0; i < 4; i++) {
       sendByte(0x00);
-      }
+    }
     latch();
-    GPIOC->BRR = (1 << CLOCK_PIN);
+    clockPort->BRR = clockPin;
 }
 
 void Led7Segment::clockPulse()
 {
-    GPIOC->BSRR = (1 << CLOCK_PIN);
-    __NOP(); __NOP();
-    GPIOC->BRR  = (1 << CLOCK_PIN);
-    __NOP();
+    if (relay && relay->isOn()) {
+        // Relay is ON (pin is HIGH).
+        clockPort->BRR = clockPin;              
+        for(volatile int d=0; d<5; d++);           
+        clockPort->BSRR = clockPin;                
+        for(volatile int d=0; d<5; d++);           
+    } else {
+        // Relay is OFF (pin is LOW).
+        clockPort->BSRR = clockPin;                
+        for(volatile int d=0; d<5; d++);            
+        clockPort->BRR = clockPin;                  
+        for(volatile int d=0; d<5; d++);            
+    }
 }
+
 void Led7Segment::sendBit(uint8_t bit)
 {
     if (bit) {
-        GPIOC->BSRR = (1 << DATA_PIN);
+        dataPort->BSRR = dataPin;
     } else {
-        GPIOC->BRR  = (1 << DATA_PIN);
+        dataPort->BRR  = dataPin;
     }
+    __NOP(); __NOP();
     clockPulse();
 }
 
@@ -54,10 +81,10 @@ void Led7Segment::sendByte(uint8_t data) {
 
 void Led7Segment::latch()
 {
-    GPIOC->BSRR = (1 << STROBE_PIN);
+    strobePort->BSRR = strobePin;
     __NOP(); __NOP(); __NOP(); __NOP();
     __NOP(); __NOP();
-    GPIOC->BRR  = (1 << STROBE_PIN);
+    strobePort->BRR  = strobePin;
 }
 
 void Led7Segment::setValue(uint16_t val) {
@@ -73,8 +100,8 @@ void Led7Segment::update()
 {
     __disable_irq();
 
-    // Gi? STROBE th?p
-    GPIOC->BRR = (1 << STROBE_PIN);
+    // Turn OFF screen to hide shifting (OE HIGH)
+    strobePort->BSRR = strobePin; 
 
     uint8_t digits[4] = {
         (uint8_t)((displayValue / 1000) % 10),
@@ -83,33 +110,65 @@ void Led7Segment::update()
         (uint8_t)( displayValue % 10)
     };
 
-    for (int i = 0; i < 4; i++)
-    {
+    for (int i = 0; i < 4; i++) {
         uint8_t segment = (i == 2) ? SEG_ACTUAL_DIGIT3[digits[i]] : SEG_ACTUAL_NORMAL[digits[i]];
 
         if ((i == 1 || i == 2) && colonState) {
             segment |= 0x08;
         }
 
-        // G?i nhanh
         for (int8_t b = 7; b >= 0; b--) {
             if (segment & (1 << b))
-                GPIOC->BSRR = (1 << DATA_PIN);
+                dataPort->BSRR = dataPin;
             else
-                GPIOC->BRR  = (1 << DATA_PIN);
-
+                dataPort->BRR  = dataPin;
+            
+            __NOP(); __NOP(); 
             clockPulse();
         }
     }
-    GPIOC->BSRR = (1 << STROBE_PIN);
-    __NOP(); __NOP(); __NOP(); __NOP();
-    GPIOC->BRR  = (1 << STROBE_PIN);
+    
+    // Turn ON screen to show new data (OE LOW)
+    strobePort->BRR = strobePin; 
+    
+    // Set Data LOW just in case
+    dataPort->BRR = dataPin;
 
-    if (relay.isOn()) {
-        GPIOC->BSRR = (1 << CLOCK_PIN);
+    if (relay && relay->isOn()) {
+        clockPort->BSRR = clockPin;
     } else {
-        GPIOC->BRR  = (1 << CLOCK_PIN);
+        clockPort->BRR  = clockPin;
     }
 
     __enable_irq();
+}
+
+void Led7Segment::blank() {
+    __disable_irq();
+    strobePort->BSRR = strobePin; // Turn OFF screen
+    for(int i = 0; i < 4; i++) {
+      sendByte(0x00);
+    }
+    
+    strobePort->BRR = strobePin; // Turn ON screen
+    
+    dataPort->BRR = dataPin;
+    if (relay && relay->isOn()) {
+        clockPort->BSRR = clockPin;
+    } else {
+        clockPort->BRR  = clockPin;
+    }
+    __enable_irq();
+}
+
+void Led7Segment::restore() {
+    update();
+}
+
+void Led7Segment::turnOff() {
+    strobePort->BSRR = strobePin;
+}
+
+void Led7Segment::turnOn() {
+    strobePort->BRR = strobePin;
 }

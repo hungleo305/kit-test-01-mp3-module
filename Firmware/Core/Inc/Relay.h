@@ -5,9 +5,12 @@
 
 class Relay {
 private:
+    GPIO_TypeDef* port;
+    uint16_t pin;
     bool state;          
 
 public:
+    Relay(GPIO_TypeDef* port, uint16_t pin);
     void init();
     void on();
     void off();

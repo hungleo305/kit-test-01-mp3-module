@@ -1,10 +1,24 @@
 #include "Buzzer.h"
 #include "SystemTimer.h"
 
+Buzzer::Buzzer(GPIO_TypeDef* port, uint16_t pin) : port(port), pin(pin) {}
+
 void Buzzer::init() {
-    RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
-    GPIOC->CRH &= ~(0xF << 28);
-    GPIOC->CRH |= (0x3 << 28); 
+    if (port == GPIOA) RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
+    else if (port == GPIOB) RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
+    else if (port == GPIOC) RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
+    else if (port == GPIOD) RCC->APB2ENR |= RCC_APB2ENR_IOPDEN;
+
+    uint32_t pinIndex = 0;
+    while (!(pin & (1 << pinIndex))) pinIndex++;
+
+    if (pinIndex < 8) {
+        port->CRL &= ~(0xF << (pinIndex * 4));
+        port->CRL |= (0x3 << (pinIndex * 4));
+    } else {
+        port->CRH &= ~(0xF << ((pinIndex - 8) * 4));
+        port->CRH |= (0x3 << ((pinIndex - 8) * 4));
+    }
     
     remainingBeeps = 0;
     isPulsing = false;
@@ -12,11 +26,11 @@ void Buzzer::init() {
 }
 
 void Buzzer::on() {
-    GPIOC->BSRR = (1 << 15);
+    port->BSRR = pin;
 }
 
 void Buzzer::off() {
-    GPIOC->BRR = (1 << 15);
+    port->BRR = pin;
 }
 
 void Buzzer::beep(int times, int timeOn, int timeOff) {

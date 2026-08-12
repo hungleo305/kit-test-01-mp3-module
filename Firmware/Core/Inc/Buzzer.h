@@ -5,6 +5,8 @@
 
 class Buzzer {
 private:
+    GPIO_TypeDef* port;
+    uint16_t pin;
     uint32_t lastTick;
     uint32_t tOn;
     uint32_t tOff;
@@ -12,6 +14,7 @@ private:
     bool isPulsing;
 
 public:
+    Buzzer(GPIO_TypeDef* port, uint16_t pin);
     void init();
     void on();
     void off();

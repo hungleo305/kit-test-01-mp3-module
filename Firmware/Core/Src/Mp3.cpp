@@ -1,32 +1,46 @@
 #include "Mp3.h"
 #include "Buzzer.h"
-
-extern SPI_HandleTypeDef hspi2; 
-
-#define VS_XRESET_HIGH() HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET)
-#define VS_XRESET_LOW()  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET)
-
-#define VS_XCS_HIGH()    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_SET)   // XCS  PC3
-#define VS_XCS_LOW()     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET) 
-
-#define VS_XDCS_HIGH()   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET)  //XDCS  PB12
-#define VS_XDCS_LOW()    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET)
-
-#define VS_DREQ_READ()   HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1)
+#include <string.h>
+#include "ff_gen_drv.h"
 
 #define SCI_MODE        0x00
+#define SCI_STATUS      0x01
+#define SCI_BASS        0x02
+#define SCI_CLOCKF      0x03
+#define SCI_DECODE_TIME 0x04
+#define SCI_AUDATA      0x05
+#define SCI_WRAM        0x06
+#define SCI_WRAMADDR    0x07
+#define SCI_HDAT0       0x08
+#define SCI_HDAT1       0x09
+#define SCI_AIADDR      0x0A
 #define SCI_VOL         0x0B
-#define SCI_CLOCKF 0x03
-Mp3 mp3;
+#define SCI_AICTRL0     0x0C
+#define SCI_AICTRL1     0x0D
+#define SCI_AICTRL2     0x0E
+#define SCI_AICTRL3     0x0F
+
+
+Mp3::Mp3(SPI_HandleTypeDef* hspi,
+        GPIO_TypeDef* xresetPort, uint16_t xresetPin,
+        GPIO_TypeDef* dreqPort, uint16_t dreqPin,
+        GPIO_TypeDef* xdcsPort, uint16_t xdcsPin,
+        GPIO_TypeDef* xcsPort, uint16_t xcsPin,
+        Buzzer* buzzer) : 
+        hspi(hspi),
+        xresetPort(xresetPort), xresetPin(xresetPin),
+        dreqPort(dreqPort), dreqPin(dreqPin),
+        xdcsPort(xdcsPort), xdcsPin(xdcsPin),
+        xcsPort(xcsPort), xcsPin(xcsPin),
+        buzzer(buzzer) {}
 
 static FIL mp3File;
 
 bool Mp3::waitReady() {
     uint32_t timeout = HAL_GetTick();
-    while (VS_DREQ_READ() == 0) {
+    while ((dreqPort->IDR & dreqPin) == 0) {
         if (HAL_GetTick() - timeout > 500) {
-            extern Buzzer buzzer; 
-            buzzer.beep(10, 50, 50); 
+            if (buzzer) buzzer->beep(10, 50, 50); 
             return false; 
         }
     }
@@ -35,7 +49,7 @@ bool Mp3::waitReady() {
 
 void Mp3::writeRegister(uint8_t address, uint16_t data) {
     if (!waitReady()) return; 
-    VS_XCS_LOW();                
+    xcsPort->BRR = xcsPin;                
     
     uint8_t cmd[4];
     cmd[0] = 0x02; 
@@ -43,14 +57,14 @@ void Mp3::writeRegister(uint8_t address, uint16_t data) {
     cmd[2] = (data >> 8) & 0xFF; 
     cmd[3] = data & 0xFF;        
     
-    HAL_SPI_Transmit(&hspi2, cmd, 4, 100);
-    VS_XCS_HIGH();               
+    HAL_SPI_Transmit(hspi, cmd, 4, 100);
+    xcsPort->BSRR = xcsPin;               
 }
 
 void Mp3::reset() {
-    VS_XRESET_LOW();
+    xresetPort->BRR = xresetPin;
     HAL_Delay(20);
-    VS_XRESET_HIGH();
+    xresetPort->BSRR = xresetPin;
     HAL_Delay(20);
     
     writeRegister(SCI_MODE, 0x0804);
@@ -65,13 +79,44 @@ void Mp3::reset() {
 }
 
 void Mp3::init() {
-    VS_XCS_HIGH();
-    VS_XDCS_HIGH();
-    VS_XRESET_HIGH();
+    GPIO_TypeDef* ports[] = {xresetPort, xdcsPort, xcsPort};
+    uint16_t pins[] = {xresetPin, xdcsPin, xcsPin};
+    
+    for (int i = 0; i < 3; i++) {
+        if (ports[i] == GPIOA) RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
+        if (ports[i] == GPIOB) RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
+        if (ports[i] == GPIOC) RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
+        if (ports[i] == GPIOD) RCC->APB2ENR |= RCC_APB2ENR_IOPDEN;
+
+        uint32_t pinIndex = 0;
+        while (!(pins[i] & (1 << pinIndex))) pinIndex++;
+
+        if (pinIndex < 8) {
+            ports[i]->CRL &= ~(0xF << (pinIndex * 4));
+            ports[i]->CRL |= (0x3 << (pinIndex * 4)); 
+        } else {
+            ports[i]->CRH &= ~(0xF << ((pinIndex - 8) * 4));
+            ports[i]->CRH |= (0x3 << ((pinIndex - 8) * 4));
+        }
+    }
+    
+    uint32_t pinIndex = 0;
+    while (!(dreqPin & (1 << pinIndex))) pinIndex++;
+    if (pinIndex < 8) {
+        dreqPort->CRL &= ~(0xF << (pinIndex * 4));
+        dreqPort->CRL |= (0x4 << (pinIndex * 4)); // input floating
+    } else {
+        dreqPort->CRH &= ~(0xF << ((pinIndex - 8) * 4));
+        dreqPort->CRH |= (0x4 << ((pinIndex - 8) * 4));
+    }
+
+    xcsPort->BSRR = xcsPin;
+    xdcsPort->BSRR = xdcsPin;
+    xresetPort->BSRR = xresetPin;
     
     HAL_Delay(50);
     uint8_t dummy = 0xFF;
-    HAL_SPI_Transmit(&hspi2, &dummy, 1, 100);
+    HAL_SPI_Transmit(hspi, &dummy, 1, 100);
     
     reset();
     isPlaying = false;
@@ -84,9 +129,9 @@ void Mp3::setVolume(uint8_t left, uint8_t right) {
 
 void Mp3::sendDataBlock(uint8_t* data, uint16_t length) {
     if (!waitReady()) return; 
-    VS_XDCS_LOW();               
-    HAL_SPI_Transmit(&hspi2, data, length, 100); 
-    VS_XDCS_HIGH();
+    xdcsPort->BRR = xdcsPin;               
+    HAL_SPI_Transmit(hspi, data, length, 100); 
+    xdcsPort->BSRR = xdcsPin;
 }
 
 void Mp3::play(const char* filename) {
@@ -96,21 +141,50 @@ void Mp3::play(const char* filename) {
     }
     
     FRESULT fres = f_open(&mp3File, filename, FA_READ);
+    
+    if (fres != FR_OK) {
+        extern FATFS fs;
+        extern char USERPath[4];
+        extern Diskio_drvTypeDef USER_Driver;
+        
+        f_mount(NULL, USERPath, 0);
+        FATFS_UnLinkDriver(USERPath);
+        FATFS_LinkDriver(&USER_Driver, USERPath);
+        
+        f_mount(&fs, USERPath, 1); 
+        
+        HAL_Delay(100);
+        
+        fres = f_open(&mp3File, filename, FA_READ); 
+    }
+
     if (fres == FR_OK) {
         bufferIndex = 0; 
         dataInBuf = 0;
         isPlaying = true; 
     } else {
-        extern Buzzer buzzer;
-        buzzer.beep(3, 100, 100); 
+        if (buzzer) buzzer->beep(5, 100, 100); 
     }
+}
+
+uint16_t Mp3::readRegister(uint8_t address) {
+    if (!waitReady()) return 0;
+    xcsPort->BRR = xcsPin;
+    
+    uint8_t tx[4] = {0x03, address, 0xFF, 0xFF};
+    uint8_t rx[4] = {0, 0, 0, 0};
+    HAL_SPI_TransmitReceive(hspi, tx, rx, 4, 100);
+    
+    xcsPort->BSRR = xcsPin;
+    
+    return (rx[2] << 8) | rx[3];
 }
 
 void Mp3::process() {
     if (!isPlaying) return;
 
     int chunksSent = 0;
-    while (VS_DREQ_READ() == 1 && chunksSent < 16) {
+    while (((dreqPort->IDR & dreqPin) ? 1 : 0) == 1 && chunksSent < 16) {
         
         if (bufferIndex >= dataInBuf) {
             UINT bytesRead;
@@ -122,13 +196,36 @@ void Mp3::process() {
                 f_close(&mp3File);
                 isPlaying = false;
                 
-                uint8_t endFill[32] = {0};
+                uint8_t endFillByte = 0x00; // Always 0x00 for MP3
+                
+                uint8_t endFill[32];
+                for(int i = 0; i < 32; i++) endFill[i] = endFillByte;
+                
+                for (int i = 0; i < 65; i++) {
+                    waitReady();
+                    xdcsPort->BRR = xdcsPin;               
+                    HAL_SPI_Transmit(hspi, endFill, 32, 100); 
+                    xdcsPort->BSRR = xdcsPin;
+                }
+                
+                uint16_t mode = readRegister(SCI_MODE);
+                mode |= 0x0008; // SM_CANCEL
+                writeRegister(SCI_MODE, mode);
+                
                 for (int i = 0; i < 64; i++) {
                     waitReady();
-                    VS_XDCS_LOW();               
-                    HAL_SPI_Transmit(&hspi2, endFill, 32, 100); 
-                    VS_XDCS_HIGH();
+                    xdcsPort->BRR = xdcsPin;               
+                    HAL_SPI_Transmit(hspi, endFill, 32, 100); 
+                    xdcsPort->BSRR = xdcsPin;
+                    
+                    mode = readRegister(SCI_MODE);
+                    if (!(mode & 0x0008)) {
+                        break; 
+                    }
                 }
+                
+                HAL_Delay(50);
+                
                 return;
             }
         }
@@ -136,9 +233,9 @@ void Mp3::process() {
         uint16_t chunk = dataInBuf - bufferIndex;
         if (chunk > 32) chunk = 32;
 
-        VS_XDCS_LOW();               
-        HAL_SPI_Transmit(&hspi2, &audioBuffer[bufferIndex], chunk, 100); 
-        VS_XDCS_HIGH();
+        xdcsPort->BRR = xdcsPin;               
+        HAL_SPI_Transmit(hspi, &audioBuffer[bufferIndex], chunk, 100); 
+        xdcsPort->BSRR = xdcsPin;
         
         bufferIndex += chunk;
         chunksSent++;
@@ -152,17 +249,17 @@ void Mp3::testAudio() {
     uint8_t sineCmd[] = {0x53, 0xEF, 0x6E, 0x44, 0x00, 0x00, 0x00, 0x00};
     
     waitReady();
-    VS_XDCS_LOW();               
-    HAL_SPI_Transmit(&hspi2, sineCmd, 8, 100); 
-    VS_XDCS_HIGH();
+    xdcsPort->BRR = xdcsPin;               
+    HAL_SPI_Transmit(hspi, sineCmd, 8, 100); 
+    xdcsPort->BSRR = xdcsPin;
 
     HAL_Delay(2000); 
 
     uint8_t exitCmd[] = {0x45, 0x78, 0x69, 0x74, 0x00, 0x00, 0x00, 0x00};
     waitReady();
-    VS_XDCS_LOW();
-    HAL_SPI_Transmit(&hspi2, exitCmd, 8, 100);
-    VS_XDCS_HIGH();
+    xdcsPort->BRR = xdcsPin;
+    HAL_SPI_Transmit(hspi, exitCmd, 8, 100);
+    xdcsPort->BSRR = xdcsPin;
     
     writeRegister(SCI_MODE, 0x0804); 
 }

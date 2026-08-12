@@ -3,9 +3,17 @@
 
 #include "stm32f1xx_hal.h"
 #include "fatfs.h"
+#include "Buzzer.h"
 
 class Mp3 {
 public:
+    Mp3(SPI_HandleTypeDef* hspi,
+        GPIO_TypeDef* xresetPort, uint16_t xresetPin,
+        GPIO_TypeDef* dreqPort, uint16_t dreqPin,
+        GPIO_TypeDef* xdcsPort, uint16_t xdcsPin,
+        GPIO_TypeDef* xcsPort, uint16_t xcsPin,
+        Buzzer* buzzer);
+
     void init();
     void play(const char* filename);
     void setVolume(uint8_t left, uint8_t right);
@@ -14,6 +22,13 @@ public:
     bool isPlaying; 
 
 private:
+    SPI_HandleTypeDef* hspi;
+    GPIO_TypeDef* xresetPort; uint16_t xresetPin;
+    GPIO_TypeDef* dreqPort;   uint16_t dreqPin;
+    GPIO_TypeDef* xdcsPort;   uint16_t xdcsPin;
+    GPIO_TypeDef* xcsPort;    uint16_t xcsPin;
+    Buzzer* buzzer;
+
     bool waitReady();
     void writeRegister(uint8_t address, uint16_t data);
     uint16_t readRegister(uint8_t address);
@@ -24,6 +39,5 @@ private:
     uint16_t bufferIndex;
     uint16_t dataInBuf;
 };
-extern Mp3 mp3;
 
 #endif

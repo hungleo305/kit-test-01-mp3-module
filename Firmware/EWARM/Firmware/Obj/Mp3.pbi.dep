@@ -42,4 +42,7 @@ Mp3.pbi: F:\tts\ vnatech\kit-test-01-mp3-module\Firmware\Core\Src\Mp3.cpp \
   F:\tts\ vnatech\kit-test-01-mp3-module\Firmware\EWARM/../Middlewares/Third_Party/FatFs/src/diskio.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\Firmware\EWARM/../Middlewares/Third_Party/FatFs/src/ff.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\Firmware\EWARM/../FATFS/Target\user_diskio.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\Firmware\EWARM/../Core/Inc\Buzzer.h
+  F:\tts\ vnatech\kit-test-01-mp3-module\Firmware\EWARM/../Core/Inc/Buzzer.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\Firmware\EWARM/../Core/Inc\Buzzer.h \
+  C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\string.h \
+  C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\DLib_Product_string.h
