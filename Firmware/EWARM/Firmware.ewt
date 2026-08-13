@@ -1249,6 +1249,12 @@
                     <name>$PROJ_DIR$\..\Core\Inc\Rtc.h</name>
                 </file>
                 <file>
+                    <name>$PROJ_DIR$\..\Core\Src\SdCard.cpp</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\Core\Inc\SdCard.h</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\..\Core\Src\Sensor.cpp</name>
                 </file>
                 <file>

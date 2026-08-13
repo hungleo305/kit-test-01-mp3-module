@@ -1,5 +1,4 @@
 #include "Mp3.h"
-#include "Buzzer.h"
 #include <string.h>
 #include "ff_gen_drv.h"
 
@@ -25,14 +24,12 @@ Mp3::Mp3(SPI_HandleTypeDef* hspi,
         GPIO_TypeDef* xresetPort, uint16_t xresetPin,
         GPIO_TypeDef* dreqPort, uint16_t dreqPin,
         GPIO_TypeDef* xdcsPort, uint16_t xdcsPin,
-        GPIO_TypeDef* xcsPort, uint16_t xcsPin,
-        Buzzer* buzzer) : 
+        GPIO_TypeDef* xcsPort, uint16_t xcsPin) : 
         hspi(hspi),
         xresetPort(xresetPort), xresetPin(xresetPin),
         dreqPort(dreqPort), dreqPin(dreqPin),
         xdcsPort(xdcsPort), xdcsPin(xdcsPin),
-        xcsPort(xcsPort), xcsPin(xcsPin),
-        buzzer(buzzer) {}
+        xcsPort(xcsPort), xcsPin(xcsPin) {}
 
 static FIL mp3File;
 
@@ -40,7 +37,6 @@ bool Mp3::waitReady() {
     uint32_t timeout = HAL_GetTick();
     while ((dreqPort->IDR & dreqPin) == 0) {
         if (HAL_GetTick() - timeout > 500) {
-            if (buzzer) buzzer->beep(10, 50, 50); 
             return false; 
         }
     }
@@ -65,6 +61,15 @@ void Mp3::reset() {
     xresetPort->BRR = xresetPin;
     HAL_Delay(20);
     xresetPort->BSRR = xresetPin;
+    HAL_Delay(20);
+    
+    // Khoi phuc SPI2 bi loi do nhieu dien khi rut/cam the nho
+    __HAL_SPI_DISABLE(hspi);
+    hspi->Instance->CR1 |= SPI_CR1_MSTR | SPI_CR1_SSI | SPI_CR1_SSM;
+    __HAL_SPI_ENABLE(hspi);
+    volatile uint32_t dummy = hspi->Instance->DR;
+    dummy = hspi->Instance->SR;
+    (void)dummy;
     HAL_Delay(20);
     
     writeRegister(SCI_MODE, 0x0804);
@@ -134,7 +139,7 @@ void Mp3::sendDataBlock(uint8_t* data, uint16_t length) {
     xdcsPort->BSRR = xdcsPin;
 }
 
-void Mp3::play(const char* filename) {
+bool Mp3::play(const char* filename) {
     if (isPlaying) {
         f_close(&mp3File);
         isPlaying = false;
@@ -142,28 +147,17 @@ void Mp3::play(const char* filename) {
     
     FRESULT fres = f_open(&mp3File, filename, FA_READ);
     
-    if (fres != FR_OK) {
-        extern FATFS fs;
-        extern char USERPath[4];
-        extern Diskio_drvTypeDef USER_Driver;
-        
-        f_mount(NULL, USERPath, 0);
-        FATFS_UnLinkDriver(USERPath);
-        FATFS_LinkDriver(&USER_Driver, USERPath);
-        
-        f_mount(&fs, USERPath, 1); 
-        
-        HAL_Delay(100);
-        
-        fres = f_open(&mp3File, filename, FA_READ); 
-    }
+    // main.cpp already handles SD card hotplugging and recovery.
+    // If f_open fails, we just return false immediately.
 
     if (fres == FR_OK) {
         bufferIndex = 0; 
         dataInBuf = 0;
         isPlaying = true; 
+        return true;
     } else {
-        if (buzzer) buzzer->beep(5, 100, 100); 
+        // failed to play
+        return false;
     }
 }
 
@@ -201,8 +195,7 @@ void Mp3::process() {
                 uint8_t endFill[32];
                 for(int i = 0; i < 32; i++) endFill[i] = endFillByte;
                 
-                for (int i = 0; i < 65; i++) {
-                    waitReady();
+                for (int i = 0; i < 65; i++) { if (!waitReady()) break;
                     xdcsPort->BRR = xdcsPin;               
                     HAL_SPI_Transmit(hspi, endFill, 32, 100); 
                     xdcsPort->BSRR = xdcsPin;
@@ -212,8 +205,7 @@ void Mp3::process() {
                 mode |= 0x0008; // SM_CANCEL
                 writeRegister(SCI_MODE, mode);
                 
-                for (int i = 0; i < 64; i++) {
-                    waitReady();
+                for (int i = 0; i < 64; i++) { if (!waitReady()) break;
                     xdcsPort->BRR = xdcsPin;               
                     HAL_SPI_Transmit(hspi, endFill, 32, 100); 
                     xdcsPort->BSRR = xdcsPin;
@@ -263,3 +255,5 @@ void Mp3::testAudio() {
     
     writeRegister(SCI_MODE, 0x0804); 
 }
+
+

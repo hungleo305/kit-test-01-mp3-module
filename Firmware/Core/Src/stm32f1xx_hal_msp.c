@@ -184,7 +184,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
 
     GPIO_InitStruct.Pin = GPIO_PIN_6;
     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Pull = GPIO_PULLUP;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     /* USER CODE BEGIN SPI1_MspInit 1 */
@@ -228,3 +228,4 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* hspi)
 /* USER CODE BEGIN 1 */
 
 /* USER CODE END 1 */
+

@@ -27,12 +27,15 @@
 #endif
 
 /* USER CODE BEGIN 0 */
-
+#include "stm32f1xx_hal.h"
+#include "diskio.h"
 /* Includes ------------------------------------------------------------------*/
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
 extern Diskio_drvTypeDef  USER_Driver;
+
+void USER_DISKIO_InitConfig(SPI_HandleTypeDef *hspi, GPIO_TypeDef* cs_port, uint16_t cs_pin);
 
 /* USER CODE END 0 */
 

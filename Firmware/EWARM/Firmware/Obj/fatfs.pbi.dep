@@ -41,4 +41,5 @@ fatfs.pbi: \
   F:\tts\ vnatech\kit-test-01-mp3-module\Firmware\EWARM/../Middlewares/Third_Party/FatFs/src\ff_gen_drv.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\Firmware\EWARM/../Middlewares/Third_Party/FatFs/src/diskio.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\Firmware\EWARM/../Middlewares/Third_Party/FatFs/src/ff.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\Firmware\EWARM/../FATFS/Target\user_diskio.h
+  F:\tts\ vnatech\kit-test-01-mp3-module\Firmware\EWARM/../FATFS/Target\user_diskio.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\Firmware\EWARM/../Middlewares/Third_Party/FatFs/src\diskio.h

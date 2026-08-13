@@ -29,6 +29,7 @@ build Mp3.pbi : index Mp3.xcl
 build Relay.pbi : index Relay.xcl
 build Rfid.pbi : index Rfid.xcl
 build Rtc.pbi : index Rtc.xcl
+build SdCard.pbi : index SdCard.xcl
 build Sensor.pbi : index Sensor.xcl
 build stm32f1xx_hal_msp.pbi : index stm32f1xx_hal_msp.xcl
 build stm32f1xx_it.pbi : index stm32f1xx_it.xcl
@@ -54,11 +55,11 @@ build ff.pbi : index ff.xcl
 build ff_gen_drv.pbi : index ff_gen_drv.xcl
 build syscall.pbi : index syscall.xcl
 build Firmware_part0.pbi : link Buzzer.pbi CanBus.pbi Led.pbi Led7Segment.pbi main.pbi Mp3.pbi
-build Firmware_part1.pbi : link Relay.pbi Rfid.pbi Rtc.pbi Sensor.pbi stm32f1xx_hal_msp.pbi stm32f1xx_it.pbi
-build Firmware_part2.pbi : link SystemTimer.pbi fatfs.pbi user_diskio.pbi system_stm32f1xx.pbi stm32f1xx_hal.pbi stm32f1xx_hal_can.pbi
-build Firmware_part3.pbi : link stm32f1xx_hal_cortex.pbi stm32f1xx_hal_dma.pbi stm32f1xx_hal_exti.pbi stm32f1xx_hal_flash.pbi stm32f1xx_hal_flash_ex.pbi stm32f1xx_hal_gpio.pbi
-build Firmware_part4.pbi : link stm32f1xx_hal_gpio_ex.pbi stm32f1xx_hal_pwr.pbi stm32f1xx_hal_rcc.pbi stm32f1xx_hal_rcc_ex.pbi stm32f1xx_hal_spi.pbi diskio.pbi
-build Firmware_part5.pbi : link ff.pbi ff_gen_drv.pbi syscall.pbi
+build Firmware_part1.pbi : link Relay.pbi Rfid.pbi Rtc.pbi SdCard.pbi Sensor.pbi stm32f1xx_hal_msp.pbi
+build Firmware_part2.pbi : link stm32f1xx_it.pbi SystemTimer.pbi fatfs.pbi user_diskio.pbi system_stm32f1xx.pbi stm32f1xx_hal.pbi
+build Firmware_part3.pbi : link stm32f1xx_hal_can.pbi stm32f1xx_hal_cortex.pbi stm32f1xx_hal_dma.pbi stm32f1xx_hal_exti.pbi stm32f1xx_hal_flash.pbi stm32f1xx_hal_flash_ex.pbi
+build Firmware_part4.pbi : link stm32f1xx_hal_gpio.pbi stm32f1xx_hal_gpio_ex.pbi stm32f1xx_hal_pwr.pbi stm32f1xx_hal_rcc.pbi stm32f1xx_hal_rcc_ex.pbi stm32f1xx_hal_spi.pbi
+build Firmware_part5.pbi : link diskio.pbi ff.pbi ff_gen_drv.pbi syscall.pbi
 build Firmware.pbd : link Firmware_part0.pbi Firmware_part1.pbi Firmware_part2.pbi Firmware_part3.pbi Firmware_part4.pbi Firmware_part5.pbi
 build Firmware.pbw : browsedata Firmware.pbd
 

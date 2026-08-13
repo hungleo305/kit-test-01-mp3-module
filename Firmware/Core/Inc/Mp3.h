@@ -3,7 +3,6 @@
 
 #include "stm32f1xx_hal.h"
 #include "fatfs.h"
-#include "Buzzer.h"
 
 class Mp3 {
 public:
@@ -11,11 +10,10 @@ public:
         GPIO_TypeDef* xresetPort, uint16_t xresetPin,
         GPIO_TypeDef* dreqPort, uint16_t dreqPin,
         GPIO_TypeDef* xdcsPort, uint16_t xdcsPin,
-        GPIO_TypeDef* xcsPort, uint16_t xcsPin,
-        Buzzer* buzzer);
+        GPIO_TypeDef* xcsPort, uint16_t xcsPin);
 
     void init();
-    void play(const char* filename);
+    bool play(const char* filename);
     void setVolume(uint8_t left, uint8_t right);
     void testAudio();
     void process(); 
@@ -27,7 +25,6 @@ private:
     GPIO_TypeDef* dreqPort;   uint16_t dreqPin;
     GPIO_TypeDef* xdcsPort;   uint16_t xdcsPin;
     GPIO_TypeDef* xcsPort;    uint16_t xcsPin;
-    Buzzer* buzzer;
 
     bool waitReady();
     void writeRegister(uint8_t address, uint16_t data);

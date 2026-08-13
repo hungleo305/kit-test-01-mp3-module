@@ -4,13 +4,33 @@ Rfid::Rfid(SPI_TypeDef* spi, GPIO_TypeDef* csPort, uint16_t csPin, GPIO_TypeDef*
     : spi(spi), csPort(csPort), csPin(csPin), rstPort(rstPort), rstPin(rstPin) {}
 
 void Rfid::csLow() {
-    while (spi->SR & SPI_SR_BSY);
-    if (spi == SPI1) AFIO->MAPR |= AFIO_MAPR_SPI1_REMAP;
+    uint32_t timeout = 10000;
+    while ((spi->SR & SPI_SR_BSY) && --timeout);
+    
+    spi->CR1 &= ~SPI_CR1_SPE;
+    
+    spi->CR1 = SPI_CR1_MSTR | SPI_CR1_SSI | SPI_CR1_SSM | SPI_CR1_BR_1 | SPI_CR1_BR_0; 
+
+    spi->CR1 |= SPI_CR1_SPE;
+
+    if (spi == SPI1) {
+        uint32_t tmpreg = AFIO->MAPR;
+        tmpreg &= ~AFIO_MAPR_SWJ_CFG_Msk; 
+        tmpreg |= (0x2 << 24);            
+        tmpreg |= AFIO_MAPR_SPI1_REMAP;   // Remap sang PB3, PB4, PB5
+        AFIO->MAPR = tmpreg;
+    }
+    
+    volatile uint32_t dummy = spi->DR;
+    dummy = spi->SR;
+    (void)dummy;
+
     csPort->BRR = csPin;
 }
 
 void Rfid::csHigh() {
-    while (spi->SR & SPI_SR_BSY);
+    uint32_t timeout = 10000;
+    while ((spi->SR & SPI_SR_BSY) && --timeout);
     csPort->BSRR = csPin;
 }
 
@@ -39,7 +59,7 @@ void Rfid::init() {
         AFIO->MAPR |= AFIO_MAPR_SPI1_REMAP; 
         
         GPIOB->CRL &= ~(0xF << 12 | 0xF << 20); GPIOB->CRL |=  (0xB << 12 | 0xB << 20); 
-        GPIOB->CRL &= ~(0xF << 16); GPIOB->CRL |=  (0x4 << 16); 
+        GPIOB->CRL &= ~(0xF << 16); GPIOB->CRL |=  (0x8 << 16); GPIOB->ODR |= (1 << 4); 
         
         GPIOB->CRH &= ~(0xF << 4);  GPIOB->CRH |=  (0x8 << 4); GPIOB->ODR |= (1 << 9); 
     }
@@ -204,8 +224,6 @@ void Rfid::clearBitMask(uint8_t reg, uint8_t mask) {
     writeRegister(reg, tmp & (~mask));
 }
 
-//bao mat
-
 void Rfid::calculateCRC(uint8_t *data, uint8_t length, uint8_t *result) {
     writeRegister(MFRC522_REG_COMMAND, PCD_IDLE);
     clearBitMask(MFRC522_REG_DIV_IRQ, 0x04);
@@ -296,6 +314,7 @@ void Rfid::PICC_HaltA() {
 void Rfid::PCD_StopCrypto1() {
     clearBitMask(MFRC522_REG_STATUS2, 0x08);
 }
+
 uint8_t Rfid::selectTag(uint8_t* serial) {
     uint8_t status;
     uint8_t size;
@@ -321,3 +340,4 @@ uint8_t Rfid::selectTag(uint8_t* serial) {
         return 0; 
     }
 }
+

@@ -34,6 +34,13 @@
 #include "Mp3.h"
 #include "ff.h"
 #include "CanBus.h"
+#include "user_diskio.h"
+#include "SdCard.h"
+
+extern char USERPath[4];
+extern Diskio_drvTypeDef USER_Driver;
+extern uint8_t FATFS_UnLinkDriver(char *path);
+extern uint8_t FATFS_LinkDriver(Diskio_drvTypeDef *drv, char *path);
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -64,31 +71,40 @@ Relay relay(GPIOC, 1<<7);
 Led7Segment dp(GPIOC, 1<<5, GPIOC, 1<<7, GPIOC, 1<<6, &relay);
 Rtc rtc(I2C1, GPIOB, 1<<6, GPIOB, 1<<7);
 Rfid rfid(SPI1, GPIOA, 1<<15, GPIOC, 1<<14);
-Mp3 mp3(&hspi2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3, &buzzer);
+Mp3 mp3(&hspi2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3);
+SdCard sdCard(&hspi1, GPIOC, GPIO_PIN_8);
 
 extern CAN_HandleTypeDef hcan;
 CanBus myCan(&hcan);
 
-uint16_t targetCount = 10;
-bool isTargetReached = false;
-uint32_t lastCanSendTick = 0;
-uint8_t currentCardUID[5];
+uint16_t mucTieu = 10;
+bool datMucTieu = false;
+uint32_t lastCanSend = 0;
+uint8_t uidTheHienTai[5];
+uint8_t uidTheDaXuLy[5] = {0}; 
+bool coTheRfid = false;
 
 //can+rfid
-uint8_t cardUpdate = 0; //0 binh thuong, 1: cho doi tinh nang, 2: cho xoa the, 3: cho doi key
-uint8_t newCardUpdate=0; //1: reset, 2: bat relay, 3:dao relay
-uint8_t newCardKey[6] = {0};//luu mat khau moi 
-uint8_t tempKey[6]={0}; //mat khau cu cua the la
-bool isTempKeyReady = false;
+uint8_t trangThaiQuetThe = 0; //0 binh thuong, 1: cho doi tinh nang, 2: cho xoa the, 3: cho doi key
+uint8_t updateDuLieuThe=0; //1: reset, 2: bat relay, 3:dao relay
+uint8_t matKhauTheMoi[6] = {0};//luu mat khau moi 
+uint8_t matKhauTam[6]={0}; //mat khau cu cua the la
+bool coMatKhauTam = false;
 
-uint32_t lastRelayToggleTime = 0;
-bool pendingDisplayRefresh = false;
+uint32_t lastRelayDao = 0;
+bool choCapNhatManHinh = false;
 
 FATFS fs;       
 FIL fil;        
 FRESULT fres;   
 UINT bytesWrote;
 
+//xu ly hot-plug the nho
+DIR rootDir;
+bool daNhanTheSD = false;
+uint32_t lastSdCheck = 0;
+uint8_t soLanLoiLienTiep = 0;
+uint8_t soLanLoiTheLienTiep = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -149,15 +165,16 @@ int main(void)
   relay.init();
   mp3.init();
   myCan.init();
+  sdCard.init();
   buzzer.beep(2, 50, 100);
   fres = f_mount(&fs, "", 1);
   if (fres != FR_OK) {
-      buzzer.beep(5, 100, 100);
+      buzzer.beep(3, 100, 100);
   }
 
   if (rtc.isTimeLost()) {
   
-      buzzer.beep(10, 50, 50); 
+      buzzer.beep(3, 100, 100); 
       
       //rtc.setTime(11, 7, 20); 
   }
@@ -185,17 +202,46 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    //chong nhay led
     uint32_t currentTick = SystemTimer::getTick();
     
-    if (pendingDisplayRefresh) {
-        if (currentTick - lastRelayToggleTime >= 20) {
+    if (choCapNhatManHinh) {
+        if (currentTick - lastRelayDao >= 20) {
             dp.update();
-            pendingDisplayRefresh = false;
+            choCapNhatManHinh = false;
         }
     }
-    
-    buzzer.update();
-    mp3.process();
+    //kiem tra the nho
+    if (currentTick - lastSdCheck >= 2000) { 
+        lastSdCheck = currentTick;
+        
+        static uint8_t boNhoTamDocThe[512]; 
+        uint8_t ketQuaDocThe = sdCard.read(boNhoTamDocThe, 0, 1); 
+        
+        if (ketQuaDocThe != 0) {
+            // mat ket noi
+            if (daNhanTheSD) {
+                daNhanTheSD = false;
+                mp3.init();
+                f_mount(NULL, "", 0); 
+            }
+            sdCard.init();
+            
+            // Ép FatFs quên trạng thái phần cứng cũ
+            FATFS_UnLinkDriver(USERPath);
+            FATFS_LinkDriver(&USER_Driver, USERPath);
+            
+            if (f_mount(&fs, USERPath, 1) == FR_OK) {
+                daNhanTheSD = true;
+                buzzer.beep(2, 50, 100); 
+            }
+        } else {
+            daNhanTheSD = true; 
+        }
+    }
+    if (daNhanTheSD) {
+        mp3.process();
+    }
 
     //1:kiem tra cam bien
     if (Sensor::isDetected)
@@ -204,9 +250,9 @@ int main(void)
       Sensor ::isDetected =false;
     }
       Sensor ::isDetected =false;
-      if(Sensor::productCount >= targetCount && !isTargetReached){
-        isTargetReached = true;
-        mp3.play("DAT.MP3");
+      if(Sensor::productCount >= mucTieu && !datMucTieu){
+        datMucTieu = true;
+        if (!mp3.play("DAT.MP3")) { uint32_t wt = SystemTimer::getTick(); while(SystemTimer::getTick() - wt < 500) buzzer.update(); buzzer.beep(5, 100, 100); }
       }
     //2:doi mode led
     if (currentTick - lastDisplayToggle >= 5000)
@@ -245,129 +291,144 @@ int main(void)
           lastDisplayValue = Sensor::productCount;
       }
     }
-    //4: doc du lieu the
-    if (currentTick - lastCardRead >= 1000) {
-        uint8_t currentKeyA[6] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
-
+    // 4: doc du lieu the
+    if (currentTick - lastCardRead >= 100) {
+        lastCardRead = currentTick; 
+        
         if (rfid.checkCard()) {
-            if (rfid.readCardSerial((uint8_t*)currentCardUID)) {
-                uint8_t readStatus = 0xFF; 
-                uint8_t readData[18] = {0};
+            if (rfid.readCardSerial((uint8_t*)uidTheHienTai)) {
                 
-                if (rfid.selectTag((uint8_t*)currentCardUID) > 0) {                    
-                    uint8_t blockAddr = 4;
-                    uint8_t trailerBlock = 7;
+                if (!coTheRfid || memcmp(uidTheHienTai, uidTheDaXuLy, 5) != 0) {
                     
-                    uint8_t status;
+                    // update the hien tai vao bo nho
+                    memcpy(uidTheDaXuLy, uidTheHienTai, 5);
+                    coTheRfid = true;
+                    buzzer.beep(1, 100, 0);
                     
-                    //chon key
-                    if (isTempKeyReady) {
-                        status = rfid.PCD_Authenticate(0x60, blockAddr, tempKey, (uint8_t*)currentCardUID);
-                    } else {
-                        status = rfid.PCD_Authenticate(0x60, blockAddr, currentKeyA, (uint8_t*)currentCardUID);
-                    }
-                    //update the
-                    if (status == STATUS_OK) {
-                        if (cardUpdate > 0) {
-                            if (cardUpdate == 1 || cardUpdate == 2) {
-                                //xoa the hoac ghi tinh nang
-                                uint8_t writeData[16] = {0};
-                                if (cardUpdate == 1) {
-                                    if (newCardUpdate == 1) strncpy((char*)writeData, "RESET_DEM", 9);
-                                    else if (newCardUpdate == 2) strncpy((char*)writeData, "BAT_RELAY", 9);
-                                    else if (newCardUpdate == 3) strncpy((char*)writeData, "DAO_RELAY", 9);
-                                }
-                                status = rfid.MIFARE_Write(blockAddr, writeData, 16);
-                                if (status == STATUS_OK) buzzer.beep(1, 500, 0); // Bp di thnh cng
-                                else buzzer.beep(4, 50, 50); // Loi ghi
-                            }
-                            else if (cardUpdate == 3) {
-                                uint8_t trailerData[16] = {
-                                    newCardKey[0], newCardKey[1], newCardKey[2], newCardKey[3], newCardKey[4], newCardKey[5], 
-                                    0xFF, 0x07, 0x80, 0x69,
-                                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF  // Key B
-                                };
-                                status = rfid.MIFARE_Write(trailerBlock, trailerData, 16);
-                                if (status == STATUS_OK) buzzer.beep(1, 500, 0);
-                                else buzzer.beep(4, 50, 50);
-                            }
-                            //don dep co
-                            cardUpdate = 0; 
-                            isTempKeyReady = false;
-                            readStatus = 0x00;
-                        } 
-                        else {
-                            uint8_t size = sizeof(readData);
-                            status = rfid.MIFARE_Read(blockAddr, readData, &size);
-                            
-                            if (status == STATUS_OK) {
-                                if (strncmp((char*)readData, "RESET_DEM", 9) == 0) {
-                                    buzzer.beep(1,50,0);
-                                    mp3.play("RESET.MP3");
-                                    Sensor::productCount = 0;
-                                    lastDisplayValue = 0xFFFF;
-                                    readStatus = 0x00;
-                                    isTargetReached = false;
-                                }
-                                else if (strncmp((char*)readData, "BAT_RELAY", 9) == 0) {
-                                    buzzer.beep(1,50,0);
-                                    mp3.play("BAT.MP3");
-                                    dp.turnOff();
-                                    relay.on();
-                                    lastRelayToggleTime = currentTick;
-                                    pendingDisplayRefresh = true;
-                                    readStatus = 0x00;
-                                }
-                                else if (strncmp((char*)readData, "DAO_RELAY", 9) == 0) {
-                                    buzzer.beep(1,50,0);
-                                    mp3.play("DAO.MP3");
-                                    dp.turnOff();
-                                    relay.toggle();
-                                    lastRelayToggleTime = currentTick;
-                                    pendingDisplayRefresh = true;
-                                    readStatus = 0x00;
-                                }
-                                else {
-                                    buzzer.beep(3, 100, 100);
-                                    readStatus = 0x01; //sai du lieu
-                                }
-                            } else {
-                                buzzer.beep(4, 50, 50);
-                                readStatus = 0x02; //ko doc duoc block
-                            }
+                    uint8_t currentKeyA[6] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
+                    uint8_t readStatus = 0xFF; 
+                    uint8_t readData[18] = {0};
+
+                    if (rfid.selectTag((uint8_t*)uidTheHienTai) > 0) {                    
+                        uint8_t blockAddr = 4;
+                        uint8_t trailerBlock = 7;
+                        uint8_t status;
+                        
+                        // chon key
+                        if (coMatKhauTam) {
+                            status = rfid.PCD_Authenticate(0x60, blockAddr, matKhauTam, (uint8_t*)uidTheHienTai);
+                        } else {
+                            status = rfid.PCD_Authenticate(0x60, blockAddr, currentKeyA, (uint8_t*)uidTheHienTai);
                         }
-                    } else {
-                        buzzer.beep(5, 50, 50);
-                        readStatus = 0x03; //sai mat khau
-                        cardUpdate = 0; 
-                        isTempKeyReady = false;
+                        
+                        // update the
+                        if (status == STATUS_OK) {
+                            if (trangThaiQuetThe > 0) {
+                                if (trangThaiQuetThe == 1 || trangThaiQuetThe == 2) {
+                                    // xoa the hoac ghi tinh nang
+                                    uint8_t writeData[16] = {0};
+                                    if (trangThaiQuetThe == 1) {
+                                        if (updateDuLieuThe == 1) strncpy((char*)writeData, "RESET_DEM", 9);
+                                        else if (updateDuLieuThe == 2) strncpy((char*)writeData, "BAT_RELAY", 9);
+                                        else if (updateDuLieuThe == 3) strncpy((char*)writeData, "DAO_RELAY", 9);
+                                    }
+                                    status = rfid.MIFARE_Write(blockAddr, writeData, 16);
+                                    if (status == STATUS_OK) buzzer.beep(1, 500, 0); 
+                                    else buzzer.beep(2, 100, 100); 
+                                }
+                                else if (trangThaiQuetThe == 3) {
+                                    uint8_t trailerData[16] = {
+                                        matKhauTheMoi[0], matKhauTheMoi[1], matKhauTheMoi[2], matKhauTheMoi[3], matKhauTheMoi[4], matKhauTheMoi[5], 
+                                        0xFF, 0x07, 0x80, 0x69,
+                                        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF  // Key B
+                                    };
+                                    status = rfid.MIFARE_Write(trailerBlock, trailerData, 16);
+                                    if (status == STATUS_OK) buzzer.beep(1, 500, 0);
+                                    else buzzer.beep(2, 100, 100);
+                                }
+                                // don dep co
+                                trangThaiQuetThe = 0; 
+                                coMatKhauTam = false;
+                                readStatus = 0x00;
+                            } 
+                            else {
+                                uint8_t size = sizeof(readData);
+                                status = rfid.MIFARE_Read(blockAddr, readData, &size);
+                                
+                                if (status == STATUS_OK) {
+                                    if (strncmp((char*)readData, "RESET_DEM", 9) == 0) {
+                                        if (!mp3.play("RESET.MP3")) { uint32_t wt = SystemTimer::getTick(); while(SystemTimer::getTick() - wt < 500) buzzer.update(); buzzer.beep(5, 100, 100); }
+                                        Sensor::productCount = 0;
+                                        lastDisplayValue = 0xFFFF;
+                                        readStatus = 0x00;
+                                        datMucTieu = false;
+                                    }
+                                    else if (strncmp((char*)readData, "BAT_RELAY", 9) == 0) {
+                                        if (!mp3.play("BAT.MP3")) { uint32_t wt = SystemTimer::getTick(); while(SystemTimer::getTick() - wt < 500) buzzer.update(); buzzer.beep(5, 100, 100); }
+                                        dp.turnOff();
+                                        relay.on();
+                                        lastRelayDao = currentTick;
+                                        choCapNhatManHinh = true;
+                                        readStatus = 0x00;
+                                    }
+                                    else if (strncmp((char*)readData, "DAO_RELAY", 9) == 0) {
+                                        if (!mp3.play("DAO.MP3")) { uint32_t wt = SystemTimer::getTick(); while(SystemTimer::getTick() - wt < 500) buzzer.update(); buzzer.beep(5, 100, 100); }
+                                        dp.turnOff();
+                                        relay.toggle();
+                                        lastRelayDao = currentTick;
+                                        choCapNhatManHinh = true;
+                                        readStatus = 0x00;
+                                    }
+                                    else {
+                                        buzzer.beep(2, 100, 100);
+                                        readStatus = 0x01; // sai du lieu
+                                    }
+                                } else {
+                                    buzzer.beep(2, 100, 100);
+                                    readStatus = 0x02; // ko doc duoc block
+                                }
+                            }
+                        } else {
+                            buzzer.beep(2, 100, 100);
+                            readStatus = 0x03; // sai mat khau
+                            trangThaiQuetThe = 0; 
+                            coMatKhauTam = false;
+                        }
                     }
-                }
-                //Frame 0x101:uid + trang thai doc
-                uint8_t frame101[6];
-                memcpy(frame101, currentCardUID, 5);
-                frame101[5] = readStatus; 
-                myCan.sendFrame(0x101, frame101, 6);
-                
-                if (readStatus == 0x00 || readStatus == 0x01) {
-                    myCan.sendFrame(0x104, &readData[0], 8);
-                    myCan.sendFrame(0x105, &readData[8], 8);
-                }
-                rfid.PICC_HaltA();
-                rfid.PCD_StopCrypto1();
-                
-                lastCardRead = currentTick; 
-            }
-        }
+                    
+                    // Frame 0x101: uid + trang thai doc
+                    uint8_t frame101[6];
+                    memcpy(frame101, uidTheHienTai, 5);
+                    frame101[5] = readStatus; 
+                    myCan.sendFrame(0x101, frame101, 6);
+                    
+                    if (readStatus == 0x00 || readStatus == 0x01) {
+                        myCan.sendFrame(0x104, &readData[0], 8);
+                        myCan.sendFrame(0x105, &readData[8], 8);
+                    }
+                    
+                    rfid.PICC_HaltA();
+                      rfid.PCD_StopCrypto1();
+                  } else {
+                      if (rfid.selectTag((uint8_t*)uidTheHienTai) > 0) {
+                          rfid.PICC_HaltA();
+                          rfid.PCD_StopCrypto1();
+                      }
+                  }
+              }
+          } else {
+              coTheRfid = false;
+          }
     }
+    
     //6:gui du lieu can rtc vs cam bien
     currentTick = SystemTimer::getTick();
     
-    if(currentTick - lastCanSendTick >= 500){
+    if(currentTick - lastCanSend >= 500){
     
       uint8_t frame102[4] = {0};
       uint16_t currentCount = Sensor::productCount; 
-      uint16_t currentTarget = targetCount;
+      uint16_t currentTarget = mucTieu;
       frame102[0] = (((currentCount / 1000) % 10) << 4) | ((currentCount / 100) % 10);
       frame102[1] = (((currentCount / 10) % 10) << 4) | (currentCount % 10);
       
@@ -385,7 +446,7 @@ int main(void)
       frame103[2] = ((s / 10) << 4) | (s % 10); 
       
       myCan.sendFrame(0x103, frame103, 3);
-      lastCanSendTick = currentTick;
+      lastCanSend = currentTick;
     }
   }
   /* USER CODE END 3 */
@@ -621,11 +682,11 @@ extern "C" {
                     uint16_t val = (BCD_to_Dec(rxData[0]) * 100) + BCD_to_Dec(rxData[1]);
 
                     if (val <= 9999) {
-                        targetCount = val;
-                        isTargetReached = false;
-                        buzzer.beep(1, 200, 0);
-                    }else buzzer.beep(3, 100, 100);
-                }else buzzer.beep(3, 100, 100);
+                        mucTieu = val;
+                        datMucTieu = false;
+                        buzzer.beep(1, 150, 0);
+                    }else buzzer.beep(2, 100, 100);
+                }else buzzer.beep(2, 100, 100);
             }
             //0x202 dem hien tai
             else if (rxId == 0x202) {
@@ -633,10 +694,10 @@ extern "C" {
                     uint16_t val = (BCD_to_Dec(rxData[0]) * 100) + BCD_to_Dec(rxData[1]);
                     if (val <= 9999) {
                         Sensor::productCount = val;
-                        isTargetReached = false;
-                        buzzer.beep(1, 200, 0);
-                    }else buzzer.beep(3, 100, 100);
-                }else buzzer.beep(3, 100, 100);
+                        datMucTieu = false;
+                        buzzer.beep(1, 150, 0);
+                    }else buzzer.beep(2, 100, 100);
+                }else buzzer.beep(2, 100, 100);
             }
             //0x203 time
             else if (rxId == 0x203) {
@@ -646,34 +707,34 @@ extern "C" {
                     uint8_t s = BCD_to_Dec(rxData[2]);
                     if (h <= 23 && m <= 59 && s <= 59) {
                         rtc.setTime(h, m, s);
-                        buzzer.beep(1, 200, 0);
-                    }else buzzer.beep(3, 100, 100);
-                }else buzzer.beep(3, 100, 100);
+                        buzzer.beep(1, 150, 0);
+                    }else buzzer.beep(2, 100, 100);
+                }else buzzer.beep(2, 100, 100);
             }
             //thay doi tinh nang
             else if (rxId == 0x204){
               if(rxData[0] >=1 && rxData[0]<=3){
-                cardUpdate = 1;
-                newCardUpdate = rxData[0];
+                trangThaiQuetThe = 1;
+                updateDuLieuThe = rxData[0];
                 buzzer.beep(2,50,50);
               }else buzzer.beep(3,100,100);  
             }
             //0x205 xoa the,doi key
             else if(rxId == 0x205){
               if(rxData[0] == 0x00){ //xoa the
-                cardUpdate = 2;
+                trangThaiQuetThe = 2;
                 buzzer.beep(2,50,50);
               }
               else if (rxData[0] == 0x01) {//doi key
-                cardUpdate = 3;
-                memcpy(newCardKey, &rxData[1],6);
+                trangThaiQuetThe = 3;
+                memcpy(matKhauTheMoi, &rxData[1],6);
                 buzzer.beep(2,50,50);
               }
               else buzzer.beep(3,100,100); 
             }
             else if (rxId == 0x206){
-              memcpy(tempKey, rxData,6);
-              isTempKeyReady = true;
+              memcpy(matKhauTam, rxData,6);
+              coMatKhauTam = true;
               buzzer.beep(2,50,50);
             }
         }
@@ -712,3 +773,12 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+
+
+
+
+
+
+
+
+
