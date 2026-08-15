@@ -1,7 +1,9 @@
 #include "Led7Segment.h"
 
-const uint8_t SEG_ACTUAL_NORMAL[10] = {0x77, 0x11, 0xB6, 0xB3, 0xD1, 0xE3, 0xE7, 0x31, 0xF7, 0xF3};
-const uint8_t SEG_ACTUAL_DIGIT3[10] = {0x77, 0x44, 0xB6, 0xE6, 0xC5, 0xE3, 0xF3, 0x46, 0xF7, 0xE7};
+//0x77, 0x11, 0xB6, 0xB3, 0xD1, 0xE3, 0xE7, 0x31, 0xF7, 0xF3
+const uint8_t BANG_MA_LED_THUONG[10] = {0x77, 0x11, 0xB6, 0xB3, 0xD1, 0xE3, 0xE7, 0x31, 0xF7, 0xF3};
+//0x77, 0x44, 0xB6, 0xE6, 0xC5, 0xE3, 0xF3, 0x46, 0xF7, 0xE7
+const uint8_t BANG_MA_LED_SO3[10] = {0x77, 0x44, 0xB6, 0xE6, 0xC5, 0xE3, 0xF3, 0x46, 0xF7, 0xE7};
 
 Led7Segment::Led7Segment(GPIO_TypeDef* dataPort, uint16_t dataPin, 
                          GPIO_TypeDef* clockPort, uint16_t clockPin, 
@@ -96,7 +98,7 @@ void Led7Segment::setColon(bool state) {
     colonState = state;
 }
 
-void Led7Segment::update()
+void Led7Segment::update(bool isTimeMode)
 {
     __disable_irq();
 
@@ -109,10 +111,20 @@ void Led7Segment::update()
         (uint8_t)((displayValue / 10)   % 10),
         (uint8_t)( displayValue % 10)
     };
-
-    for (int i = 0; i < 4; i++) {
-        uint8_t segment = (i == 2) ? SEG_ACTUAL_DIGIT3[digits[i]] : SEG_ACTUAL_NORMAL[digits[i]];
-
+    //dem den dau hien thi den do
+      bool isLeadingZero = !isTimeMode;
+      for (int i =0 ; i<4;i ++){
+        if (digits[i] != 0 || i ==3){
+          isLeadingZero = false;
+        }
+        
+        uint8_t segment;
+        if(isLeadingZero){
+          segment = 0x00;
+        }else{
+          segment = (i==2) ? BANG_MA_LED_SO3[digits[i]] : BANG_MA_LED_THUONG[digits[i]];
+        }
+        
         if ((i == 1 || i == 2) && colonState) {
             segment |= 0x08;
         }

@@ -25,15 +25,14 @@ void Sensor::init() {
         port->CRH &= ~(0xF << ((pinIndex - 8) * 4));
         port->CRH |= (0x8 << ((pinIndex - 8) * 4));  
     }
-    
-    port->ODR |= pin; // Pull up
+    port->ODR |= pin; // Kéo trở Pull-up
     
     uint32_t portIndex = (port == GPIOA) ? 0 : (port == GPIOB) ? 1 : (port == GPIOC) ? 2 : 3;
     AFIO->EXTICR[pinIndex / 4] &= ~(0xF << ((pinIndex % 4) * 4));
     AFIO->EXTICR[pinIndex / 4] |= (portIndex << ((pinIndex % 4) * 4));
     
     EXTI->IMR |= pin;
-    EXTI->FTSR |= pin;
+    EXTI->FTSR |= pin; //RTSR canh len
     
     IRQn_Type irq;
     if (pinIndex >= 10 && pinIndex <= 15) irq = EXTI15_10_IRQn;
@@ -50,6 +49,7 @@ void Sensor::init() {
 
 void Sensor::handleInterrupt(uint16_t extiPin) {
     if (EXTI->PR & extiPin) {
+        EXTI->PR = extiPin; 
         
         uint32_t currentTick = SystemTimer::getTick();
         
@@ -58,7 +58,6 @@ void Sensor::handleInterrupt(uint16_t extiPin) {
             isDetected = true;
             lastInterruptTick = currentTick;
         }
-        EXTI->PR |= extiPin;
     }
 }
 

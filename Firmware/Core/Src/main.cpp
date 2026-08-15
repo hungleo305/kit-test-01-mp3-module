@@ -206,7 +206,7 @@ int main(void)
     uint32_t currentTick = SystemTimer::getTick();
     
     if (choCapNhatManHinh) {
-        if (currentTick - lastRelayDao >= 20) {
+        if (currentTick - lastRelayDao >= 100) {
             dp.update();
             choCapNhatManHinh = false;
         }
@@ -252,7 +252,11 @@ int main(void)
       Sensor ::isDetected =false;
       if(Sensor::productCount >= mucTieu && !datMucTieu){
         datMucTieu = true;
-        if (!mp3.play("DAT.MP3")) { uint32_t wt = SystemTimer::getTick(); while(SystemTimer::getTick() - wt < 500) buzzer.update(); buzzer.beep(5, 100, 100); }
+        if (!mp3.play("DAT.MP3")) { 
+          uint32_t wt = SystemTimer::getTick(); 
+          while(SystemTimer::getTick() - wt < 500) buzzer.update(); 
+          buzzer.beep(5, 100, 100); 
+        }
       }
     //2:doi mode led
     if (currentTick - lastDisplayToggle >= 5000)
@@ -271,12 +275,12 @@ int main(void)
           lastRtcRead = currentTick;
       }
       
-      bool currentBlinkState = true;
+      bool currentBlinkState = (currentTick/500)%2 ==0; //nhay dau cham
 
       if ((timeValue != lastDisplayValue) || (currentBlinkState != lastBlinkState)) {
           dp.setColon(currentBlinkState);     
           dp.setValue(timeValue);    
-          dp.update();    
+          dp.update(true);    
           lastDisplayValue = timeValue;
           lastBlinkState = currentBlinkState;
       }
@@ -287,7 +291,7 @@ int main(void)
       {
           dp.setColon(false);   
           dp.setValue(Sensor::productCount);    
-          dp.update();
+          dp.update(false);
           lastDisplayValue = Sensor::productCount;
       }
     }
@@ -295,7 +299,8 @@ int main(void)
     if (currentTick - lastCardRead >= 100) {
         lastCardRead = currentTick; 
         
-        if (rfid.checkCard()) {
+        // Khóa không cho quét thẻ mới nếu MP3 đang phát nhạc
+        if (!mp3.isPlaying && rfid.checkCard()) {
             if (rfid.readCardSerial((uint8_t*)uidTheHienTai)) {
                 
                 if (!coTheRfid || memcmp(uidTheHienTai, uidTheDaXuLy, 5) != 0) {
@@ -357,22 +362,44 @@ int main(void)
                                 
                                 if (status == STATUS_OK) {
                                     if (strncmp((char*)readData, "RESET_DEM", 9) == 0) {
-                                        if (!mp3.play("RESET.MP3")) { uint32_t wt = SystemTimer::getTick(); while(SystemTimer::getTick() - wt < 500) buzzer.update(); buzzer.beep(5, 100, 100); }
-                                        Sensor::productCount = 0;
-                                        lastDisplayValue = 0xFFFF;
-                                        readStatus = 0x00;
-                                        datMucTieu = false;
+                                        if (Sensor::productCount == 0) {
+                                            buzzer.beep(2, 100, 100); // Đã reset rồi, báo lỗi
+                                            readStatus = 0x01;
+                                        } else {
+                                            if (!mp3.play("RESET.MP3")) { 
+                                              uint32_t wt = SystemTimer::getTick(); 
+                                              while(SystemTimer::getTick() - wt < 500) buzzer.update(); 
+                                              buzzer.beep(5, 100, 100); 
+                                            }
+                                            Sensor::productCount = 0;
+                                            lastDisplayValue = 0xFFFF;
+                                            readStatus = 0x00;
+                                            datMucTieu = false;
+                                        }
                                     }
                                     else if (strncmp((char*)readData, "BAT_RELAY", 9) == 0) {
-                                        if (!mp3.play("BAT.MP3")) { uint32_t wt = SystemTimer::getTick(); while(SystemTimer::getTick() - wt < 500) buzzer.update(); buzzer.beep(5, 100, 100); }
-                                        dp.turnOff();
-                                        relay.on();
-                                        lastRelayDao = currentTick;
-                                        choCapNhatManHinh = true;
-                                        readStatus = 0x00;
+                                        if (relay.isOn()) {
+                                            buzzer.beep(2, 100, 100); // Đã bật rồi, báo lỗi
+                                            readStatus = 0x01;
+                                        } else {
+                                            if (!mp3.play("BAT.MP3")) { 
+                                              uint32_t wt = SystemTimer::getTick(); 
+                                              while(SystemTimer::getTick() - wt < 500) buzzer.update(); 
+                                              buzzer.beep(5, 100, 100); 
+                                            }
+                                            dp.turnOff();
+                                            relay.on();
+                                            lastRelayDao = currentTick;
+                                            choCapNhatManHinh = true;
+                                            readStatus = 0x00;
+                                        }
                                     }
                                     else if (strncmp((char*)readData, "DAO_RELAY", 9) == 0) {
-                                        if (!mp3.play("DAO.MP3")) { uint32_t wt = SystemTimer::getTick(); while(SystemTimer::getTick() - wt < 500) buzzer.update(); buzzer.beep(5, 100, 100); }
+                                        if (!mp3.play("DAO.MP3")) { 
+                                          uint32_t wt = SystemTimer::getTick();
+                                          while(SystemTimer::getTick() - wt < 500) buzzer.update(); 
+                                          buzzer.beep(5, 100, 100); 
+                                        }
                                         dp.turnOff();
                                         relay.toggle();
                                         lastRelayDao = currentTick;

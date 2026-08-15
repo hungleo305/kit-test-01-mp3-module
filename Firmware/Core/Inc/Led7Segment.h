@@ -31,7 +31,7 @@ public:
     void init();
     void setValue(uint16_t val);
     void setColon(bool state);
-    void update();
+    void update(bool isTimeMode = false);
     void blank();     
     void restore();
     void turnOff();
