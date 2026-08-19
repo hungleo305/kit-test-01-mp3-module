@@ -140,25 +140,23 @@ void Mp3::sendDataBlock(uint8_t* data, uint16_t length) {
 }
 
 bool Mp3::play(const char* filename) {
-    if (isPlaying) {
-        f_close(&mp3File);
-        isPlaying = false;
-    }
-    
-    FRESULT fres = f_open(&mp3File, filename, FA_READ);
-    
-    // main.cpp already handles SD card hotplugging and recovery.
-    // If f_open fails, we just return false immediately.
-
+    // [FIX] Task 1: Khai báo biến bằng static để lưu trên vùng BSS thay vì Stack, khắc phục lỗi tràn Stack gây treo (HardFault)
+    static FIL tempFile;
+    // Kiem tra file ton tai de tranh main.cpp bao loi
+    FRESULT fres = f_open(&tempFile, filename, FA_READ);
     if (fres == FR_OK) {
-        bufferIndex = 0; 
-        dataInBuf = 0;
-        isPlaying = true; 
-        return true;
-    } else {
-        // failed to play
-        return false;
+        f_close(&tempFile);
+        
+        // [FIX] Task 1: Đẩy tên file vào Hàng đợi (Queue) thay vì phát trực tiếp để không cắt ngang bài cũ
+        if (queueCount < 5) {
+            strncpy(queue[queueTail], filename, 31);
+            queue[queueTail][31] = '\0';
+            queueTail = (queueTail + 1) % 5;
+            queueCount++;
+        }
+        return true; 
     }
+    return false;
 }
 
 uint16_t Mp3::readRegister(uint8_t address) {
@@ -175,7 +173,21 @@ uint16_t Mp3::readRegister(uint8_t address) {
 }
 
 void Mp3::process() {
-    if (!isPlaying) return;
+    // [FIX] Task 1: Nếu chip VS1011E đang rảnh rỗi (!isPlaying) và Hàng đợi (Queue) có file chờ, tự động lôi ra phát tiếp
+    if (!isPlaying) {
+        if (queueCount > 0) {
+            FRESULT fres = f_open(&mp3File, queue[queueHead], FA_READ);
+            queueHead = (queueHead + 1) % 5;
+            queueCount--;
+            
+            if (fres == FR_OK) {
+                bufferIndex = 0; 
+                dataInBuf = 0;
+                isPlaying = true; 
+            }
+        }
+        return;
+    }
 
     int chunksSent = 0;
     while (((dreqPort->IDR & dreqPin) ? 1 : 0) == 1 && chunksSent < 16) {
@@ -218,7 +230,7 @@ void Mp3::process() {
                 
                 HAL_Delay(50);
                 
-                return;
+                return; // Let next process iteration check queue
             }
         }
 

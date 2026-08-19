@@ -155,6 +155,12 @@ int main(void)
   MX_FATFS_Init();
   MX_CAN_Init();
   /* USER CODE BEGIN 2 */
+  //Kích hoạt nguồn và Clock cho Backup Register. Nạp lại biến đếm từ thanh ghi BKP->DR1
+  RCC->APB1ENR |= (RCC_APB1ENR_PWREN | RCC_APB1ENR_BKPEN); // Cấp xung nhịp cho PWR và BKP
+  PWR->CR |= PWR_CR_DBP; // Mở khóa cho phép ghi vào phân vùng Backup (Disable Backup Domain write protection)
+  
+  Sensor::productCount = BKP->DR1;
+
   ledOb.init();
   cb.init();
   dp.init();
@@ -166,6 +172,40 @@ int main(void)
   myCan.init();
   sdCard.init();
   buzzer.beep(2, 50, 100);
+  
+  /* ====== BẮT ĐẦU BÀI KIỂM TRA CẢM BIẾN (STRESS TEST) ====== */
+  /* Anh bôi đen đoạn trong ngoặc nhọn này và Comment (Ctrl + /) để tắt test khi cần chạy bình thường */
+  {
+      // Lưu lại biến đếm thật trước khi test, vì trong lúc test hàm ngắt sẽ ghi đè liên tục vào BKP->DR1
+      uint32_t realCount = BKP->DR1;
+      
+      // [FIX] Task 3: Chạy Stress Test
+      uint32_t maxCount = cb.testMaxCountsPerSecond();
+      
+      // 1. Hiển thị lên LED 7 thanh (4 số cuối)
+      dp.setValue(maxCount % 10000);
+      dp.update(false);
+      
+      // 2. Chuyển đổi số đếm (Dec) sang mã BCD để đọc trực tiếp bằng mắt thường trên Cangaroo thay vì mã Hex
+      uint8_t canData[4] = {0, 0, 0, 0};
+      uint32_t temp = maxCount;
+      if (temp > 99999999) temp = 99999999; // Giới hạn tối đa 8 chữ số (hiển thị trên 4 byte)
+      
+      canData[3] = ((temp % 100) / 10 << 4) | (temp % 10); temp /= 100;
+      canData[2] = ((temp % 100) / 10 << 4) | (temp % 10); temp /= 100;
+      canData[1] = ((temp % 100) / 10 << 4) | (temp % 10); temp /= 100;
+      canData[0] = ((temp % 100) / 10 << 4) | (temp % 10);
+      
+      myCan.sendFrame(0x123, canData, 4);
+      
+      // Đứng hình 3 giây để sếp anh kịp nhìn thấy
+      HAL_Delay(3000); 
+      
+      // 3. Phục hồi biến đếm thật trả lại cho BKP và biến Sensor
+      Sensor::productCount = realCount;
+      BKP->DR1 = realCount;
+  }
+  /* ====== KẾT THÚC BÀI KIỂM TRA CẢM BIẾN ====== */
   
   fres = f_mount(&fs, "", 1);
   if (fres != FR_OK) {
@@ -370,7 +410,9 @@ int main(void)
                                               while(SystemTimer::getTick() - wt < 500) buzzer.update(); 
                                               buzzer.beep(5, 100, 100); 
                                             }
+                                            // [FIX] Task 2: Cập nhật lại thanh ghi BKP khi Reset đếm
                                             Sensor::productCount = 0;
+                                            BKP->DR1 = Sensor::productCount;
                                             lastDisplayValue = 0xFFFF;
                                             readStatus = 0x00;
                                             datMucTieu = false;
@@ -719,7 +761,9 @@ extern "C" {
                 if (isValidBCD(rxData[0]) && isValidBCD(rxData[1])) {
                     uint16_t val = (BCD_to_Dec(rxData[0]) * 100) + BCD_to_Dec(rxData[1]);
                     if (val <= 9999) {
+                        // [FIX] Task 2: Cập nhật lại thanh ghi BKP khi set giá trị đếm từ mạng CAN
                         Sensor::productCount = val;
+                        BKP->DR1 = Sensor::productCount;
                         datMucTieu = false;
                         buzzer.beep(1, 150, 0);
                     }else buzzer.beep(2, 100, 100);

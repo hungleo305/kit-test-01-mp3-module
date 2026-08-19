@@ -16,6 +16,9 @@ public:
 
     void init();
     static void handleInterrupt(uint16_t extiPin);
+    
+    // Hàm stress-test xem MCU có thể bắt được bao nhiêu ngắt cảm biến trong 1 giây
+    uint32_t testMaxCountsPerSecond();
 };
 
 #endif

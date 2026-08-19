@@ -35,6 +35,12 @@ private:
     uint8_t audioBuffer[512]; 
     uint16_t bufferIndex;
     uint16_t dataInBuf;
+
+    // Queue for audio files
+    char queue[5][32];
+    uint8_t queueHead;
+    uint8_t queueTail;
+    uint8_t queueCount;
 };
 
 #endif

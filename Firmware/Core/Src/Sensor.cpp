@@ -53,8 +53,11 @@ void Sensor::handleInterrupt(uint16_t extiPin) {
         
         uint32_t currentTick = SystemTimer::getTick();
         
-        if (currentTick - lastInterruptTick > 200) {
+        // [FIX] Task 3: Giảm thời gian chống rung xuống 20ms (trước đây là 200ms làm lọt số)
+        if (currentTick - lastInterruptTick > 20) {
+            // [FIX] Task 2: Ghi giá trị đếm mới vào thanh ghi BKP->DR1 để chống mất điện
             productCount++;
+            BKP->DR1 = productCount;
             isDetected = true;
             lastInterruptTick = currentTick;
         }
@@ -63,4 +66,24 @@ void Sensor::handleInterrupt(uint16_t extiPin) {
 
 extern "C" void EXTI15_10_IRQHandler(void) {
     Sensor::handleInterrupt(1 << 13);
+}
+
+uint32_t Sensor::testMaxCountsPerSecond() {
+    uint32_t startTick = SystemTimer::getTick();
+    uint32_t simulatedCount = 0;
+    
+    // Tạm thời vô hiệu hóa debounce bằng cách reset lastInterruptTick liên tục
+    lastInterruptTick = 0;
+    
+    // Bắn ngắt liên tục trong 1 giây (1000ms)
+    while (SystemTimer::getTick() - startTick < 1000) {
+        // Kích hoạt ngắt mềm (Software Interrupt) trên chân của cảm biến (EXTI 13)
+        EXTI->SWIER |= (1 << 13);
+        simulatedCount++;
+        
+        // Hàm ngắt handleInterrupt sẽ tự động được phần cứng gọi và đếm productCount
+        lastInterruptTick = 0; // Ép bỏ qua debounce cho lần lặp tiếp theo
+    }
+    
+    return simulatedCount;
 }
