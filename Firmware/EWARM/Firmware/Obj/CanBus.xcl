@@ -1,30 +1,30 @@
-"F:\tts vnatech\kit-test-01-mp3-module\Firmware\Core\Src\CanBus.cpp"
+"G:\tv ok\Firmware\oldlib\Firmware\Core\Src\CanBus.cpp"
 -std=c++17
 -ferror-limit=0
 -fbracket-depth=512
 -MD
 -MF
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\EWARM\Firmware\Obj\CanBus.pbi.dep
+G:\tv ok\Firmware\oldlib\Firmware\EWARM\Firmware\Obj\CanBus.pbi.dep
 -o
 CanBus.pbi
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\Core\Src
+G:\tv ok\Firmware\oldlib\Firmware\Core\Src
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\EWARM/../Core/Inc
+G:\tv ok\Firmware\oldlib\Firmware\EWARM/../Core/Inc
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy
+G:\tv ok\Firmware\oldlib\Firmware\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc
+G:\tv ok\Firmware\oldlib\Firmware\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\EWARM/../Drivers/CMSIS/Device/ST/STM32F1xx/Include
+G:\tv ok\Firmware\oldlib\Firmware\EWARM/../Drivers/CMSIS/Device/ST/STM32F1xx/Include
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\EWARM/../Drivers/CMSIS/Include
+G:\tv ok\Firmware\oldlib\Firmware\EWARM/../Drivers/CMSIS/Include
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\EWARM/../FATFS/Target
+G:\tv ok\Firmware\oldlib\Firmware\EWARM/../FATFS/Target
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\EWARM/../FATFS/App
+G:\tv ok\Firmware\oldlib\Firmware\EWARM/../FATFS/App
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\EWARM/../Middlewares/Third_Party/FatFs/src
+G:\tv ok\Firmware\oldlib\Firmware\EWARM/../Middlewares/Third_Party/FatFs/src
 -I
 C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3\arm\inc
 -I
@@ -32,21 +32,21 @@ C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3\arm\inc\c
 -I
 C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3\arm\inc\cpp
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\Core\Inc
+G:\tv ok\Firmware\oldlib\Firmware\Core\Inc
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\Drivers\STM32F1xx_HAL_Driver\Inc\Legacy
+G:\tv ok\Firmware\oldlib\Firmware\Drivers\STM32F1xx_HAL_Driver\Inc\Legacy
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\Drivers\STM32F1xx_HAL_Driver\Inc
+G:\tv ok\Firmware\oldlib\Firmware\Drivers\STM32F1xx_HAL_Driver\Inc
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\Drivers\CMSIS\Device\ST\STM32F1xx\Include
+G:\tv ok\Firmware\oldlib\Firmware\Drivers\CMSIS\Device\ST\STM32F1xx\Include
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\Drivers\CMSIS\Include
+G:\tv ok\Firmware\oldlib\Firmware\Drivers\CMSIS\Include
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\FATFS\Target
+G:\tv ok\Firmware\oldlib\Firmware\FATFS\Target
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\FATFS\App
+G:\tv ok\Firmware\oldlib\Firmware\FATFS\App
 -I
-F:\tts vnatech\kit-test-01-mp3-module\Firmware\Middlewares\Third_Party\FatFs\src
+G:\tv ok\Firmware\oldlib\Firmware\Middlewares\Third_Party\FatFs\src
 -D__CHAR_BITS__=8
 -D__CHAR_MAX__=0xff
 -D__CHAR_MIN__=0

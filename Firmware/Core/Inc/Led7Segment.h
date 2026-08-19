@@ -3,8 +3,6 @@
 
 #include "main.h"
 #include <stdint.h>
-#include "Relay.h"
-
 class Led7Segment {
 private:
     GPIO_TypeDef* dataPort;
@@ -13,10 +11,11 @@ private:
     uint16_t clockPin;
     GPIO_TypeDef* strobePort;
     uint16_t strobePin;
-    Relay* relay;
+    bool (*getClockState)();
     
     uint16_t displayValue;
     bool colonState;
+    bool cachedClockState;
 
     void clockPulse();
     void sendBit(uint8_t bit);
@@ -27,7 +26,7 @@ public:
     Led7Segment(GPIO_TypeDef* dataPort, uint16_t dataPin, 
                 GPIO_TypeDef* clockPort, uint16_t clockPin, 
                 GPIO_TypeDef* strobePort, uint16_t strobePin, 
-                Relay* relay);
+                bool (*getClockState)() = nullptr);
     void init();
     void setValue(uint16_t val);
     void setColon(bool state);

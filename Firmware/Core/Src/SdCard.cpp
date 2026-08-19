@@ -1,32 +1,35 @@
 #include "SdCard.h"
+#include "SystemTimer.h"
 
 #define SD_DUMMY_BYTE 0xFF
 
 static uint32_t current_spi_baudrate = SPI_BAUDRATEPRESCALER_256;
 
-static void applySpiSettings(SPI_HandleTypeDef *hspi) {
+static void applySpiSettings(SPI_TypeDef *spi) {
     uint32_t timeout = 10000;
-    while (__HAL_SPI_GET_FLAG(hspi, SPI_FLAG_BSY) && --timeout);
+    while ((spi->SR & SPI_SR_BSY) && --timeout);
     
-    __HAL_SPI_DISABLE(hspi);
+    spi->CR1 &= ~SPI_CR1_SPE;
 
-    hspi->Instance->CR1 = SPI_CR1_MSTR | SPI_CR1_SSI | SPI_CR1_SSM | current_spi_baudrate;
+    spi->CR1 = SPI_CR1_MSTR | SPI_CR1_SSI | SPI_CR1_SSM | current_spi_baudrate;
 
-    __HAL_SPI_ENABLE(hspi);
+    spi->CR1 |= SPI_CR1_SPE;
 
     uint32_t tmpreg = AFIO->MAPR;
     tmpreg &= ~AFIO_MAPR_SWJ_CFG_Msk;
     tmpreg |= (0x2 << 24); 
-    tmpreg &= ~AFIO_MAPR_SPI1_REMAP;
+    if (spi == SPI1) {
+        tmpreg &= ~AFIO_MAPR_SPI1_REMAP; // Gỡ remap cho SPI1 để về PA5-6-7
+    }
     AFIO->MAPR = tmpreg;
 
-    volatile uint32_t dummy = hspi->Instance->DR;
-    dummy = hspi->Instance->SR;
+    volatile uint32_t dummy = spi->DR;
+    dummy = spi->SR;
     (void)dummy;
 }
 
-SdCard::SdCard(SPI_HandleTypeDef *hspi, GPIO_TypeDef *cs_port, uint16_t cs_pin) {
-    this->hspi = hspi;
+SdCard::SdCard(SPI_TypeDef *spi, GPIO_TypeDef *cs_port, uint16_t cs_pin) {
+    this->spi = spi;
     this->cs_port = cs_port;
     this->cs_pin = cs_pin;
     this->stat = 0x01;
@@ -34,37 +37,49 @@ SdCard::SdCard(SPI_HandleTypeDef *hspi, GPIO_TypeDef *cs_port, uint16_t cs_pin) 
 }
 
 void SdCard::init() {
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    GPIO_InitStruct.Pin = cs_pin;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(cs_port, &GPIO_InitStruct);
-    HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);
+    // 1. Enable Clocks
+    RCC->APB2ENR |= RCC_APB2ENR_IOPCEN | RCC_APB2ENR_AFIOEN;
+    if (spi == SPI1) {
+        RCC->APB2ENR |= RCC_APB2ENR_SPI1EN | RCC_APB2ENR_IOPAEN;
+    } else if (spi == SPI2) {
+        RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
+        RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
+    }
+
+    // 2. Configure CS Pin (PC8) as Output Push-Pull 50MHz
+    if (cs_port == GPIOC && cs_pin == (1<<8)) {
+        GPIOC->CRH &= ~(0xF << 0);
+        GPIOC->CRH |=  (0x3 << 0);
+    } else {
+        // Fallback for general purpose (not perfectly generic but works for this project)
+        // Would need complex port matching to be generic
+    }
+
+    csHigh();
 }
 
 void SdCard::csLow() {
-    applySpiSettings(hspi); // Chiếm quyền điều khiển bus
+    applySpiSettings(spi);
     spiTxRx(SD_DUMMY_BYTE);
-    HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_RESET);
+    cs_port->BRR = cs_pin;
 }
 
 void SdCard::csHigh() {
-    HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);
+    cs_port->BSRR = cs_pin;
     spiTxRx(SD_DUMMY_BYTE);
 }
 
 void SdCard::setSpiSpeedSlow() {
     current_spi_baudrate = SPI_BAUDRATEPRESCALER_256;
-    applySpiSettings(hspi);
+    applySpiSettings(spi);
 }
 
 void SdCard::setSpiSpeedFast() {
     current_spi_baudrate = SPI_BAUDRATEPRESCALER_8;
-    applySpiSettings(hspi);
+    applySpiSettings(spi);
 }
 
 uint8_t SdCard::spiTxRx(uint8_t data) {
-    SPI_TypeDef* spi = hspi->Instance;
     spi->DR = data;
     uint32_t timeout = 10000;
     while (!(spi->SR & SPI_SR_TXE) && --timeout);
@@ -75,10 +90,10 @@ uint8_t SdCard::spiTxRx(uint8_t data) {
 
 uint8_t SdCard::waitReady() {
     uint8_t res;
-    uint32_t tickstart = HAL_GetTick();
+    uint32_t tickstart = SystemTimer::getTick();
     do {
         res = spiTxRx(SD_DUMMY_BYTE);
-    } while (res != 0xFF && (HAL_GetTick() - tickstart) < 500);
+    } while (res != 0xFF && (SystemTimer::getTick() - tickstart) < 500);
     return res;
 }
 
@@ -120,31 +135,24 @@ uint8_t SdCard::sendCmd(uint8_t cmd, uint32_t arg) {
 uint8_t SdCard::initialize() {
     stat = 0x01; 
    
-    __HAL_RCC_GPIOA_CLK_ENABLE();
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    GPIO_InitStruct.Pin = GPIO_PIN_5 | GPIO_PIN_7;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP; 
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-    HAL_GPIO_WritePin(cs_port, cs_pin, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_7, GPIO_PIN_SET); 
-
-    for(int i = 0; i < 100; i++) {
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);
-        for(volatile int j = 0; j < 20; j++); 
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET);
-        for(volatile int j = 0; j < 20; j++);
+    // Ensure SCK, MISO, MOSI are initialized based on SPI selected
+    if (spi == SPI1) {
+        // PA5 (SCK) & PA7 (MOSI) Alt Func PP 50MHz, PA6 (MISO) Input Pull-Up
+        GPIOA->CRL &= ~(0xF << 20 | 0xF << 24 | 0xF << 28);
+        GPIOA->CRL |=  (0xB << 20 | 0x8 << 24 | 0xB << 28);
+        GPIOA->ODR |= (1 << 6); // Pull-up for MISO
+    } else if (spi == SPI2) {
+        // PB13 (SCK) & PB15 (MOSI) Alt Func PP 50MHz, PB14 (MISO) Input Pull-Up
+        GPIOB->CRH &= ~(0xF << 20 | 0xF << 24 | 0xF << 28);
+        GPIOB->CRH |=  (0xB << 20 | 0x8 << 24 | 0xB << 28);
+        GPIOB->ODR |= (1 << 14); // Pull-up for MISO
     }
-
-    // Trả lại cấu hình cho Hardware SPI
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     setSpiSpeedSlow(); 
     csHigh();
-    HAL_Delay(10); 
+    SystemTimer::delay_ms(10); 
     
+    // At least 74 dummy clocks with CS high
     for (int i = 0; i < 100; i++) {
         spiTxRx(SD_DUMMY_BYTE);
     }
@@ -155,21 +163,21 @@ uint8_t SdCard::initialize() {
         cmd0_res = sendCmd(0, 0); 
         if (cmd0_res == 1) break;
         csHigh();
-        HAL_Delay(10);
+        SystemTimer::delay_ms(10);
     }
     
     cardType = 0;
     if (cmd0_res == 1) {
         if (sendCmd(8, 0x1AA) == 1) { 
             for (int i = 0; i < 4; i++) spiTxRx(SD_DUMMY_BYTE); 
-            uint32_t tickstart = HAL_GetTick();
+            uint32_t tickstart = SystemTimer::getTick();
             do {
                 sendCmd(55, 0);
                 if (sendCmd(41, 1UL << 30) == 0) { 
                     stat &= ~0x01; 
                     break;
                 }
-            } while ((HAL_GetTick() - tickstart) < 1000); 
+            } while ((SystemTimer::getTick() - tickstart) < 1000); 
             
             if (sendCmd(58, 0) == 0) {
                 uint8_t ocr[4];
@@ -177,14 +185,14 @@ uint8_t SdCard::initialize() {
                 if (ocr[0] & 0x40) cardType = 1; 
             }
         } else {
-            uint32_t tickstart = HAL_GetTick();
+            uint32_t tickstart = SystemTimer::getTick();
             do {
                 sendCmd(55, 0);
                 if (sendCmd(41, 0) == 0) { 
                     stat &= ~0x01; 
                     break;
                 }
-            } while ((HAL_GetTick() - tickstart) < 1000); 
+            } while ((SystemTimer::getTick() - tickstart) < 1000); 
         }
     }
     
@@ -203,9 +211,9 @@ uint8_t SdCard::read(uint8_t *buff, uint32_t sector, uint32_t count) {
     csLow();
     while (count > 0) {
         if (sendCmd(17, sector) == 0) { 
-            uint32_t tickstart = HAL_GetTick();
+            uint32_t tickstart = SystemTimer::getTick();
             while (spiTxRx(SD_DUMMY_BYTE) != 0xFE) {
-                if ((HAL_GetTick() - tickstart) > 500) { csHigh(); return 1; }
+                if ((SystemTimer::getTick() - tickstart) > 500) { csHigh(); return 1; }
             }
             for (int i = 0; i < 512; i++) buff[i] = spiTxRx(SD_DUMMY_BYTE);
             spiTxRx(SD_DUMMY_BYTE); spiTxRx(SD_DUMMY_BYTE); 

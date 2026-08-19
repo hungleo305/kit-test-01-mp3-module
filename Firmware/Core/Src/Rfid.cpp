@@ -62,6 +62,12 @@ void Rfid::init() {
         GPIOB->CRL &= ~(0xF << 16); GPIOB->CRL |=  (0x8 << 16); GPIOB->ODR |= (1 << 4); 
         
         GPIOB->CRH &= ~(0xF << 4);  GPIOB->CRH |=  (0x8 << 4); GPIOB->ODR |= (1 << 9); 
+    } else if (spi == SPI2) {
+        RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
+        // PB13 (SCK) & PB15 (MOSI) Alt Func PP 50MHz, PB14 (MISO) Input Pull-Up
+        GPIOB->CRH &= ~(0xF << 20 | 0xF << 24 | 0xF << 28);
+        GPIOB->CRH |=  (0xB << 20 | 0x8 << 24 | 0xB << 28);
+        GPIOB->ODR |= (1 << 14); // Pull-up for MISO
     }
     
     GPIO_TypeDef* ports[] = {csPort, rstPort};

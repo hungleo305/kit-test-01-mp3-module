@@ -51,7 +51,7 @@ void Rtc::init() {
 }
 
 void Rtc::i2cWrite(uint8_t reg, uint8_t data) {
-    uint32_t t = 10000; // Bi?n ch?ng treo MCU
+    uint32_t t = 10000; 
 
     while ((i2c->SR2 & I2C_SR2_BUSY) && --t); if(!t) return;
 

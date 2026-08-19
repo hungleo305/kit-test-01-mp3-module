@@ -68,11 +68,12 @@ Led ledOb(GPIOB, 1<<2);
 Buzzer buzzer(GPIOC, 1<<15);
 Sensor cb(GPIOC, 1<<13);
 Relay relay(GPIOC, 1<<7);
-Led7Segment dp(GPIOC, 1<<5, GPIOC, 1<<7, GPIOC, 1<<6, &relay);
+bool getRelayState() { return relay.isOn(); }
+Led7Segment dp(GPIOC, 1<<5, GPIOC, 1<<7, GPIOC, 1<<6, getRelayState);
 Rtc rtc(I2C1, GPIOB, 1<<6, GPIOB, 1<<7);
 Rfid rfid(SPI1, GPIOA, 1<<15, GPIOC, 1<<14);
 Mp3 mp3(&hspi2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3);
-SdCard sdCard(&hspi1, GPIOC, GPIO_PIN_8);
+SdCard sdCard(SPI1, GPIOC, 1<<8);
 
 extern CAN_HandleTypeDef hcan;
 CanBus myCan(&hcan);
@@ -103,8 +104,6 @@ UINT bytesWrote;
 DIR rootDir;
 bool daNhanTheSD = false;
 uint32_t lastSdCheck = 0;
-uint8_t soLanLoiLienTiep = 0;
-uint8_t soLanLoiTheLienTiep = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -167,6 +166,7 @@ int main(void)
   myCan.init();
   sdCard.init();
   buzzer.beep(2, 50, 100);
+  
   fres = f_mount(&fs, "", 1);
   if (fres != FR_OK) {
       buzzer.beep(3, 100, 100);
@@ -207,7 +207,7 @@ int main(void)
     
     if (choCapNhatManHinh) {
         if (currentTick - lastRelayDao >= 100) {
-            dp.update();
+            dp.update(isShowingTime);
             choCapNhatManHinh = false;
         }
     }
@@ -249,7 +249,6 @@ int main(void)
       buzzer.beep(1, 50, 0);
       Sensor ::isDetected =false;
     }
-      Sensor ::isDetected =false;
       if(Sensor::productCount >= mucTieu && !datMucTieu){
         datMucTieu = true;
         if (!mp3.play("DAT.MP3")) { 
@@ -300,7 +299,7 @@ int main(void)
         lastCardRead = currentTick; 
         
         // Khóa không cho quét thẻ mới nếu MP3 đang phát nhạc
-        if (!mp3.isPlaying && rfid.checkCard()) {
+        if (rfid.checkCard()) {
             if (rfid.readCardSerial((uint8_t*)uidTheHienTai)) {
                 
                 if (!coTheRfid || memcmp(uidTheHienTai, uidTheDaXuLy, 5) != 0) {

@@ -23,9 +23,9 @@
 
 if ($debugfile -eq "")
 {
-& "C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3\common\bin\cspybat" -f "F:\tts vnatech\kit-test-01-mp3-module\Firmware\EWARM\settings\Firmware.Firmware.general.xcl" --backend -f "F:\tts vnatech\kit-test-01-mp3-module\Firmware\EWARM\settings\Firmware.Firmware.driver.xcl" 
+& "C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3\common\bin\cspybat" -f "G:\tv ok\Firmware\oldlib\Firmware\EWARM\settings\Firmware.Firmware.general.xcl" --backend -f "G:\tv ok\Firmware\oldlib\Firmware\EWARM\settings\Firmware.Firmware.driver.xcl" 
 }
 else
 {
-& "C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3\common\bin\cspybat" -f "F:\tts vnatech\kit-test-01-mp3-module\Firmware\EWARM\settings\Firmware.Firmware.general.xcl" --debug_file=$debugfile --backend -f "F:\tts vnatech\kit-test-01-mp3-module\Firmware\EWARM\settings\Firmware.Firmware.driver.xcl" 
+& "C:\Program Files (x86)\IAR Systems\Embedded Workbench 8.3\common\bin\cspybat" -f "G:\tv ok\Firmware\oldlib\Firmware\EWARM\settings\Firmware.Firmware.general.xcl" --debug_file=$debugfile --backend -f "G:\tv ok\Firmware\oldlib\Firmware\EWARM\settings\Firmware.Firmware.driver.xcl" 
 }
