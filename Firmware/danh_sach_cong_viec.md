@@ -1,3 +1,4 @@
+# DEADLINE : THỨ 4,26-08-2026
 # Danh Sách Công Việc & Kế Hoạch Cập Nhật Firmware 
 
 Tài liệu này theo dõi tiến độ các hạng mục cần nâng cấp/sửa lỗi cho Firmware của dự án.
