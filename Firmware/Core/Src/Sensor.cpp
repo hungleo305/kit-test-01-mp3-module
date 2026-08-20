@@ -5,6 +5,32 @@ volatile uint16_t Sensor::productCount = 0;
 volatile bool Sensor::isDetected = false;
 uint32_t Sensor::lastInterruptTick = 0;
 
+volatile bool Sensor::isDiagnosticMode = false;
+volatile uint32_t Sensor::lastEnterTick = 0;
+volatile uint32_t Sensor::lastExitTick = 0;
+volatile uint32_t Sensor::blockDuration = 0;
+volatile uint32_t Sensor::gapDuration = 0;
+volatile bool Sensor::newDataReady = false;
+
+void Sensor::enableDiagnosticMode(bool enable) {
+    isDiagnosticMode = enable;
+    if (enable) {
+        EXTI->RTSR |= (1 << 13); // Bật thêm ngắt cạnh lên (Rút tay ra)
+    } else {
+        EXTI->RTSR &= ~(1 << 13); // Tắt ngắt cạnh lên, trở về bình thường
+    }
+}
+
+bool Sensor::getDiagnosticData(uint32_t& outBlockDuration, uint32_t& outGapDuration) {
+    if (newDataReady) {
+        outBlockDuration = blockDuration;
+        outGapDuration = gapDuration;
+        newDataReady = false;
+        return true;
+    }
+    return false;
+}
+
 Sensor::Sensor(GPIO_TypeDef* port, uint16_t pin) : port(port), pin(pin) {}
 
 void Sensor::init() {
@@ -53,9 +79,41 @@ void Sensor::handleInterrupt(uint16_t extiPin) {
         
         uint32_t currentTick = SystemTimer::getTick();
         
-        // [FIX] Task 3: Giảm thời gian chống rung xuống 20ms (trước đây là 200ms làm lọt số)
-        if (currentTick - lastInterruptTick > 20) {
-            // [FIX] Task 2: Ghi giá trị đếm mới vào thanh ghi BKP->DR1 để chống mất điện
+        // Đọc trạng thái chân PC13 (0 = bị che, 1 = không bị che) -- Đang giả định NPN
+        // Nhưng thực tế là PNP (1 = Bị che, 0 = Hở)
+        bool isPinHigh = (GPIOC->IDR & (1 << 13)) != 0;
+        
+        if (isDiagnosticMode) {
+            // Dùng State Machine và Debounce để chống nhiễu tuyệt đối cho Logic Analyzer
+            static bool lastDiagState = false;
+            static uint32_t lastDiagChangeTick = 0;
+            
+            if (currentTick - lastDiagChangeTick > 20) { // Lọc dội phím (Bounce)
+                if (isPinHigh != lastDiagState) {
+                    if (!isPinHigh) { 
+                        // Cạnh xuống: Bắt đầu che (Cảm biến báo 0)
+                        if (lastExitTick > 0) {
+                            gapDuration = currentTick - lastExitTick; 
+                        }
+                        lastEnterTick = currentTick;
+                    } else {
+                        // Cạnh lên: Rút tay ra (Cảm biến báo 1)
+                        if (lastEnterTick > 0) {
+                            blockDuration = currentTick - lastEnterTick; 
+                            newDataReady = true; // Rút tay ra mới gửi CAN
+                        }
+                        lastExitTick = currentTick;
+                    }
+                    lastDiagState = isPinHigh;
+                    lastDiagChangeTick = currentTick;
+                }
+            }
+        }
+        
+        //Giảm thời gian chống rung xuống 20ms (trước đây là 200ms làm lọt số)
+        // Lưu ý: Code này đếm sản phẩm khi RÚT TAY RA (Cạnh lên, isPinHigh = 1)
+        if (isPinHigh && (currentTick - lastInterruptTick > 20)) {
+            //Ghi giá trị đếm mới vào thanh ghi BKP->DR1 để chống mất điện
             productCount++;
             BKP->DR1 = productCount;
             isDetected = true;
@@ -66,24 +124,4 @@ void Sensor::handleInterrupt(uint16_t extiPin) {
 
 extern "C" void EXTI15_10_IRQHandler(void) {
     Sensor::handleInterrupt(1 << 13);
-}
-
-uint32_t Sensor::testMaxCountsPerSecond() {
-    uint32_t startTick = SystemTimer::getTick();
-    uint32_t simulatedCount = 0;
-    
-    // Tạm thời vô hiệu hóa debounce bằng cách reset lastInterruptTick liên tục
-    lastInterruptTick = 0;
-    
-    // Bắn ngắt liên tục trong 1 giây (1000ms)
-    while (SystemTimer::getTick() - startTick < 1000) {
-        // Kích hoạt ngắt mềm (Software Interrupt) trên chân của cảm biến (EXTI 13)
-        EXTI->SWIER |= (1 << 13);
-        simulatedCount++;
-        
-        // Hàm ngắt handleInterrupt sẽ tự động được phần cứng gọi và đếm productCount
-        lastInterruptTick = 0; // Ép bỏ qua debounce cho lần lặp tiếp theo
-    }
-    
-    return simulatedCount;
 }

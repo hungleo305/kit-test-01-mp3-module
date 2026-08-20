@@ -17,9 +17,17 @@ public:
     void setVolume(uint8_t left, uint8_t right);
     void testAudio();
     void process(); 
+    
+    void saveState();
+    void resumeState();
+    
     bool isPlaying; 
 
 private:
+    char currentFilename[32];
+    char savedFilename[32];
+    uint32_t savedPosition;
+    bool hasSavedState;
     SPI_HandleTypeDef* hspi;
     GPIO_TypeDef* xresetPort; uint16_t xresetPin;
     GPIO_TypeDef* dreqPort;   uint16_t dreqPin;

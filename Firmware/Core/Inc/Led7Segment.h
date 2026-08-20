@@ -35,6 +35,7 @@ public:
     void restore();
     void turnOff();
     void turnOn();
+    void showDashes();
 };
 
 #endif

@@ -29,7 +29,8 @@ Mp3::Mp3(SPI_HandleTypeDef* hspi,
         xresetPort(xresetPort), xresetPin(xresetPin),
         dreqPort(dreqPort), dreqPin(dreqPin),
         xdcsPort(xdcsPort), xdcsPin(xdcsPin),
-        xcsPort(xcsPort), xcsPin(xcsPin) {}
+        xcsPort(xcsPort), xcsPin(xcsPin),
+        hasSavedState(false) {}
 
 static FIL mp3File;
 
@@ -177,14 +178,17 @@ void Mp3::process() {
     if (!isPlaying) {
         if (queueCount > 0) {
             FRESULT fres = f_open(&mp3File, queue[queueHead], FA_READ);
-            queueHead = (queueHead + 1) % 5;
-            queueCount--;
             
             if (fres == FR_OK) {
+                strncpy(currentFilename, queue[queueHead], 31);
+                currentFilename[31] = '\0';
                 bufferIndex = 0; 
                 dataInBuf = 0;
                 isPlaying = true; 
             }
+            
+            queueHead = (queueHead + 1) % 5;
+            queueCount--;
         }
         return;
     }
@@ -194,11 +198,17 @@ void Mp3::process() {
         
         if (bufferIndex >= dataInBuf) {
             UINT bytesRead;
-            f_read(&mp3File, audioBuffer, 512, &bytesRead);
+            FRESULT fres = f_read(&mp3File, audioBuffer, 512, &bytesRead);
             dataInBuf = bytesRead;
             bufferIndex = 0;
 
             if (bytesRead == 0) { 
+                if (fres != FR_OK) {
+                    // SD Card removed or read error -> Save state to resume later
+                    saveState();
+                    return;
+                }
+                
                 f_close(&mp3File);
                 isPlaying = false;
                 
@@ -266,6 +276,34 @@ void Mp3::testAudio() {
     xdcsPort->BSRR = xdcsPin;
     
     writeRegister(SCI_MODE, 0x0804); 
+}
+
+void Mp3::saveState() {
+    if (isPlaying) {
+        strncpy(savedFilename, currentFilename, 31);
+        savedFilename[31] = '\0';
+        savedPosition = f_tell(&mp3File);
+        hasSavedState = true;
+        
+        f_close(&mp3File);
+        isPlaying = false;
+    }
+}
+
+void Mp3::resumeState() {
+    if (hasSavedState) {
+        FRESULT fres = f_open(&mp3File, savedFilename, FA_READ);
+        if (fres == FR_OK) {
+            f_lseek(&mp3File, savedPosition);
+            bufferIndex = 0;
+            dataInBuf = 0;
+            isPlaying = true;
+            
+            strncpy(currentFilename, savedFilename, 31);
+            currentFilename[31] = '\0';
+        }
+        hasSavedState = false;
+    }
 }
 
 

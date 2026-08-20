@@ -38,13 +38,21 @@ SdCard::SdCard(SPI_TypeDef *spi, GPIO_TypeDef *cs_port, uint16_t cs_pin) {
 
 void SdCard::init() {
     // 1. Enable Clocks
-    RCC->APB2ENR |= RCC_APB2ENR_IOPCEN | RCC_APB2ENR_AFIOEN;
+    RCC->APB2ENR |= RCC_APB2ENR_IOPCEN | RCC_APB2ENR_AFIOEN | RCC_APB2ENR_IOPBEN;
     if (spi == SPI1) {
         RCC->APB2ENR |= RCC_APB2ENR_SPI1EN | RCC_APB2ENR_IOPAEN;
     } else if (spi == SPI2) {
         RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
-        RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
     }
+
+    // Cấu hình PB0 (SD_DETECT) là Input Pull-Up để chống nhiễu từ bus SPI
+    GPIOB->CRL &= ~(0xF << 0);
+    GPIOB->CRL |= (0x8 << 0);
+    GPIOB->ODR |= (1 << 0); // Kéo lên HIGH
+    
+    // Cấu hình PB1 (SD_POWER_EN) là Output Push-Pull 50MHz
+    GPIOB->CRL &= ~(0xF << 4);
+    GPIOB->CRL |= (0x3 << 4);
 
     // 2. Configure CS Pin (PC8) as Output Push-Pull 50MHz
     if (cs_port == GPIOC && cs_pin == (1<<8)) {
@@ -56,6 +64,32 @@ void SdCard::init() {
     }
 
     csHigh();
+    powerOn(); // Mặc định cấp nguồn cho thẻ nhớ
+}
+
+bool SdCard::checkPhysicalPresence() {
+    // Thẻ cắm vào sẽ kéo PB0 xuống GND (LOW)
+    // Rút thẻ ra sẽ bị kéo lên HIGH (nhờ Pull-Up)
+    // Thêm lọc nhiễu phần mềm (đọc 10 lần liên tiếp) để chống nhiễu chéo từ RFID
+    for (int i = 0; i < 10; i++) {
+        if ((GPIOB->IDR & (1 << 0)) != 0) {
+            return false; // Chỉ cần 1 lần đọc thấy HIGH là báo không có thẻ
+        }
+        SystemTimer::delay_ms(2);
+    }
+    return true; // Phải LOW liên tục 20ms mới xác nhận là có thẻ cắm vào
+}
+
+void SdCard::powerOn() {
+    // PNP transistor: PB1 = 0 để bật nguồn SD
+    GPIOB->BRR = (1 << 1);
+    SystemTimer::delay_ms(50); // Chờ điện áp ổn định
+}
+
+void SdCard::powerOff() {
+    // PNP transistor: PB1 = 1 để tắt nguồn SD
+    GPIOB->BSRR = (1 << 1);
+    SystemTimer::delay_ms(50);
 }
 
 void SdCard::csLow() {
@@ -80,12 +114,12 @@ void SdCard::setSpiSpeedFast() {
 }
 
 uint8_t SdCard::spiTxRx(uint8_t data) {
-    spi->DR = data;
+    *((volatile uint8_t *)&spi->DR) = data;
     uint32_t timeout = 10000;
     while (!(spi->SR & SPI_SR_TXE) && --timeout);
     timeout = 10000;
     while (!(spi->SR & SPI_SR_RXNE) && --timeout);
-    return (uint8_t)spi->DR;
+    return *((volatile uint8_t *)&spi->DR);
 }
 
 uint8_t SdCard::waitReady() {
@@ -133,7 +167,12 @@ uint8_t SdCard::sendCmd(uint8_t cmd, uint32_t arg) {
 }
 
 uint8_t SdCard::initialize() {
-    stat = 0x01; 
+    stat = 0x01; // STA_NOINIT by default
+    
+    if (!checkPhysicalPresence()) {
+        stat = 0x02; // STA_NODISK (Không có thẻ)
+        return stat;
+    } 
    
     // Ensure SCK, MISO, MOSI are initialized based on SPI selected
     if (spi == SPI1) {
@@ -158,7 +197,7 @@ uint8_t SdCard::initialize() {
     }
     
     uint8_t cmd0_res = 0xFF;
-    for (int retry = 0; retry < 10; retry++) { 
+    for (int retry = 0; retry < 100; retry++) { // Tăng lên 100 lần (1 giây) cho thẻ dung lượng lớn
         csLow();
         cmd0_res = sendCmd(0, 0); 
         if (cmd0_res == 1) break;
@@ -168,23 +207,32 @@ uint8_t SdCard::initialize() {
     
     cardType = 0;
     if (cmd0_res == 1) {
+        // Gửi CMD8 với dải điện áp 2.7-3.6V (0x1) và check pattern (0xAA)
         if (sendCmd(8, 0x1AA) == 1) { 
-            for (int i = 0; i < 4; i++) spiTxRx(SD_DUMMY_BYTE); 
-            uint32_t tickstart = SystemTimer::getTick();
-            do {
-                sendCmd(55, 0);
-                if (sendCmd(41, 1UL << 30) == 0) { 
-                    stat &= ~0x01; 
-                    break;
-                }
-            } while ((SystemTimer::getTick() - tickstart) < 1000); 
+            uint8_t ocr[4];
+            for (int i = 0; i < 4; i++) ocr[i] = spiTxRx(SD_DUMMY_BYTE); 
             
-            if (sendCmd(58, 0) == 0) {
-                uint8_t ocr[4];
-                for (int i = 0; i < 4; i++) ocr[i] = spiTxRx(SD_DUMMY_BYTE);
-                if (ocr[0] & 0x40) cardType = 1; 
+            if (ocr[2] == 0x01 && ocr[3] == 0xAA) {
+                // Thẻ SDv2 hợp lệ, gửi ACMD41 với cờ HCS (Host Capacity Support = bit 30)
+                uint32_t tickstart = SystemTimer::getTick();
+                do {
+                    sendCmd(55, 0);
+                    if (sendCmd(41, 1UL << 30) == 0) { 
+                        stat &= ~0x01; 
+                        break;
+                    }
+                } while ((SystemTimer::getTick() - tickstart) < 2000); // Tăng lên 2000ms
+                
+                // Nếu khởi tạo thành công, đọc thanh ghi OCR qua CMD58 để xác định thẻ SDHC/SDXC
+                if (!(stat & 0x01) && sendCmd(58, 0) == 0) {
+                    for (int i = 0; i < 4; i++) ocr[i] = spiTxRx(SD_DUMMY_BYTE);
+                    if (ocr[0] & 0x40) {
+                        cardType = 1; // SDHC hoặc SDXC (Block Addressing)
+                    }
+                }
             }
         } else {
+            // Thẻ SDv1 hoặc MMC
             uint32_t tickstart = SystemTimer::getTick();
             do {
                 sendCmd(55, 0);
@@ -192,7 +240,7 @@ uint8_t SdCard::initialize() {
                     stat &= ~0x01; 
                     break;
                 }
-            } while ((SystemTimer::getTick() - tickstart) < 1000); 
+            } while ((SystemTimer::getTick() - tickstart) < 2000); // Tăng lên 2000ms
         }
     }
     

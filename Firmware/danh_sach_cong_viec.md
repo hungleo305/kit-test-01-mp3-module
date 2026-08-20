@@ -20,44 +20,57 @@ Tài liệu này theo dõi tiến độ các hạng mục cần nâng cấp/sử
   1. Chạy băng chuyền cho đếm đến 150. Rút điện mạch đột ngột. Cắm điện lại. Kết quả mong đợi: Màn hình hiển thị ngay lập tức số 150.
   2. Bắn lệnh set số đếm qua mạng CAN thành 5000. Rút điện và cắm lại. Kết quả mong đợi: Giữ nguyên 5000.
 
-### Task 3: Tăng độ nhạy ngắt cảm biến 
+### Task 3: Tăng độ nhạy ngắt cảm biến & Máy chẩn đoán quang học
 - **Trạng thái:** Đã hoàn thành
-- **Mục tiêu:** Cảm biến phải bắt được vật thể lướt qua với tốc độ cực cao, không bị điểm mù do thuật toán chống rung (Debounce) bằng phần mềm gây ra.
+- **Mục tiêu:** Cảm biến phải bắt được vật thể lướt qua với tốc độ cực cao. Xây dựng công cụ đo đạc thời gian thực tế cảm biến bị che khuất và khoảng hở giữa các lần che.
 - **Kịch bản kiểm thử :**
   1. Dùng tay (hoặc vật cản) lướt qua cảm biến cực nhanh 2 - 3 lần liên tục. Kết quả mong đợi: Còi bíp đủ số lần, bộ đếm nhảy đủ số lượng.
-  2. Bật chế độ "Stress Test" trong mã nguồn ,kết quả mong đợi: Gói tin CAN ID `0x123` đẩy lên Cangaroo chỉ ra MCU có thể xử lý thành công ~370.000 sự kiện/giây.
+  2. Bật chế độ `Diagnostic Mode` trong `main.cpp`, che tay vào cảm biến rồi rút ra. Kết quả mong đợi: Cangaroo nhận được gói tin CAN `0x124` dài 8 Byte (mã BCD hệ thập phân dễ đọc). 4 Byte đầu là thời gian che (Block Time), 4 Byte sau là khoảng hở (Gap Time) tính bằng mili-giây.
 
 ---
 
 ## 2. Nâng cấp module thẻ nhớ SD & Audio (SD Card & MP3)
 
 ### Task 4: Tối ưu cơ chế nhận diện và kết nối thẻ SD
-- **Trạng thái:** Chưa bắt đầu 
-- **Mục tiêu:** Tự động phát hiện thẻ bị rút/cắm vào ngay lập tức (Zero Delay) thông qua chân tín hiệu phần cứng Detect (PB0) thay vì phải liên tục gọi hàm Polling . Đảm bảo thư viện hỗ trợ tốt mọi loại thẻ SD.
+- **Trạng thái:** Đã hoàn thành
+- **Mục tiêu:** Tự động phát hiện thẻ bị rút/cắm vào ngay lập tức qua chân cứng Detect (PB0) thay vì Polling. Chống nhiễu chéo từ RFID, ngăn chặn vòng lặp khởi tạo vô tận (treo hệ thống) khi cắm thẻ hỏng. Nâng cấp thư viện hỗ trợ tương thích hoàn hảo thẻ dung lượng cao SDHC/SDXC (16GB, 64GB).
 - **Kịch bản kiểm thử :**
-  1. Đang chạy bình thường, rút thẻ SD ra. Kết quả mong đợi: Còi báo hiệu thẻ lỗi ngay lập tức (không cần đợi vài giây).
-  2. Cắm thẻ SD vào lại. Kết quả mong đợi: Mạch tự động Mount lại File System ngay lập tức và sẵn sàng đọc file.
+  1. Đang chạy bình thường, rút thẻ SD ra. Kết quả mong đợi: Còi báo hiệu thẻ lỗi 1 tiếng bíp ngay lập tức (không cần đợi vài giây).
+  2. Cắm thẻ SD tốt vào lại. Kết quả mong đợi: Mạch Mount thành công, bíp 2 tiếng và sẵn sàng.
+  3. Cắm thẻ SD hỏng/chưa format đúng FAT32 vào. Kết quả mong đợi: Mạch báo lỗi (bíp 3 hoặc 5 tiếng) rồi nghỉ, CPU rảnh rỗi tuyệt đối, quẹt thẻ RFID vẫn mượt mà không bị đơ.
 
-### Task 5: Hot-plug thẻ nhớ không gián đoạn âm thanh
-- **Trạng thái:** Chưa bắt đầu 
-- **Mục tiêu:** Nếu người dùng rút thẻ SD trong lúc đang phát nhạc và cắm lại rất nhanh, hệ thống phải lưu được con trỏ file (File Pointer) và tiếp tục phát ở đúng giây bị gián đoạn.
+### Task 5: Đo tốc độ nhận diện thẻ SD & Triệt tiêu âm thanh "bụp" khởi động
+- **Trạng thái:** Đã hoàn thành
+- **Mục tiêu:** Đo đạc được thời gian mạch khởi tạo thành công thẻ SD và hiển thị/truyền qua CAN bus. Đồng thời loại bỏ tiếng tạp âm (pop noise) phát ra loa khi mạch vừa khởi động hoặc thao tác rút/cắm thẻ bằng chân MUTE của Amply (PA4).
 - **Kịch bản kiểm thử :**
-  1. Cho mạch phát một file mp3 dài khoảng 20 giây. Đến giây thứ 5, rút thẻ SD ra và cắm lại ngay. Kết quả mong đợi: Bài nhạc tiếp tục phát từ khoảng giây thứ 5.
+  1. Cấp nguồn hoặc bấm Reset hệ thống. Kết quả mong đợi: Loa hoàn toàn im lặng, không có tiếng bụp.
+  2. Rút thẻ SD và cắm lại nóng. Kết quả mong đợi: Đèn LED hiển thị thời gian kết nối (ms), loa im lặng tuyệt đối không xẹt nhiễu, sau đó báo 2 bíp và phát nhạc bình thường. Dữ liệu trên CAN sniffer báo đúng BCD frame `0x125`.
+
+---
+
+### Task 6: Lưu và khôi phục trạng thái phát nhạc khi nóng-rút thẻ (Hot-plug Resume)
+- **Trạng thái:** Đã hoàn thành
+- **Mục tiêu:** Mạch phải tự động lưu lại điểm dừng của bài hát đang phát nếu người dùng rút thẻ nhớ đột ngột. Khi cắm thẻ vào lại, mạch tự động tìm file cũ và phát tiếp từ điểm bị ngắt thay vì hát lại từ đầu. Hỗ trợ ghi thẻ RFID `PHAT_NHAC` thông qua câu lệnh CANBus ID `0x204`.
+- **Kịch bản kiểm thử:**
+  1. Cho chạy file nhạc dài `MUSIC.MP3` bằng thẻ RFID. Đột ngột rút thẻ nhớ.
+  2. Cắm thẻ nhớ lại. Kết quả mong đợi: Bản nhạc tự động nhảy tới đúng mili-giây bị ngắt và hát nối tiếp mượt mà.
 
 ---
 
 ## 3. Cải thiện canbus
 
-### Task 6: Tối ưu & hiển thị trạng thái mạng CAN Bus
-- **Trạng thái:** Chưa bắt đầu
-- **Mục tiêu:** Tối ưu hóa băng thông mạng CAN, giảm tỷ lệ lỗi gói tin và hiển thị cảnh báo rõ ràng khi mạng bị mất kết nối. Thêm hiển thị rõ ràng các giá trị được gửi và nhận có nghĩa là gì thay vì chỉ mỗi giá trị
+### Task 7: Tối ưu mạng CAN và Cảnh báo lỗi
+- [x] Tối ưu hóa băng thông (chỉ gửi frame định kỳ/sự kiện).
+- [x] Kích hoạt chế độ `AutoBusOff` (Tự phục hồi sau khi đứt dây).
+- [x] Thêm file `database.dbc` để hiển thị tiếng Việt rõ ràng trên Cangaroo thay vì mã Hex.
+- [x] Thêm cảnh báo thông minh bằng còi và chớp `----` khi đứt cáp, tự dọn lỗi khi cắm lại.
 
 
 ---
 
 ## 4. Quản lý tài nguyên
 
-### Task 7: Đánh giá và tối ưu tài nguyên Chip 
+### Task 8: Đánh giá và tối ưu tài nguyên Chip 
 - **Trạng thái:** Chưa bắt đầu 
 - **Mục tiêu:** Đo đạc mức sử dụng cpu, mức độ sử dụng RAM và Stack để đảm bảo mạch không bao giờ bị  quá tải hoặc tràn bộ nhớ.
 - **Kịch bản kiểm thử (Test Cases):**

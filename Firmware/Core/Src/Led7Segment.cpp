@@ -190,3 +190,25 @@ void Led7Segment::turnOff() {
 void Led7Segment::turnOn() {
     strobePort->BRR = strobePin;
 }
+
+void Led7Segment::showDashes() {
+    __disable_irq();
+    cachedClockState = (getClockState != nullptr) ? getClockState() : false;
+    strobePort->BSRR = strobePin; // Turn OFF screen
+    
+    // Segment 'g' (dấu gạch ngang) tương ứng với bit 7 (0x80) cho cả chip chuẩn và SO3
+    for(int i = 0; i < 4; i++) {
+        uint8_t segment = 0x80;
+        for (int8_t b = 7; b >= 0; b--) {
+            if (segment & (1 << b)) dataPort->BSRR = dataPin;
+            else dataPort->BRR = dataPin;
+            __NOP(); __NOP(); clockPulse();
+        }
+    }
+    
+    strobePort->BRR = strobePin; // Turn ON screen
+    dataPort->BRR = dataPin;
+    if (cachedClockState) clockPort->BSRR = clockPin;
+    else clockPort->BRR  = clockPin;
+    __enable_irq();
+}

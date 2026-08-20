@@ -26,6 +26,9 @@ public:
     SdCard(SPI_TypeDef *spi, GPIO_TypeDef *cs_port, uint16_t cs_pin);
     
     void init();
+    bool checkPhysicalPresence();
+    void powerOn();
+    void powerOff();
     uint8_t initialize();
     uint8_t status();
     uint8_t read(uint8_t *buff, uint32_t sector, uint32_t count);
