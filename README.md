@@ -6,7 +6,7 @@ Dự án mạch Kit điều khiển đa năng giao tiếp CAN Bus, tích hợp �
 
 ## 1. CẤU TRÚC THƯ MỤC DỰ ÁN
 
-`	ext
+`	Text
 kit-test-01-mp3-module/
 ├── Core/
 │   ├── Inc/                # Header thư viện (.h)
