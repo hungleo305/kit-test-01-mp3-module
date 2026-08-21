@@ -1,4 +1,4 @@
-#include "SystemTimer.h"
+﻿#include "SystemTimer.h"
 
 uint32_t SystemTimer::getTick() {
     return HAL_GetTick();

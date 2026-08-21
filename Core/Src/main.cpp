@@ -1,4 +1,4 @@
-/* USER CODE BEGIN Header */
+﻿/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
@@ -69,6 +69,7 @@ Buzzer buzzer(GPIOC, 1<<15);
 Sensor cb(GPIOC, 1<<13);
 Relay relay(GPIOC, 1<<7);
 bool getRelayState() { return relay.isOn(); }
+volatile bool rtcErrorFlag = false;
 Led7Segment dp(GPIOC, 1<<5, GPIOC, 1<<7, GPIOC, 1<<6);
 Rtc rtc(I2C1, GPIOB, 1<<6, GPIOB, 1<<7);
 Rfid rfid(SPI3, GPIOA, 1<<15, GPIOC, 1<<14);
@@ -194,6 +195,7 @@ int main(void)
   NVIC_EnableIRQ(EXTI0_IRQn);
   NVIC_SetPriority(EXTI0_IRQn, 5); // Độ ưu tiên trung bình
   buzzer.beep(2, 50, 100);
+    SystemTimer::delay_ms(300); // Chờ tiếng bíp khởi động hoàn tất
   
   /* ====== BẬT/TẮT BÀI KIỂM TRA CẢM BIẾN (DIAGNOSTIC TEST) ====== */
   /* Bỏ comment dòng dưới để BẬT chế độ đo đạc quang học cảm biến qua CAN */
@@ -368,6 +370,10 @@ int main(void)
     {
       buzzer.beep(1, 50, 0);
       Sensor ::isDetected =false;
+      // Chuyển màn hình về đếm số ngay lập tức
+      isShowingTime = false;
+      lastDisplayToggle = currentTick;
+      lastDisplayValue = 0xFFFF; // Cập nhật lại số đếm
     }
       if(Sensor::productCount >= mucTieu && !datMucTieu){
         datMucTieu = true;

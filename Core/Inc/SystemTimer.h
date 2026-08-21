@@ -1,4 +1,4 @@
-#ifndef SYSTEM_TIMER_H
+﻿#ifndef SYSTEM_TIMER_H
 #define SYSTEM_TIMER_H
 
 #include "stm32f1xx.h"

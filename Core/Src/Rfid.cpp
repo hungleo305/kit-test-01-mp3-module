@@ -1,4 +1,4 @@
-#include "Rfid.h"
+﻿#include "Rfid.h"
 
 Rfid::Rfid(SPI_TypeDef* spi, GPIO_TypeDef* csPort, uint16_t csPin, GPIO_TypeDef* rstPort, uint16_t rstPin)
     : spi(spi), csPort(csPort), csPin(csPin), rstPort(rstPort), rstPin(rstPin) {}

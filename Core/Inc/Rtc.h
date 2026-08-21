@@ -1,4 +1,4 @@
-#ifndef RTC_H
+﻿#ifndef RTC_H
 #define RTC_H
 
 #include "stm32f1xx.h"
@@ -21,6 +21,8 @@ public:
     void init();
     void setTime(uint8_t hour, uint8_t minute, uint8_t second);
     void getTime(uint8_t &hour, uint8_t &minute, uint8_t &second);
+    void setDate(uint8_t dayOfWeek, uint8_t date, uint8_t month, uint8_t year);
+    void getDate(uint8_t &dayOfWeek, uint8_t &date, uint8_t &month, uint8_t &year);
     bool isTimeLost();
 };
 

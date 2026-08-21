@@ -1,4 +1,4 @@
-#ifndef CANBUS_H
+﻿#ifndef CANBUS_H
 #define CANBUS_H
 
 #include "stm32f1xx_hal.h"

@@ -1,4 +1,4 @@
-#include "SdCard.h"
+﻿#include "SdCard.h"
 #include "SystemTimer.h"
 
 #define SD_DUMMY_BYTE 0xFF
@@ -167,7 +167,7 @@ uint8_t SdCard::initialize() {
     stat = 0x01; // STA_NOINIT by default
     
     if (!checkPhysicalPresence()) {
-        stat = 0x02; // STA_NODISK (Không có thẻ)
+        stat = 0x03; // STA_NODISK (Không có thẻ)
         return stat;
     } 
    

@@ -1,4 +1,4 @@
-#include "Sensor.h"
+﻿#include "Sensor.h"
 #include "SystemTimer.h"
 
 volatile uint16_t Sensor::productCount = 0;
@@ -17,9 +17,9 @@ volatile bool Sensor::newDataReady = false;
 void Sensor::enableDiagnosticMode(bool enable) {
     isDiagnosticMode = enable;
     if (enable) {
-        EXTI->RTSR |= (1 << 13); // Bật thêm ngắt cạnh lên
+        EXTI->RTSR |= (1 << 13); // Báº­t thĂªm ngáº¯t cáº¡nh lĂªn
     } else {
-        EXTI->RTSR &= ~(1 << 13); // Tắt ngắt cạnh lên, trở về bình thường
+        EXTI->RTSR &= ~(1 << 13); // Táº¯t ngáº¯t cáº¡nh lĂªn, trá»Ÿ vá» bĂ¬nh thÆ°á»ng
     }
 }
 
@@ -55,7 +55,7 @@ void Sensor::init() {
         port->CRH &= ~(0xF << ((pinIndex - 8) * 4));
         port->CRH |= (0x8 << ((pinIndex - 8) * 4));  
     }
-    port->ODR |= pin; // Kéo trở Pull-up
+    port->ODR |= pin; // KĂ©o trá»Ÿ Pull-up
     
     uint32_t portIndex = (port == GPIOA) ? 0 : (port == GPIOB) ? 1 : (port == GPIOC) ? 2 : 3;
     AFIO->EXTICR[pinIndex / 4] &= ~(0xF << ((pinIndex % 4) * 4));
@@ -97,6 +97,7 @@ void Sensor::handleInterrupt(uint16_t extiPin) {
                     if (isPinHigh) { 
                         // Cạnh lên (Mức CAO): Bắt đầu che
                         if (lastExitTick > 0) {
+                            prevGapDuration = gapDuration;
                             gapDuration = currentTick - lastExitTick; 
                         }
                         lastEnterTick = currentTick;
@@ -104,8 +105,6 @@ void Sensor::handleInterrupt(uint16_t extiPin) {
                         // Cạnh xuống (Mức THẤP): Rút tay ra
                         if (lastEnterTick > 0) {
                             prevBlockDuration = blockDuration;
-                            prevGapDuration = gapDuration;
-                            
                             blockDuration = currentTick - lastEnterTick; 
                             newDataReady = true; // Rút tay ra mới gửi CAN
                         }
@@ -117,12 +116,11 @@ void Sensor::handleInterrupt(uint16_t extiPin) {
             }
         }
         
-        // Phục hồi nguyên bản code của sếp: Đếm khi ĐƯA TAY VÀO (Ngắt cạnh xuống)
-        // Set thời gian khóa nhiễu (Debounce) về nguyên gốc 200ms để làm bài test chứng minh
-        bool isPinLow = (GPIOC->IDR & (1 << 13)) == 0;
+        // Phục hồi nguyên bản code của sếp: Đếm sản phẩm khi ngắt cạnh xuống
+        bool isPinLow = !isPinHigh;
         
-        if (isPinLow && (currentTick - lastInterruptTick > 200)) {
-            //Ghi giá trị đếm mới vào thanh ghi BKP->DR1 để chống mất điện
+        if (isPinLow && (currentTick - lastInterruptTick > 20)) {
+            // Ghi giá trị đếm mới vào thanh ghi BKP->DR1 để chống mất điện (Task 2)
             productCount++;
             BKP->DR1 = productCount;
             isDetected = true;
@@ -134,3 +132,6 @@ void Sensor::handleInterrupt(uint16_t extiPin) {
 extern "C" void EXTI15_10_IRQHandler(void) {
     Sensor::handleInterrupt(1 << 13);
 }
+
+
+

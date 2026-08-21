@@ -1,4 +1,4 @@
-#ifndef BUZZER_H
+﻿#ifndef BUZZER_H
 #define BUZZER_H
 
 #include "stm32f1xx.h"

@@ -1,4 +1,4 @@
-#include "Rtc.h"
+﻿#include "Rtc.h"
 
 uint8_t Rtc::decToBcd(uint8_t val) {
     return ((val / 10) << 4) | (val % 10);
@@ -115,11 +115,18 @@ void Rtc::getTime(uint8_t &hour, uint8_t &minute, uint8_t &second) {
     hour   = bcdToDec(i2cRead(0x02) & 0x3F);
 }
 bool Rtc::isTimeLost() {
-    uint8_t secReg = i2cRead(0x00);
-    
-    if (secReg & 0x80) {
-        return true;
+    // Đọc thử vài lần để tránh nhiễu I2C lúc khởi động
+    for (int i = 0; i < 3; i++) {
+        uint8_t secReg = i2cRead(0x00);
+        // Nếu đọc được bit 7 == 0 (Clock đang chạy), thì kết luận là không lỗi
+        if ((secReg & 0x80) == 0) {
+            return false;
+        }
+        HAL_Delay(5);
     }
+    // Nếu cả 3 lần đọc đều thấy bit 7 == 1 (Clock Halt), chắc chắn mất thời gian
+    return true;
+}
     
     return false;
 }

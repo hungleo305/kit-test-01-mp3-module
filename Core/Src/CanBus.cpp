@@ -1,4 +1,4 @@
-#include "CanBus.h"
+﻿#include "CanBus.h"
 
 CanBus::CanBus(CAN_HandleTypeDef* hcan_ptr) {
     hcan = hcan_ptr;

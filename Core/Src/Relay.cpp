@@ -1,4 +1,4 @@
-#include "Relay.h"
+﻿#include "Relay.h"
 
 Relay::Relay(GPIO_TypeDef* port, uint16_t pin) : port(port), pin(pin) {}
 

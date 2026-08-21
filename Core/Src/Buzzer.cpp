@@ -1,4 +1,4 @@
-#include "Buzzer.h"
+﻿#include "Buzzer.h"
 #include "SystemTimer.h"
 
 Buzzer::Buzzer(GPIO_TypeDef* port, uint16_t pin) : port(port), pin(pin) {}
