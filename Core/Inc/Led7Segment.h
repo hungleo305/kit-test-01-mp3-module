@@ -11,11 +11,9 @@ private:
     uint16_t clockPin;
     GPIO_TypeDef* strobePort;
     uint16_t strobePin;
-    bool (*getClockState)();
     
     uint16_t displayValue;
     bool colonState;
-    bool cachedClockState;
 
     void clockPulse();
     void sendBit(uint8_t bit);
@@ -25,8 +23,7 @@ private:
 public:
     Led7Segment(GPIO_TypeDef* dataPort, uint16_t dataPin, 
                 GPIO_TypeDef* clockPort, uint16_t clockPin, 
-                GPIO_TypeDef* strobePort, uint16_t strobePin, 
-                bool (*getClockState)() = nullptr);
+                GPIO_TypeDef* strobePort, uint16_t strobePin);
     void init();
     void setValue(uint16_t val);
     void setColon(bool state);

@@ -7,12 +7,10 @@ const uint8_t BANG_MA_LED_SO3[10] = {0x77, 0x44, 0xB6, 0xE6, 0xC5, 0xE3, 0xF3, 0
 
 Led7Segment::Led7Segment(GPIO_TypeDef* dataPort, uint16_t dataPin, 
                          GPIO_TypeDef* clockPort, uint16_t clockPin, 
-                         GPIO_TypeDef* strobePort, uint16_t strobePin, 
-                         bool (*getClockState)()) 
+                         GPIO_TypeDef* strobePort, uint16_t strobePin) 
     : dataPort(dataPort), dataPin(dataPin), 
       clockPort(clockPort), clockPin(clockPin), 
-      strobePort(strobePort), strobePin(strobePin), 
-      getClockState(getClockState) {}
+      strobePort(strobePort), strobePin(strobePin) {}
 
 void Led7Segment::init() {
     if (dataPort == GPIOA || clockPort == GPIOA || strobePort == GPIOA) RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
@@ -39,7 +37,6 @@ void Led7Segment::init() {
     
     displayValue = 0;
     colonState = false;
-    cachedClockState = false;
     
     for(int i = 0; i < 4; i++) {
       sendByte(0x00);
@@ -50,18 +47,21 @@ void Led7Segment::init() {
 
 void Led7Segment::clockPulse()
 {
-    if (cachedClockState) {
-        // Relay is ON (pin is HIGH).
-        clockPort->BRR = clockPin;              
-        for(volatile int d=0; d<5; d++);           
-        clockPort->BSRR = clockPin;                
-        for(volatile int d=0; d<5; d++);           
+    // Tu dong kiem tra trang thai thuc te cua chan phan cung (khong lam anh huong Relay)
+    bool isHigh = (clockPort->ODR & clockPin) != 0;
+    
+    if (isHigh) {
+        // Neu pin dang HIGH -> keo LOW roi tra lai HIGH
+        clockPort->BRR = clockPin;
+        for(volatile int d=0; d<5; d++);
+        clockPort->BSRR = clockPin;
+        for(volatile int d=0; d<5; d++);
     } else {
-        // Relay is OFF (pin is LOW).
+        // Neu pin dang LOW -> keo HIGH roi tra lai LOW
         clockPort->BSRR = clockPin;                
         for(volatile int d=0; d<5; d++);            
         clockPort->BRR = clockPin;                  
-        for(volatile int d=0; d<5; d++);            
+        for(volatile int d=0; d<5; d++);
     }
 }
 
@@ -102,8 +102,6 @@ void Led7Segment::setColon(bool state) {
 void Led7Segment::update(bool isTimeMode)
 {
     __disable_irq();
-
-    cachedClockState = (getClockState != nullptr) ? getClockState() : false;
 
     // Turn OFF screen to hide shifting (OE HIGH)
     strobePort->BSRR = strobePin; 
@@ -148,34 +146,20 @@ void Led7Segment::update(bool isTimeMode)
     
     // Set Data LOW just in case
     dataPort->BRR = dataPin;
-
-    if (cachedClockState) {
-        clockPort->BSRR = clockPin;
-    } else {
-        clockPort->BRR  = clockPin;
-    }
-
     __enable_irq();
 }
 
 void Led7Segment::blank() {
     __disable_irq();
     
-    cachedClockState = (getClockState != nullptr) ? getClockState() : false;
-    
-    strobePort->BSRR = strobePin; // Turn OFF screen
+    strobePort->BRR = strobePin; // Lock STROBE screen
     for(int i = 0; i < 4; i++) {
       sendByte(0x00);
     }
     
-    strobePort->BRR = strobePin; // Turn ON screen
+    latch(); // Latch output
     
     dataPort->BRR = dataPin;
-    if (cachedClockState) {
-        clockPort->BSRR = clockPin;
-    } else {
-        clockPort->BRR  = clockPin;
-    }
     __enable_irq();
 }
 
@@ -193,8 +177,7 @@ void Led7Segment::turnOn() {
 
 void Led7Segment::showDashes() {
     __disable_irq();
-    cachedClockState = (getClockState != nullptr) ? getClockState() : false;
-    strobePort->BSRR = strobePin; // Turn OFF screen
+    strobePort->BRR = strobePin; // Lock STROBE screen
     
     // Segment 'g' (dấu gạch ngang) tương ứng với bit 7 (0x80) cho cả chip chuẩn và SO3
     for(int i = 0; i < 4; i++) {
@@ -206,9 +189,7 @@ void Led7Segment::showDashes() {
         }
     }
     
-    strobePort->BRR = strobePin; // Turn ON screen
+    latch(); // Latch output
     dataPort->BRR = dataPin;
-    if (cachedClockState) clockPort->BSRR = clockPin;
-    else clockPort->BRR  = clockPin;
     __enable_irq();
 }

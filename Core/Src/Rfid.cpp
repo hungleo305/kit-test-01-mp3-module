@@ -13,13 +13,7 @@ void Rfid::csLow() {
 
     spi->CR1 |= SPI_CR1_SPE;
 
-    if (spi == SPI1) {
-        uint32_t tmpreg = AFIO->MAPR;
-        tmpreg &= ~AFIO_MAPR_SWJ_CFG_Msk; 
-        tmpreg |= (0x2 << 24);            
-        tmpreg |= AFIO_MAPR_SPI1_REMAP;   // Remap sang PB3, PB4, PB5
-        AFIO->MAPR = tmpreg;
-    }
+    
     
     volatile uint32_t dummy = spi->DR;
     dummy = spi->SR;
@@ -52,22 +46,23 @@ void Rfid::init() {
     
     if (spi == SPI1) RCC->APB2ENR |= RCC_APB2ENR_SPI1EN;
     else if (spi == SPI2) RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
+    else if (spi == SPI3) RCC->APB1ENR |= RCC_APB1ENR_SPI3EN;
     
     if (spi == SPI1) {
+        RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
+        GPIOA->CRL &= ~(0xF << 20 | 0xF << 28); GPIOA->CRL |=  (0xB << 20 | 0xB << 28); 
+        GPIOA->CRL &= ~(0xF << 24); GPIOA->CRL |=  (0x8 << 24); GPIOA->ODR |= (1 << 6); 
+    } else if (spi == SPI2) {
+        RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
+        GPIOB->CRH &= ~(0xF << 20 | 0xF << 24 | 0xF << 28);
+        GPIOB->CRH |=  (0xB << 20 | 0x8 << 24 | 0xB << 28);
+        GPIOB->ODR |= (1 << 14); 
+    } else if (spi == SPI3) {
         RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
         AFIO->MAPR = (AFIO->MAPR & ~AFIO_MAPR_SWJ_CFG_Msk) | AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
-        AFIO->MAPR |= AFIO_MAPR_SPI1_REMAP; 
         
         GPIOB->CRL &= ~(0xF << 12 | 0xF << 20); GPIOB->CRL |=  (0xB << 12 | 0xB << 20); 
         GPIOB->CRL &= ~(0xF << 16); GPIOB->CRL |=  (0x8 << 16); GPIOB->ODR |= (1 << 4); 
-        
-        GPIOB->CRH &= ~(0xF << 4);  GPIOB->CRH |=  (0x8 << 4); GPIOB->ODR |= (1 << 9); 
-    } else if (spi == SPI2) {
-        RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
-        // PB13 (SCK) & PB15 (MOSI) Alt Func PP 50MHz, PB14 (MISO) Input Pull-Up
-        GPIOB->CRH &= ~(0xF << 20 | 0xF << 24 | 0xF << 28);
-        GPIOB->CRH |=  (0xB << 20 | 0x8 << 24 | 0xB << 28);
-        GPIOB->ODR |= (1 << 14); // Pull-up for MISO
     }
     
     GPIO_TypeDef* ports[] = {csPort, rstPort};

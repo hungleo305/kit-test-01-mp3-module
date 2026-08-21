@@ -15,13 +15,7 @@ static void applySpiSettings(SPI_TypeDef *spi) {
 
     spi->CR1 |= SPI_CR1_SPE;
 
-    uint32_t tmpreg = AFIO->MAPR;
-    tmpreg &= ~AFIO_MAPR_SWJ_CFG_Msk;
-    tmpreg |= (0x2 << 24); 
-    if (spi == SPI1) {
-        tmpreg &= ~AFIO_MAPR_SPI1_REMAP; // Gỡ remap cho SPI1 để về PA5-6-7
-    }
-    AFIO->MAPR = tmpreg;
+    
 
     volatile uint32_t dummy = spi->DR;
     dummy = spi->SR;
@@ -41,6 +35,9 @@ void SdCard::init() {
     RCC->APB2ENR |= RCC_APB2ENR_IOPCEN | RCC_APB2ENR_AFIOEN | RCC_APB2ENR_IOPBEN;
     if (spi == SPI1) {
         RCC->APB2ENR |= RCC_APB2ENR_SPI1EN | RCC_APB2ENR_IOPAEN;
+        
+        GPIOA->CRL &= ~(0xF << 20 | 0xF << 28); GPIOA->CRL |=  (0xB << 20 | 0xB << 28); // PA5 SCK, PA7 MOSI
+        GPIOA->CRL &= ~(0xF << 24); GPIOA->CRL |=  (0x8 << 24); GPIOA->ODR |= (1 << 6); // PA6 MISO Pull-up
     } else if (spi == SPI2) {
         RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
     }

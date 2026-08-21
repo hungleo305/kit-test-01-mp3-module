@@ -61,7 +61,7 @@ extern uint8_t FATFS_LinkDriver(Diskio_drvTypeDef *drv, char *path);
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan;
 
-SPI_HandleTypeDef hspi1;
+SPI_HandleTypeDef hSPI3;
 SPI_HandleTypeDef hspi2;
 /* USER CODE BEGIN PV */
 Led ledOb(GPIOB, 1<<2);
@@ -69,9 +69,9 @@ Buzzer buzzer(GPIOC, 1<<15);
 Sensor cb(GPIOC, 1<<13);
 Relay relay(GPIOC, 1<<7);
 bool getRelayState() { return relay.isOn(); }
-Led7Segment dp(GPIOC, 1<<5, GPIOC, 1<<7, GPIOC, 1<<6, getRelayState);
+Led7Segment dp(GPIOC, 1<<5, GPIOC, 1<<7, GPIOC, 1<<6);
 Rtc rtc(I2C1, GPIOB, 1<<6, GPIOB, 1<<7);
-Rfid rfid(SPI1, GPIOA, 1<<15, GPIOC, 1<<14);
+Rfid rfid(SPI3, GPIOA, 1<<15, GPIOC, 1<<14);
 Mp3 mp3(&hspi2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3);
 SdCard sdCard(SPI1, GPIOC, 1<<8);
 
@@ -123,7 +123,7 @@ uint32_t lastSdCheck = 0;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
-static void MX_SPI1_Init(void);
+static void MX_SPI3_Init(void);
 static void MX_SPI2_Init(void);
 /* USER CODE BEGIN PFP */
 
@@ -163,7 +163,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_CAN_Init();
-  MX_SPI1_Init();
+  MX_SPI3_Init();
   MX_SPI2_Init();
   MX_FATFS_Init();
   MX_CAN_Init();
@@ -690,39 +690,39 @@ static void MX_CAN_Init(void)
 }
 
 /**
-  * @brief SPI1 Initialization Function
+  * @brief SPI3 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_SPI1_Init(void)
+static void MX_SPI3_Init(void)
 {
-  /* USER CODE BEGIN SPI1_Init 0 */
+  /* USER CODE BEGIN SPI3_Init 0 */
 
-  /* USER CODE END SPI1_Init 0 */
+  /* USER CODE END SPI3_Init 0 */
 
-  /* USER CODE BEGIN SPI1_Init 1 */
+  /* USER CODE BEGIN SPI3_Init 1 */
 
-  /* USER CODE END SPI1_Init 1 */
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8; 
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  /* USER CODE END SPI3_Init 1 */
+  /* SPI3 parameter configuration*/
+  hSPI3.Instance = SPI3;
+  hSPI3.Init.Mode = SPI_MODE_MASTER;
+  hSPI3.Init.Direction = SPI_DIRECTION_2LINES;
+  hSPI3.Init.DataSize = SPI_DATASIZE_8BIT;
+  hSPI3.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hSPI3.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hSPI3.Init.NSS = SPI_NSS_SOFT;
+  hSPI3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8; 
+  hSPI3.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hSPI3.Init.TIMode = SPI_TIMODE_DISABLE;
+  hSPI3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hSPI3.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hSPI3) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN SPI1_Init 2 */
+  /* USER CODE BEGIN SPI3_Init 2 */
 
-  /* USER CODE END SPI1_Init 2 */
+  /* USER CODE END SPI3_Init 2 */
 }
 /**
   * @brief SPI2 Initialization Function
