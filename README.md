@@ -27,7 +27,7 @@ kit-test-01-mp3-module/
 ├── kit_vna_can.dbc         # Database ánh xạ dữ liệu CAN
 ├── danh_sach_cong_viec.md  # Danh sách công việc
 └── README.md               # Tài liệu này
-`
+```
 ---
 
 ## 2. HƯỚNG DẪN SỬ DỤNG DÀNH CHO NGƯỜI DÙNG (KHÔNG CẦN BIẾT LẬP TRÌNH)
