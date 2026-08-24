@@ -19,9 +19,9 @@ Dự án mạch Kit STM32F103RCT6 điều khiển đa năng giao tiếp CAN Bus,
 kit-test-01-mp3-module/
 ├── Core/
 │   ├── Inc/                # Header thư viện C++ (.h)
-│   │   ├── Buzzer.h        # Còi chip (Hỗ trợ hàng đợi Non-blocking)
-│   │   ├── CanBus.h        # Mạng CAN (Hỗ trợ Auto-Recovery)
-│   │   ├── Led7Segment.h   # LED 7 đoạn
+│   │   ├── Buzzer.h        # Còi chip 
+│   │   ├── CanBus.h        # Mạng CAN 
+│   │   ├── Led7Segment.h   # LED 7 đoạn CD4094
 │   │   ├── Mp3.h           # Phát nhạc VS1101E
 │   │   ├── Relay.h         # Công tắc
 │   │   ├── Rfid.h          # Thẻ RC522
@@ -30,7 +30,7 @@ kit-test-01-mp3-module/
 │   │   ├── Sensor.h        # Cảm biến đếm
 │   │   └── SystemTimer.h   # Bộ đếm Non-blocking
 │   └── Src/                # Source code C/C++ (.cpp / .c)
-│       ├── main.cpp        # Vòng lặp chính, xử lý CAN và logic trung tâm
+│       ├── main.cpp        # Chương trình chính
 │       ├── Sensor.cpp      # Tích hợp sẵn ngắt EXTI (EXTI15_10_IRQHandler) để đọc cảm biến
 │       ├── stm32f1xx_it.c  # File chứa các ngắt hệ thống (SysTick, HardFault)
 │       └── *.cpp           # (Các file mã nguồn tương ứng cho thư viện trong thư mục Inc/)
@@ -444,7 +444,7 @@ Mạch Kit sử dụng vi điều khiển **STM32F103RCT6** (256 KB Flash, 48 KB
 
 Dựa trên file Memory Map (`EWARM/Firmware/List/Firmware.map`), dưới đây là mức tiêu thụ tài nguyên phần cứng của Firmware hiện tại:
 
-- **Dung lượng Flash (Read-only Code + Data):** `32.290 Bytes` (~31.53 KB) 👉 **Chỉ chiếm 12,31%**
-- **Dung lượng RAM (Read-write Data):** `4.120 Bytes` (~4.02 KB) 👉 **Chỉ chiếm 8,38%**
+- **Dung lượng Flash (Read-only Code + Data):** `32.290 Bytes` (~31.53 KB) **Chỉ chiếm 12,31%**
+- **Dung lượng RAM (Read-write Data):** `4.120 Bytes` (~4.02 KB) **Chỉ chiếm 8,38%**
 
-**Kết luận:** Dù tích hợp đồng thời nhiều module nặng (FatFs File System, giả mã MP3, giao thức CAN Bus và RFID), chương trình vẫn chạy rất nhẹ nhàng, chừa lại tới ~88% Flash và ~91% RAM. Lượng tài nguyên dư dả này đủ sức gánh thêm hàng chục tính năng cao cấp khác (kết nối Wifi/Bluetooth, màn hình LCD đồ họa...) mà không lo bị tràn bộ nhớ hay treo hệ thống (HardFault).
+**Kết luận:** Dù tích hợp đồng thời nhiều module nặng (FatFs File System, giả mã MP3, giao thức CAN Bus và RFID), chương trình vẫn chạy rất nhẹ nhàng, chừa lại tới ~88% Flash và ~91% RAM. Lượng tài nguyên dư dả này đủ sức gánh thêm các tính năng khác (kết nối Wifi/Bluetooth, màn hình LCD đồ họa...) mà không lo bị tràn bộ nhớ hay treo hệ thống (HardFault).
