@@ -43,14 +43,22 @@ Phần này hướng dẫn chi tiết cách vận hành mạch từ lúc cắm �
   2. **Giờ hiện tại (Giờ:Phút):** Dấu chấm ở giữa màn hình sẽ **NHẤP NHÁY** theo từng giây.
 
 ### 2.2. Cách đọc Cảnh báo bằng Còi và Màn hình
-Mạch có hệ thống tự động cảnh báo lỗi thông minh:
-- **Lỗi đứt dây mạng CAN (hoặc chưa cắm dây máy tính):** Còi kêu **10 tiếng bíp nhanh**. Sau đó, ở màn hình đếm số, dấu chấm sẽ nhấp nháy cực kỳ nhanh (5 lần/giây) để nhắc nhở không gửi dược dữ liệu qua canbus
-- **Lỗi mất thời gian thực :** Lúc mới bật máy sẽ im lặng hoàn toàn. Tới lúc màn hình chuyển sang xem giờ, thay vì hiện giờ, màn hình sẽ hiện chữ ---- nhấp nháy liên tục (1 lần/giây) mãi mãi. Cần nạp lại thời gian qua canbus.
-- **Lỗi Thẻ Nhớ (Thẻ hỏng, chưa cắm, hoặc sai định dạng):** Còi sẽ kêu 1 tiếng bíp dài báo lỗi. Mạch vẫn sẽ đếm sản phẩm và quẹt thẻ bình thường nhưng sẽ không phát ra bài nhạc nào cả.
+Mạch có hệ thống tự động cảnh báo lỗi và trạng thái thông minh:
+
+**Tín hiệu Còi (Buzzer):**
+- **1 Bíp ngắn:** Có sản phẩm đi qua cảm biến, HOẶC quẹt thẻ RFID thành công.
+- **1 Bíp dài (Nửa giây):** Cảnh báo MẤT kết nối mạng CAN.
+- **2 Bíp ngắn:** Khởi động mạch thành công, HOẶC cắm thẻ SD thành công, HOẶC nhận được cấu hình thành công từ CAN.
+- **3 Bíp ngắn:** Lỗi mất bộ nhớ Thời gian thực (RTC) lúc khởi động, HOẶC định dạng thẻ SD bị sai/không tìm thấy file MP3.
+- **5 Bíp ngắn:** Cắm thẻ SD nhưng không giao tiếp được (Thẻ bị hỏng vật lý hoặc không tương thích).
+
+**Tín hiệu Màn hình LED:**
+- **Lỗi đứt dây mạng CAN:** Ở chế độ đếm số, dấu chấm sẽ nhấp nháy cực kỳ nhanh (5 lần/giây) để nhắc nhở dữ liệu không gửi được.
+- **Lỗi mất thời gian thực (Hết pin RTC):** Ở chế độ Xem giờ, thay vì hiện giờ, màn hình sẽ hiện chữ `----` nhấp nháy liên tục (1 lần/giây) mãi mãi. Lúc này cần nạp lại thời gian qua phần mềm máy tính (mạng CAN).
 
 ### 2.3. Hướng dẫn sử dụng Thẻ Nhớ MP3 (Thẻ SD)
 - **Chuẩn bị thẻ:** Rút thẻ ra cắm vào máy tính, Format thẻ với định dạng **FAT32**. Sau đó copy các bài nhạc (đuôi file là .mp3) trực tiếp vào thẻ, không bỏ vào thư mục nào cả. 
-- **Rút/Cắm thẻ khi đang chạy (Hot-plug):** Nếu đang phát nhạc mà bạn vô tình rút thẻ ra -> Mạch kêu 1 bíp, tự động ngắt amply để loa không bị nổ lụp bụp, đồng thời ghi nhớ vị trí bài hát đang nghe. Khi cắm thẻ lại -> Mạch kêu 2 bíp và **tự động hát tiếp** đúng ngay đoạn nhạc vừa bị ngắt!
+- **Rút/Cắm thẻ khi đang chạy (Hot-plug):** Nếu đang phát nhạc mà bạn vô tình rút thẻ ra -> Mạch kêu **1 bíp**, tự động ngắt amply để loa không bị nổ lụp bụp, đồng thời lưu lại vị trí bài hát đang nghe dở. Khi cắm thẻ lại -> Mạch kêu **2 bíp** (báo kết nối thành công), màn hình hiển thị thời gian kết nối (ms), và **tự động hát tiếp** đúng ngay đoạn nhạc vừa bị ngắt!
 
 ### 2.4. Hướng dẫn đếm sản phẩm bằng Cảm biến
 - **Cách đếm:** Khi có sản phẩm chạy ngang qua mắt cảm biến, còi kêu 1 tiếng **Bíp** và số trên màn hình tăng lên 1. 

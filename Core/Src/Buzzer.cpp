@@ -1,4 +1,4 @@
-﻿#include "Buzzer.h"
+#include "Buzzer.h"
 #include "SystemTimer.h"
 
 Buzzer::Buzzer(GPIO_TypeDef* port, uint16_t pin) : port(port), pin(pin) {}
@@ -22,6 +22,9 @@ void Buzzer::init() {
     
     remainingBeeps = 0;
     isPulsing = false;
+    head = 0;
+    tail = 0;
+    count = 0;
     off();
 }
 
@@ -33,14 +36,49 @@ void Buzzer::off() {
     port->BRR = pin;
 }
 
-void Buzzer::beep(int times, int timeOn, int timeOff) {
-    if (times > 0) {
+void Buzzer::playNext() {
+    if (count > 0) {
+        remainingBeeps = queue[head].times;
+        tOn = queue[head].tOn;
+        tOff = queue[head].tOff;
+        head = (head + 1) % MAX_BEEP_QUEUE;
+        count--;
+        
+        isPulsing = true;
+        lastTick = SystemTimer::getTick();
+        on();
+    }
+}
+
+void Buzzer::beep(int times, int timeOn, int timeOff, bool instant) {
+    if (times <= 0) return;
+    
+    if (instant) {
+        // Xoa hang doi va phat ngay lap tuc
+        head = 0;
+        tail = 0;
+        count = 0;
+        
         remainingBeeps = times;
         tOn = timeOn;
         tOff = timeOff;
         isPulsing = true;
         lastTick = SystemTimer::getTick();
         on();
+    } else {
+        // Them vao hang doi
+        if (count < MAX_BEEP_QUEUE) {
+            queue[tail].times = times;
+            queue[tail].tOn = timeOn;
+            queue[tail].tOff = timeOff;
+            tail = (tail + 1) % MAX_BEEP_QUEUE;
+            count++;
+            
+            // Neu coi dang ranh thi phat luon
+            if (remainingBeeps == 0) {
+                playNext();
+            }
+        }
     }
 }
 
@@ -62,6 +100,8 @@ void Buzzer::update() {
                 on();
                 isPulsing = true;
                 lastTick = currentTick;
+            } else {
+                playNext();
             }
         }
     }

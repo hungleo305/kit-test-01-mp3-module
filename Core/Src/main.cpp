@@ -1,4 +1,4 @@
-﻿/* USER CODE BEGIN Header */
+/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
@@ -105,7 +105,7 @@ DIR rootDir;
 
 
 bool daNhanTheSD = false;
-volatile bool sdCardChanged = true; // Ban đầu bằng true để tự động check lần đầu
+volatile bool sdCardChanged = true; // Ban đầu b?ng true để tự động check lần đầu
 volatile uint32_t sdChangeTick = 0;
 bool sdCardInSlot = false; // Biến theo dõi trạng thái vật lý của thẻ trong khe
 uint32_t showMountTimeUntil = 0; // Biến lưu thời điểm kết thúc hiển thị thời gian kết nối thẻ
@@ -169,9 +169,9 @@ int main(void)
   MX_FATFS_Init();
   MX_CAN_Init();
   /* USER CODE BEGIN 2 */
-  //Kích hoạt nguồn và Clock cho Backup Register. Nạp lại biến đếm từ thanh ghi BKP->DR1
+  //Kích hoạt nguồn và Clock cho Backup Register. Nạp lại biến ầm từ thanh ghi BKP->DR1
   RCC->APB1ENR |= (RCC_APB1ENR_PWREN | RCC_APB1ENR_BKPEN); // Cấp xung nhịp cho PWR và BKP
-  PWR->CR |= PWR_CR_DBP; // Mở khóa cho phép ghi vào phân vùng Backup (Disable Backup Domain write protection)
+  PWR->CR |= PWR_CR_DBP; // Mở khóa cho phép ghi vào phần vùng Backup (Disable Backup Domain write protection)
   
   Sensor::productCount = BKP->DR1;
 
@@ -190,27 +190,28 @@ int main(void)
   AFIO->EXTICR[0] &= ~(0xF << 0);
   AFIO->EXTICR[0] |= (0x1 << 0); // Chọn Port B
   EXTI->IMR |= (1 << 0);
-  EXTI->RTSR |= (1 << 0); // Ngắt cạnh lên (Rút thẻ)
+  EXTI->RTSR |= (1 << 0); // Ngắt cạnh lên (Rớt thẻ)
   EXTI->FTSR |= (1 << 0); // Ngắt cạnh xuống (Cắm thẻ)
   NVIC_EnableIRQ(EXTI0_IRQn);
-  NVIC_SetPriority(EXTI0_IRQn, 5); // Độ ưu tiên trung bình
-  buzzer.beep(2, 50, 100);
-    SystemTimer::delay_ms(300); // Chờ tiếng bíp khởi động hoàn tất
+  NVIC_SetPriority(EXTI0_IRQn, 5); // Ưu tiên trung bình
+  buzzer.beep(2, 50, 100, true);
+    SystemTimer::delay_ms(300); // Chờ tiếng bíp khởi động hơn tắt
   
-  /* ====== BẬT/TẮT BÀI KIỂM TRA CẢM BIẾN (DIAGNOSTIC TEST) ====== */
-  /* Bỏ comment dòng dưới để BẬT chế độ đo đạc quang học cảm biến qua CAN */
+  /* ====== BẬT/TẮT BIẾN KIỂM TRA CẢM BIẾN (DIAGNOSTIC TEST) ====== */
+  /* Bỏ comment dòng dưới để BẬT chế độ kiểm tra cảm biến qua CAN */
   Sensor::enableDiagnosticMode(true);
   
   fres = f_mount(&fs, "", 1);
   if (fres != FR_OK) {
-      buzzer.beep(3, 100, 100);
+      (void)0; // buzzer.beep(3, 100, 100);
   }
 
   if (rtc.isTimeLost()) {
   
-      buzzer.beep(3, 100, 100); 
+      (void)0; // buzzer.beep(3, 100, 100); 
       
-      rtc.setTime(11, 7, 20); 
+
+      rtcErrorFlag = true;
   }
   
   dp.setColon(false);
@@ -233,6 +234,18 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    static bool lastCanError = false;
+    bool currentCanError = (CAN1->ESR & (CAN_ESR_BOFF | CAN_ESR_EPVF)) != 0;
+    if (currentCanError && !lastCanError) {
+        buzzer.beep(1, 500, 0); // Bao mat CAN 1 tieng bip dai
+    }
+    // Fix: Tự động xóa cờ lỗi của thư viện HAL khi phần cứng CAN đã kết nối lại thành công (ABOM)
+    if (!currentCanError && lastCanError) {
+        hcan.ErrorCode = HAL_CAN_ERROR_NONE;
+        hcan.State = HAL_CAN_STATE_LISTENING;
+    }
+    lastCanError = currentCanError;
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -241,7 +254,7 @@ int main(void)
     // Chỉ hoạt động khi enableDiagnosticMode(true) được gọi
     uint16_t currBlock, currGap, prevBlock, prevGap;
     if (Sensor::getDiagnosticData(currBlock, currGap, prevBlock, prevGap)) {
-        // Gửi qua CAN ID: 0x124 (Định dạng BCD để đọc trực tiếp số thập phân trên Cangaroo)
+        // Gửi qua CAN ID: 0x124 (định dạng BCD để đọc trực tiếp số thập phân trên Cangaroo)
         // Byte 0-1: Current Block, Byte 2-3: Current Gap
         // Byte 4-5: Previous Block, Byte 6-7: Previous Gap
         uint8_t canData[8] = {0};
@@ -281,13 +294,13 @@ int main(void)
             if (!cardPresent) {
                 // Rút thẻ
                 if (daNhanTheSD || sdCardInSlot) {
-                    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // Tắt Amply (Mute) để chống tiếng bụp
+                    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // Tắt Amply (Mute) để chống tiếng bíp
                     daNhanTheSD = false;
                     sdCardInSlot = false;
-                    mp3.saveState(); // Lưu trạng thái bài hát đang phát dở
+                    mp3.saveState(); // Lưu trạng thái bị ngắt để phát tiếp
                     mp3.init();
                     f_mount(NULL, "", 0); 
-                    buzzer.beep(1, 100, 0); // Kêu 1 tiếng báo hiệu đã rút thẻ
+                    buzzer.beep(1, 100, 0, true); // Kêu 1 tiếng bíp hiệu rút thẻ
                     SystemTimer::delay_ms(100);
                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // Bật lại Amply
                 }
@@ -295,16 +308,15 @@ int main(void)
                 // Cắm thẻ
                 if (!sdCardInSlot) {
                     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // Tắt Amply (Mute) để chống nhiễu điện khi cắm nóng
-                    sdCardInSlot = true; // Đánh dấu là đã có thẻ cắm vào (tránh lặp vô tận nếu thẻ hỏng)
+                    sdCardInSlot = true; // đánh dấu là đã cắm vào (tránh lặp và tiếng nổ nếu thẻ hỏng)
                     uint32_t startMount = SystemTimer::getTick();
                 
                     sdCard.init();
                 
-                    // Ép FatFs quên trạng thái phần cứng cũ
                     FATFS_UnLinkDriver(USERPath);
                     FATFS_LinkDriver(&USER_Driver, USERPath);
                 
-                    // Chờ một chút để điện áp ổn định sau khi cắm nóng
+                    // Chờ chút ổn định điện áp sau khi cắm nóng
                     SystemTimer::delay_ms(300); // Tăng lên 300ms cho các thẻ dung lượng cao
                 
                     uint8_t stat = sdCard.initialize();
@@ -315,7 +327,7 @@ int main(void)
                               uint32_t mountTime = SystemTimer::getTick() - startMount;
                           
                               // Kêu 2 tiếng ngắn báo thành công
-                          buzzer.beep(2, 50, 100); 
+                          buzzer.beep(2, 50, 100, true); 
                           
                           // Hiển thị thời gian kết nối (ms) lên màn hình LED trong 3 giây
                           dp.setColon(false);
@@ -324,7 +336,7 @@ int main(void)
                           lastDisplayValue = mountTime;
                           showMountTimeUntil = SystemTimer::getTick() + 3000;
                           
-                          // Chuyển đổi thời gian (ms) sang định dạng BCD để hiển thị "giả" thập phân trên CAN Monitor
+                          // Chuyển đổi thời gian (ms) sang định dạng BCD để hiển thị "giờ" thập phân trên CAN Monitor
                           uint32_t bcdTime = 0;
                           uint32_t tempVal = mountTime;
                           int shift = 0;
@@ -342,7 +354,7 @@ int main(void)
                           canData[3] = bcdTime & 0xFF;
                           myCan.sendFrame(0x125, canData, 4);
                           
-                          // Khôi phục bài hát đang nghe dở
+                          // Khi phục hồi biết đang nghe dở
                           mp3.resumeState();
                         } else {
                             // Lỗi File System
@@ -368,19 +380,20 @@ int main(void)
     //1:kiem tra cam bien
     if (Sensor::isDetected)
     {
-      buzzer.beep(1, 50, 0);
+      buzzer.beep(1, 50, 0, true);
       Sensor ::isDetected =false;
       // Chuyển màn hình về đếm số ngay lập tức
       isShowingTime = false;
       lastDisplayToggle = currentTick;
-      lastDisplayValue = 0xFFFF; // Cập nhật lại số đếm
+      lastDisplayValue = Sensor::productCount;
+      dp.setColon(false);
+      dp.setValue(Sensor::productCount);
+      dp.update(false); // Cập nhật lại số đếm
     }
       if(Sensor::productCount >= mucTieu && !datMucTieu){
         datMucTieu = true;
         if (!mp3.play("DAT.MP3")) { 
-          uint32_t wt = SystemTimer::getTick(); 
-          while(SystemTimer::getTick() - wt < 500) buzzer.update(); 
-          buzzer.beep(5, 100, 100); 
+          (void)0; // buzzer.beep(3, 100, 100); 
         }
       }
     //2:doi mode led
@@ -392,33 +405,47 @@ int main(void)
     }
     //3:hien thi led
     if (currentTick < showMountTimeUntil) {
-        // Đang hiển thị thời gian kết nối thẻ, tạm thời giữ nguyên màn hình LED
+        // đang hiển thị thời gian kết nối thẻ, tạm thời giữ nguyên màn hình LED
     }
     else if (isShowingTime)
     {
-      static uint32_t lastRtcReadTime = 0;
-      if (currentTick - lastRtcReadTime >= 1000 || lastRtcReadTime == 0) {
-          uint8_t curH = 0, curM = 0, curS = 0;
-          rtc.getTime(curH, curM, curS);
-          timeValue = (curH * 100) + curM;
-          lastRtcReadTime = currentTick;
-      }
-      
-      // Mode thời gian: Nháy 1Hz bình thường không bị ảnh hưởng bởi lỗi CAN
       bool currentBlinkState = (currentTick / 500) % 2 == 0;
-
-      if ((timeValue != lastDisplayValue) || (currentBlinkState != lastBlinkState)) {
-          dp.setColon(currentBlinkState);     
-          dp.setValue(timeValue);    
-          dp.update(true);    
-          lastDisplayValue = timeValue;
-          lastBlinkState = currentBlinkState;
+      
+      if (rtcErrorFlag) {
+          if (currentBlinkState != lastBlinkState) {
+              if (currentBlinkState) {
+                  dp.showDashes();
+              } else {
+                  dp.blank();
+              }
+              lastBlinkState = currentBlinkState;
+              lastDisplayValue = 0xFFFE;
+          }
+      }
+      else {
+          static uint32_t lastRtcReadTime = 0;
+          if (currentTick - lastRtcReadTime >= 1000 || lastRtcReadTime == 0) {
+              uint8_t curH = 0, curM = 0, curS = 0;
+              rtc.getTime(curH, curM, curS);
+              timeValue = (curH * 100) + curM;
+              lastRtcReadTime = currentTick;
+          }
+          
+          if ((timeValue != lastDisplayValue) || (currentBlinkState != lastBlinkState)) {
+              dp.setColon(currentBlinkState);     
+              dp.setValue(timeValue);    
+              dp.update(true);    
+              lastDisplayValue = timeValue;
+              lastBlinkState = currentBlinkState;
+          }
       }
     }
     else
     {
-      // Mode đếm: Không chớp dấu chấm
       bool currentBlinkState = false;
+      if (CAN1->ESR & (CAN_ESR_BOFF | CAN_ESR_EPVF)) {
+          currentBlinkState = (currentTick / 100) % 2 == 0;
+      }
       
       if (Sensor::productCount != lastDisplayValue || currentBlinkState != lastBlinkState) 
       {
@@ -432,8 +459,6 @@ int main(void)
     // 4: doc du lieu the
     if (currentTick - lastCardRead >= 100) {
         lastCardRead = currentTick; 
-        
-        // Khóa không cho quét thẻ mới nếu MP3 đang phát nhạc
         if (rfid.checkCard()) {
             if (rfid.readCardSerial((uint8_t*)uidTheHienTai)) {
                 
@@ -442,7 +467,7 @@ int main(void)
                     // update the hien tai vao bo nho
                     memcpy(uidTheDaXuLy, uidTheHienTai, 5);
                     coTheRfid = true;
-                    buzzer.beep(1, 100, 0);
+                    buzzer.beep(1, 100, 0, true);
                     
                     uint8_t currentKeyA[6] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
                     uint8_t readStatus = 0xFF; 
@@ -473,8 +498,8 @@ int main(void)
                                         else if (updateDuLieuThe == 4) strncpy((char*)writeData, "PHAT_NHAC", 9);
                                     }
                                     status = rfid.MIFARE_Write(blockAddr, writeData, 16);
-                                    if (status == STATUS_OK) buzzer.beep(1, 500, 0); 
-                                    else buzzer.beep(2, 100, 100); 
+                                    if (status == STATUS_OK) (void)0; // buzzer.beep(1, 500, 0); 
+                                    else (void)0; // buzzer.beep(2, 100, 100); 
                                 }
                                 else if (trangThaiQuetThe == 3) {
                                     uint8_t trailerData[16] = {
@@ -483,8 +508,8 @@ int main(void)
                                         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF  // Key B
                                     };
                                     status = rfid.MIFARE_Write(trailerBlock, trailerData, 16);
-                                    if (status == STATUS_OK) buzzer.beep(1, 500, 0);
-                                    else buzzer.beep(2, 100, 100);
+                                    if (status == STATUS_OK) (void)0; // buzzer.beep(1, 500, 0);
+                                    else (void)0; // buzzer.beep(2, 100, 100);
                                 }
                                 // don dep co
                                 trangThaiQuetThe = 0; 
@@ -498,15 +523,14 @@ int main(void)
                                 if (status == STATUS_OK) {
                                     if (strncmp((char*)readData, "RESET_DEM", 9) == 0) {
                                         if (Sensor::productCount == 0) {
-                                            buzzer.beep(2, 100, 100); // Đã reset rồi, báo lỗi
+                                            (void)0; // buzzer.beep(2, 100, 100); // đã reset rồi, bỏ qua
                                             readStatus = 0x01;
                                         } else {
                                             if (!mp3.play("RESET.MP3")) { 
-                                              uint32_t wt = SystemTimer::getTick(); 
-                                              while(SystemTimer::getTick() - wt < 500) buzzer.update(); 
-                                              buzzer.beep(5, 100, 100); 
+
+                                              (void)0; // buzzer.beep(3, 100, 100); 
                                             }
-                                            // [FIX] Task 2: Cập nhật lại thanh ghi BKP khi Reset đếm
+                                            //Cập nhật lại thanh ghi BKP khi Reset đểm
                                             Sensor::productCount = 0;
                                             BKP->DR1 = Sensor::productCount;
                                             lastDisplayValue = 0xFFFF;
@@ -516,13 +540,12 @@ int main(void)
                                     }
                                     else if (strncmp((char*)readData, "BAT_RELAY", 9) == 0) {
                                         if (relay.isOn()) {
-                                            buzzer.beep(2, 100, 100); // Đã bật rồi, báo lỗi
+                                            (void)0; // buzzer.beep(2, 100, 100); // đã bật rồi, bỏ qua
                                             readStatus = 0x01;
                                         } else {
                                             if (!mp3.play("BAT.MP3")) { 
-                                              uint32_t wt = SystemTimer::getTick(); 
-                                              while(SystemTimer::getTick() - wt < 500) buzzer.update(); 
-                                              buzzer.beep(5, 100, 100); 
+
+                                              (void)0; // buzzer.beep(3, 100, 100); 
                                             }
                                             dp.turnOff();
                                             relay.on();
@@ -533,9 +556,8 @@ int main(void)
                                     }
                                     else if (strncmp((char*)readData, "DAO_RELAY", 9) == 0) {
                                         if (!mp3.play("DAO.MP3")) { 
-                                          uint32_t wt = SystemTimer::getTick();
-                                          while(SystemTimer::getTick() - wt < 500) buzzer.update(); 
-                                          buzzer.beep(5, 100, 100); 
+
+                                          (void)0; // buzzer.beep(3, 100, 100); 
                                         }
                                         dp.turnOff();
                                         relay.toggle();
@@ -545,23 +567,22 @@ int main(void)
                                     }
                                     else if (strncmp((char*)readData, "PHAT_NHAC", 9) == 0) {
                                         if (!mp3.play("MUSIC.MP3")) { 
-                                          uint32_t wt = SystemTimer::getTick();
-                                          while(SystemTimer::getTick() - wt < 500) buzzer.update(); 
-                                          buzzer.beep(5, 100, 100); 
+
+                                          (void)0; // buzzer.beep(3, 100, 100); 
                                         }
                                         readStatus = 0x00;
                                     }
                                     else {
-                                        buzzer.beep(2, 100, 100);
+                                        (void)0; // buzzer.beep(2, 100, 100);
                                         readStatus = 0x01; // sai du lieu
                                     }
                                 } else {
-                                    buzzer.beep(2, 100, 100);
+                                    (void)0; // buzzer.beep(2, 100, 100);
                                     readStatus = 0x02; // ko doc duoc block
                                 }
                             }
                         } else {
-                            buzzer.beep(2, 100, 100);
+                            (void)0; // buzzer.beep(2, 100, 100);
                             readStatus = 0x03; // sai mat khau
                             trangThaiQuetThe = 0; 
                             coMatKhauTam = false;
@@ -598,23 +619,30 @@ int main(void)
       uint8_t frame102[4] = {0};
       uint16_t currentCount = Sensor::productCount; 
       uint16_t currentTarget = mucTieu;
-      frame102[0] = currentCount >> 8;
-      frame102[1] = currentCount & 0xFF;
-      
-      frame102[2] = currentTarget >> 8;
-      frame102[3] = currentTarget & 0xFF;
+      // Đổi sang dạng Little Endian để trùng khớp với Cangaroo (.dbc)
+        frame102[0] = currentCount & 0xFF;
+        frame102[1] = (currentCount >> 8) & 0xFF;
+        frame102[2] = currentTarget & 0xFF;
+        frame102[3] = (currentTarget >> 8) & 0xFF;
       
       myCan.sendFrame(0x102, frame102, 4);
       
-      uint8_t h, m , s;
-      rtc.getTime(h, m,s);
-      
-      uint8_t frame103[3];
-      frame103[0] = ((h / 10) << 4) | (h % 10); 
-      frame103[1] = ((m / 10) << 4) | (m % 10); 
-      frame103[2] = ((s / 10) << 4) | (s % 10); 
-      
-      myCan.sendFrame(0x103, frame103, 3);
+      uint8_t h, m, s;
+        rtc.getTime(h, m, s);
+        uint8_t dow, date, month, year;
+        rtc.getDate(dow, date, month, year);
+        
+        uint8_t frame103[7];
+        // Truyền thẳng dạng thập phân (Decimal) thay vì BCD để Cangaroo hiển thị chuẩn
+        frame103[0] = h; 
+        frame103[1] = m; 
+        frame103[2] = s; 
+        frame103[3] = date;
+        frame103[4] = month;
+        frame103[5] = year;
+        frame103[6] = dow;
+        
+        myCan.sendFrame(0x103, frame103, 7);
       lastCanSend = currentTick;
     }
   }
@@ -810,7 +838,7 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // Khởi động mặc định ở trạng thái Tắt Amply (Mute) để triệt tiêu tiếng bụp
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // Khởi động mặc định ở trạng thái Tắt Amply (Mute) để triệt tiêu tiếng bíp
   
   /* USER CODE END MX_GPIO_Init_2 */
 }
@@ -861,7 +889,7 @@ extern "C" {
             else if (rxId == 0x202) {
                 uint16_t val = (rxData[0] << 8) | rxData[1];
                 if (val <= 9999) {
-                    // [FIX] Task 2: Cập nhật lại thanh ghi BKP khi set giá trị đếm từ mạng CAN
+                    // Cập nhật lại thanh ghi BKP khi set giá trị đếm từ mạng CAN
                     Sensor::productCount = val;
                     BKP->DR1 = Sensor::productCount;
                     datMucTieu = false;
@@ -872,17 +900,26 @@ extern "C" {
             }
             //0x203 time
             else if (rxId == 0x203) {
-                if (isValidBCD(rxData[0]) && isValidBCD(rxData[1]) && isValidBCD(rxData[2])) {
-                    uint8_t h = BCD_to_Dec(rxData[0]);
-                    uint8_t m = BCD_to_Dec(rxData[1]);
-                    uint8_t s = BCD_to_Dec(rxData[2]);
+                if (rxLen >= 3) {
+                    uint8_t h = rxData[0];
+                    uint8_t m = rxData[1];
+                    uint8_t s = rxData[2];
                     if (h <= 23 && m <= 59 && s <= 59) {
                         rtc.setTime(h, m, s);
+                        rtcErrorFlag = false;
+                        if (rxLen >= 7) {
+                            // Đọc đúng thứ tự của .dbc: Ngày(3), Tháng(4), Năm(5), Thứ(6)
+                            uint8_t date = rxData[3];
+                            uint8_t month = rxData[4];
+                            uint8_t year = rxData[5];
+                            uint8_t dow = rxData[6];
+                            rtc.setDate(dow, date, month, year);
+                        }
                         buzzer.beep(1, 150, 0);
-                    }else buzzer.beep(2, 100, 100);
-                }else buzzer.beep(2, 100, 100);
+                    } else buzzer.beep(2, 100, 100);
+                } else buzzer.beep(2, 100, 100);
             }
-            //thay doi tinh nang
+              //thay doi tinh nang
             else if (rxId == 0x204){
               if(rxData[0] >=1 && rxData[0]<=4){
                 trangThaiQuetThe = 1;

@@ -127,6 +127,19 @@ bool Rtc::isTimeLost() {
     // Nếu cả 3 lần đọc đều thấy bit 7 == 1 (Clock Halt), chắc chắn mất thời gian
     return true;
 }
-    
-    return false;
+
+
+
+void Rtc::setDate(uint8_t dayOfWeek, uint8_t date, uint8_t month, uint8_t year) {
+    i2cWrite(0x03, decToBcd(dayOfWeek));
+    i2cWrite(0x04, decToBcd(date));
+    i2cWrite(0x05, decToBcd(month));
+    i2cWrite(0x06, decToBcd(year));
+}
+
+void Rtc::getDate(uint8_t &dayOfWeek, uint8_t &date, uint8_t &month, uint8_t &year) {
+    dayOfWeek = bcdToDec(i2cRead(0x03));
+    date      = bcdToDec(i2cRead(0x04));
+    month     = bcdToDec(i2cRead(0x05));
+    year      = bcdToDec(i2cRead(0x06));
 }
