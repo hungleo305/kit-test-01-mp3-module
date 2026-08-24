@@ -114,7 +114,7 @@ Bạn cắm mạch vào máy tính qua bộ chuyển đổi CAN. Mở phần m�
 
 ---
 
-## 3. HƯỚNG DẪN DÀNH CHO LẬP TRÌNH VIÊN (API CÁC THƯ VIỆN)
+## 3. HƯỚNG DẪN DÀNH CHO LẬP TRÌNH VIÊN
 
 Mã nguồn được tổ chức theo cấu trúc Hướng đối tượng (OOP) C++. Các class ngoại vi được thiết kế theo mô hình Non-blocking, không sử dụng hàm trễ `HAL_Delay`, đảm bảo mạch có thể đa nhiệm mượt mà.
 
@@ -278,13 +278,15 @@ int main(void) {
 ### 3.5. Thư viện `Rtc` (DS1307)
 **Hướng dẫn Setup (Cài đặt):**
 - **Include:** `#include "Rtc.h"`
+- **Cấu hình I2C:** Thư viện giao tiếp qua bus I2C. Bạn cần truyền chuẩn xác thanh ghi phần cứng (`I2C1` hoặc `I2C2`) cùng với các chân SCL và SDA tương ứng vào constructor để thư viện tự động khởi tạo.
 - **Báo lỗi mất thời gian:** Hàm `isTimeLost()` quét bit Clock Halt (CH). Nếu pin CMOS cạn nguồn, RTC sẽ dừng đếm, hàm này trả về `true` để bạn cảnh báo lên UI.
 
 **Ví dụ Code:**
 ```cpp
 #include "Rtc.h"
 
-Rtc rtc;
+// 1. Khai báo (I2C_Hardware, SCL_Port, SCL_Pin, SDA_Port, SDA_Pin)
+Rtc rtc(I2C1, GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);
 
 int main(void) {
     // ...
