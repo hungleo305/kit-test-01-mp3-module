@@ -19,9 +19,9 @@ Dự án mạch Kit STM32F103RCT6 điều khiển đa năng giao tiếp CAN Bus,
 kit-test-01-mp3-module/
 ├── Core/
 │   ├── Inc/                # Header thư viện C++ (.h)
-│   │   ├── Buzzer.h        # Còi chip (Hỗ trợ hàng đợi Non-blocking)
-│   │   ├── CanBus.h        # Mạng CAN (Hỗ trợ Auto-Recovery)
-│   │   ├── Led7Segment.h   # LED 7 đoạn
+│   │   ├── Buzzer.h        # Còi chip 
+│   │   ├── CanBus.h        # Mạng CAN 
+│   │   ├── Led7Segment.h   # LED 7 đoạn CD4094
 │   │   ├── Mp3.h           # Phát nhạc VS1101E
 │   │   ├── Relay.h         # Công tắc
 │   │   ├── Rfid.h          # Thẻ RC522
@@ -30,7 +30,7 @@ kit-test-01-mp3-module/
 │   │   ├── Sensor.h        # Cảm biến đếm
 │   │   └── SystemTimer.h   # Bộ đếm Non-blocking
 │   └── Src/                # Source code C/C++ (.cpp / .c)
-│       ├── main.cpp        # Vòng lặp chính, xử lý CAN và logic trung tâm
+│       ├── main.cpp        # Chương trình chính
 │       ├── Sensor.cpp      # Tích hợp sẵn ngắt EXTI (EXTI15_10_IRQHandler) để đọc cảm biến
 │       ├── stm32f1xx_it.c  # File chứa các ngắt hệ thống (SysTick, HardFault)
 │       └── *.cpp           # (Các file mã nguồn tương ứng cho thư viện trong thư mục Inc/)
