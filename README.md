@@ -429,7 +429,7 @@ Mạch Kit sử dụng vi điều khiển **STM32F103RCT6** (256 KB Flash, 48 KB
 
 Dựa trên file Memory Map (`EWARM/Firmware/List/Firmware.map`), dưới đây là mức tiêu thụ tài nguyên phần cứng của Firmware hiện tại:
 
-- **Dung lượng Flash (Read-only Code + Data):** `32.290 Bytes` (~31.53 KB) 👉 **Chỉ chiếm 12,31%**
-- **Dung lượng RAM (Read-write Data):** `4.120 Bytes` (~4.02 KB) 👉 **Chỉ chiếm 8,38%**
+- **Dung lượng Flash (Read-only Code + Data):** `32.290 Bytes` (~31.53 KB) **Chỉ chiếm 12,31%**
+- **Dung lượng RAM (Read-write Data):** `4.120 Bytes` (~4.02 KB) **Chỉ chiếm 8,38%**
 
 **Kết luận:** Dù tích hợp đồng thời nhiều module nặng (FatFs File System, giả mã MP3, giao thức CAN Bus và RFID), chương trình vẫn chạy rất nhẹ nhàng, chừa lại tới ~88% Flash và ~91% RAM. Lượng tài nguyên dư dả này đủ sức gánh thêm hàng chục tính năng cao cấp khác (kết nối Wifi/Bluetooth, màn hình LCD đồ họa...) mà không lo bị tràn bộ nhớ hay treo hệ thống (HardFault).
