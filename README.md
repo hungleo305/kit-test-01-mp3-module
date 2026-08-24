@@ -50,14 +50,14 @@ kit-test-01-mp3-module/
 
 Phần này hướng dẫn chi tiết cách vận hành mạch từ lúc cắm điện đến lúc sử dụng các tính năng. Bạn chỉ cần làm theo các bước dưới đây.
 
-### 4.1. Cắm điện và Khởi động
+### 3.1. Cắm điện và Khởi động
 - **Cắm điện:** Ngay khi vừa cấp nguồn, mạch sẽ khởi động hệ thống và kêu **2 tiếng Bíp** để báo hiệu đã có điện và sẵn sàng.
 - **Đèn LED Onboard :** Đèn LED nhỏ trên thân mạch sẽ chớp nháy liên tục rất nhanh (chu kỳ 0.1 giây sáng / 0.1 giây tắt - tức là chớp 5 lần/giây). Đèn này nháy đều đặn chứng tỏ  vi xử lý đang chạy cực kỳ trơn tru, vòng lặp hoạt động không bị treo .
 - **Màn hình LED 7 đoạn:** Sẽ bắt đầu tự động luân phiên hiển thị giữa 2 thông tin (mỗi thông tin hiển thị 5 giây):
   1. **Số lượng sản phẩm đã đếm được:** Dấu chấm ở giữa màn hình sẽ **TẮT**.
   2. **Giờ hiện tại (Giờ:Phút):** Dấu chấm ở giữa màn hình sẽ **NHẤP NHÁY** theo từng giây.
 
-### 4.2. Tín hiệu Còi (Buzzer) và Cảnh báo
+### 3.2. Tín hiệu Còi (Buzzer) và Cảnh báo
 Hệ thống còi bíp đã được tinh chỉnh để chạy hoàn toàn đa nhiệm (có hàng chờ thông minh) nên các tiếng bíp sẽ lần lượt phát ra mượt mà, không bao giờ bị dính hoặc nuốt tiếng của nhau. 
 
 Mạch được quy định phản hồi các thao tác thông qua số lượng tiếng bíp như sau:
@@ -73,16 +73,16 @@ Mạch được quy định phản hồi các thao tác thông qua số lượng
 - **Lỗi đứt cáp mạng CAN:** Nếu mạch phát hiện mạng CAN bị đứt, ở chế độ đếm số, **dấu chấm ở giữa màn hình sẽ nhấp nháy liên tục rất nhanh (5 lần/giây)** để cảnh báo dữ liệu không gửi được lên máy tính. Ngay khi khôi phục lại kết nối canbus, phần cứng sẽ tự khôi phục và dấu chấm tự động ngừng nhấp nháy (hệ thống về trạng thái bình thường).
 - **Lỗi mất thời gian thực (Hết pin RTC):** Nếu mạch bị mất thời gian thực. Khi hiển thị chế độ Xem giờ, thay vì hiện `Giờ:Phút`, màn hình sẽ hiện chữ `----` nhấp nháy mãi mãi để báo lỗi. Lúc này cần nạp lại thời gian qua CAN Bus (Cangaroo).
 
-### 4.3. Hướng dẫn đếm sản phẩm bằng Cảm biến
+### 3.3. Hướng dẫn đếm sản phẩm bằng Cảm biến
 - **Cách đếm:** Khi có sản phẩm chạy ngang qua mắt cảm biến, còi kêu 1 tiếng **Bíp** và số trên màn hình tăng lên 1. 
 - **Tính năng lấn át:** Nếu màn hình đang ở chế độ "Xem giờ" mà cảm biến bắt được sản phẩm, màn hình sẽ **lập tức nhảy về chế độ Số Đếm** để dễ dàng theo dõi.
 - **Đạt mục tiêu:** Khi số lượng sản phẩm đếm được bằng với con số "Mục tiêu" (có thể cài đặt qua máy tính bằng canbus), loa sẽ tự động phát âm thanh "Đã đạt mục tiêu" (tên file là `DAT.MP3`).
 
-### 4.4. Hướng dẫn sử dụng Thẻ Nhớ MP3 (Thẻ SD)
+### 3.4. Hướng dẫn sử dụng Thẻ Nhớ MP3 (Thẻ SD)
 - **Chuẩn bị thẻ:** Rút thẻ ra cắm vào máy tính, Format thẻ với định dạng **FAT32**. Sau đó copy các file âm thanh (đuôi file là `.mp3`) trực tiếp vào thẻ, không bỏ vào thư mục nào cả. 
 - **Rút/Cắm thẻ khi đang chạy (Hot-plug):** Nếu đang phát âm thanh mà vô tình rút thẻ ra -> Mạch sẽ kêu **1 tiếng bíp**, đồng thời tự động ngắt amply để loa không bị nổ lụp bụp và lưu lại vị trí bài hát đang nghe dở. Khi cắm thẻ lại thành công -> Mạch sẽ kêu **2 tiếng bíp**, đồng thời **màn hình LED 7 đoạn sẽ hiển thị thời gian kết nối thẻ (tính bằng mili-giây) trong vòng 3 giây**, sau đó mạch tự động hát tiếp đoạn âm thanh vừa bị ngắt.
 
-### 4.5. Hướng dẫn Quẹt thẻ Thao tác (RFID)
+### 3.5. Hướng dẫn Quẹt thẻ Thao tác (RFID)
 Mạch đi kèm bộ thẻ từ. Quẹt các thẻ này vào anten (miếng vuông in chữ RC522) để ra lệnh cho mạch làm việc:
 - Quẹt thẻ **RESET**: Mạch tự động xóa số đếm sản phẩm về 0 và loa phát bài `RESET.MP3`.
 - Quẹt thẻ **BAT**: Bật công tắc điện (Relay) trên mạch, loa phát bài `BAT.MP3`.
@@ -90,7 +90,7 @@ Mạch đi kèm bộ thẻ từ. Quẹt các thẻ này vào anten (miếng vuô
 - Quẹt thẻ **PHAT_NHAC**: Ra lệnh cho loa phát một bài nhạc giải trí tên là `MUSIC.MP3`.
 *( Có thể quẹt liên tục nhiều thẻ khác nhau, các âm thanh sẽ tự động xếp hàng và phát lần lượt).*
 
-### 4.6. Hướng dẫn dùng phần mềm máy tính (Cangaroo qua CAN Bus)
+### 3.6. Hướng dẫn dùng phần mềm máy tính (Cangaroo qua CAN Bus)
 Bạn cắm mạch vào máy tính qua bộ chuyển đổi CAN. Mở phần mềm **Cangaroo** trên máy tính:
 1. Load file có sẵn tên là `kit_vna_can.dbc` (có sẵn trong thư mục dự án) vào phần mềm.
 2. Lúc này toàn bộ các ID kỹ thuật sẽ tự động biến thành tiếng Việt (Ví dụ: *Thoi_Gian_Thuc_RTC, Muc_Tieu...*).
@@ -135,11 +135,26 @@ Bạn cắm mạch vào máy tính qua bộ chuyển đổi CAN. Mở phần m�
 
 Mã nguồn được tổ chức theo cấu trúc Hướng đối tượng (OOP) C++. Các class ngoại vi được thiết kế theo mô hình Non-blocking, không sử dụng hàm trễ `HAL_Delay`, đảm bảo mạch có thể đa nhiệm mượt mà.
 
-**Lưu ý:** Bộ thư viện này viết trên nền tảng STM32 HAL (cụ thể là chip **STM32F1**). Để mang sang dòng chip khác (STM32F4, G0...), bạn chỉ cần vào các file `.h` và đổi `#include "stm32f1xx_hal.h"` thành thư viện HAL tương ứng.
-
+**Lưu ý:** Bộ thư viện này viết trên nền tảng STM32 HAL (cụ thể là chip **STM32F1**).
 ---
 
-### 4.1. Thư viện `Buzzer`
+### 4.1. Cấu hình Hệ thống & Xung nhịp (System Core & Clock Tree)
+
+![Sơ đồ Xung nhịp CubeMX](docs/cubemx_clock.png)
+
+Để vi điều khiển hoạt động chính xác với các giao thức tốc độ cao (như CAN, SPI), bạn bắt buộc phải cấu hình xung nhịp gốc (Clock Tree) trong CubeMX như sau:
+- **Chuẩn nạp (SYS):** Cấu hình Serial Wire (`PA13` - SWDIO, `PA14` - SWCLK).
+- **Thạch anh (RCC):** Kích hoạt High Speed Clock (HSE) ở dạng Crystal/Ceramic Resonator (`PD0`, `PD1`).
+- **Clock Tree:** 
+  - Input Frequency HSE: **8 MHz**.
+  - PLL Source Mux: Chọn **HSE**.
+  - PLLMul: Đặt hệ số nhân **X9** (8 x 9 = 72).
+  - System Clock Mux: Chọn **PLLCLK** để đẩy SYSCLK lên **72 MHz**.
+  - **AHB Prescaler:** `/1` (HCLK = 72 MHz).
+  - **APB1 Prescaler:** Bắt buộc `/2` (PCLK1 = 36 MHz) để không làm quá tải bus tĩnh.
+  - **APB2 Prescaler:** Đặt `/1` (PCLK2 = 72 MHz) để chạy ngoại vi SPI/CAN tốc độ tối đa.
+
+### 4.2. Thư viện `Buzzer`
 **Hướng dẫn Setup (Cài đặt):**
 - **Include:** `#include "Buzzer.h"`
 - **Vị trí khai báo:** Khai báo đối tượng ở Global (đầu file `main.cpp`).
@@ -175,7 +190,7 @@ void HAL_IncTick(void) {
 }
 ```
 
-### 4.2. Thư viện `Mp3` (VS1011e)
+### 4.3. Thư viện `Mp3` (VS1011e)
 **Hướng dẫn Setup (Cài đặt):**
 - **Include:** `#include "Mp3.h"`
 - **Phụ thuộc:** Yêu cầu thư viện `FatFs` phải được kích hoạt trước (chạy lệnh `f_mount`).
@@ -217,7 +232,7 @@ int main(void) {
 }
 ```
 
-### 4.3. Thư viện `SdCard`
+### 4.4. Thư viện `SdCard`
 **Hướng dẫn Setup (Cài đặt):**
 - **Include:** Không cần include vào `main.cpp` nếu bạn chỉ thao tác đọc/ghi file. 
 - **Cách hoạt động:** Lớp `SdCard` chỉ phụ trách gửi lệnh vật lý (CMD) qua SPI. Các hàm của nó đã được nhúng thẳng vào file `diskio.c` của thư viện `FatFs`. 
@@ -246,7 +261,7 @@ int main(void) {
 }
 ```
 
-### 4.4. Thư viện `Rfid` (MFRC522)
+### 4.5. Thư viện `Rfid` (MFRC522)
 **Hướng dẫn Setup (Cài đặt):**
 - **Include:** `#include "Rfid.h"`
 - **Giao thức:** Yêu cầu bus SPI ổn định. Nếu phát hiện mạch bị mất module hoặc cắm rút nóng thẻ nhớ chung bus SPI, bắt buộc phải gọi lại `rfid.init()` để thiết lập lại dao động.
@@ -292,7 +307,7 @@ int main(void) {
 }
 ```
 
-### 4.5. Thư viện `Rtc` (DS1307)
+### 4.6. Thư viện `Rtc` (DS1307)
 **Hướng dẫn Setup (Cài đặt):**
 - **Include:** `#include "Rtc.h"`
 - **Cấu hình I2C:** Thư viện giao tiếp qua bus I2C. Bạn cần truyền chuẩn xác thanh ghi phần cứng (`I2C1` hoặc `I2C2`) cùng với các chân SCL và SDA tương ứng vào constructor để thư viện tự động khởi tạo.
@@ -327,7 +342,7 @@ int main(void) {
 }
 ```
 
-### 4.6. Thư viện `Led7Segment` (CD4094)
+### 4.7. Thư viện `Led7Segment` (CD4094)
 **Hướng dẫn Setup (Cài đặt):**
 - **Include:** `#include "Led7Segment.h"`
 - **Giao tiếp:** Chuẩn 3 dây IC dịch `CD4094` (Data, Clock, Strobe).
@@ -359,7 +374,7 @@ int main(void) {
 }
 ```
 
-### 4.7. Thư viện `CanBus`
+### 4.8. Thư viện `CanBus`
 **Hướng dẫn Setup (Cài đặt):**
 - **Include:** `#include "CanBus.h"` 
 - **Quy tắc ghép Byte :** Giao thức CAN gửi dữ liệu thành các đoạn cắt nhỏ 8-bit (1 byte). Phần mềm trên PC (ví dụ Cangaroo) sử dụng kiến trúc Little-Endian, nghĩa là khi một số lớn (như số 16-bit) bị cắt đôi gửi đi, **Byte thấp (Low Byte)** sẽ được gửi trước nằm ở `rxData[0]`, và **Byte cao (High Byte)** gửi sau nằm ở `rxData[1]`.
@@ -392,7 +407,7 @@ int main(void) {
 }
 ```
 
-### 4.8. Các class `Sensor` và `Relay`
+### 4.9. Các class `Sensor` và `Relay`
 **Hướng dẫn Setup (Cài đặt):**
 - **Relay:** `Relay.h` dùng để đảo trạng thái Output cơ bản.
 - **Sensor:** `Sensor.h` BẮT BUỘC bạn cấu hình phần cứng chân cảm biến ở chế độ **Ngắt ngoài EXTI**.
