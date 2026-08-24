@@ -203,12 +203,12 @@ int main(void)
   
   fres = f_mount(&fs, "", 1);
   if (fres != FR_OK) {
-      (void)0; // buzzer.beep(3, 100, 100);
+      buzzer.beep(3, 100, 100);
   }
 
   if (rtc.isTimeLost()) {
   
-      (void)0; // buzzer.beep(3, 100, 100); 
+      buzzer.beep(3, 100, 100); 
       
 
       rtcErrorFlag = true;
@@ -393,7 +393,7 @@ int main(void)
       if(Sensor::productCount >= mucTieu && !datMucTieu){
         datMucTieu = true;
         if (!mp3.play("DAT.MP3")) { 
-          (void)0; // buzzer.beep(3, 100, 100); 
+          buzzer.beep(3, 100, 100); 
         }
       }
     //2:doi mode led
@@ -523,12 +523,12 @@ int main(void)
                                 if (status == STATUS_OK) {
                                     if (strncmp((char*)readData, "RESET_DEM", 9) == 0) {
                                         if (Sensor::productCount == 0) {
-                                            (void)0; // buzzer.beep(2, 100, 100); // đã reset rồi, bỏ qua
+                                            buzzer.beep(2, 100, 100); // đã reset rồi, bỏ qua
                                             readStatus = 0x01;
                                         } else {
                                             if (!mp3.play("RESET.MP3")) { 
 
-                                              (void)0; // buzzer.beep(3, 100, 100); 
+                                              buzzer.beep(3, 100, 100); 
                                             }
                                             //Cập nhật lại thanh ghi BKP khi Reset đểm
                                             Sensor::productCount = 0;
@@ -540,12 +540,12 @@ int main(void)
                                     }
                                     else if (strncmp((char*)readData, "BAT_RELAY", 9) == 0) {
                                         if (relay.isOn()) {
-                                            (void)0; // buzzer.beep(2, 100, 100); // đã bật rồi, bỏ qua
+                                            buzzer.beep(2, 100, 100); // đã bật rồi, bỏ qua
                                             readStatus = 0x01;
                                         } else {
                                             if (!mp3.play("BAT.MP3")) { 
 
-                                              (void)0; // buzzer.beep(3, 100, 100); 
+                                              buzzer.beep(3, 100, 100); 
                                             }
                                             dp.turnOff();
                                             relay.on();
@@ -557,7 +557,7 @@ int main(void)
                                     else if (strncmp((char*)readData, "DAO_RELAY", 9) == 0) {
                                         if (!mp3.play("DAO.MP3")) { 
 
-                                          (void)0; // buzzer.beep(3, 100, 100); 
+                                          buzzer.beep(3, 100, 100); 
                                         }
                                         dp.turnOff();
                                         relay.toggle();
@@ -568,21 +568,21 @@ int main(void)
                                     else if (strncmp((char*)readData, "PHAT_NHAC", 9) == 0) {
                                         if (!mp3.play("MUSIC.MP3")) { 
 
-                                          (void)0; // buzzer.beep(3, 100, 100); 
+                                          buzzer.beep(3, 100, 100); 
                                         }
                                         readStatus = 0x00;
                                     }
                                     else {
-                                        (void)0; // buzzer.beep(2, 100, 100);
+                                        buzzer.beep(2, 100, 100);
                                         readStatus = 0x01; // sai du lieu
                                     }
                                 } else {
-                                    (void)0; // buzzer.beep(2, 100, 100);
+                                    buzzer.beep(2, 100, 100);
                                     readStatus = 0x02; // ko doc duoc block
                                 }
                             }
                         } else {
-                            (void)0; // buzzer.beep(2, 100, 100);
+                            buzzer.beep(2, 100, 100);
                             readStatus = 0x03; // sai mat khau
                             trangThaiQuetThe = 0; 
                             coMatKhauTam = false;
@@ -875,19 +875,16 @@ extern "C" {
         if (myCan.readFrame(&rxId, rxData, &rxLen)) {
           //0x201 target
             if (rxId == 0x201) {
-                if (isValidBCD(rxData[0]) && isValidBCD(rxData[1])) {
-                    uint16_t val = (BCD_to_Dec(rxData[0]) * 100) + BCD_to_Dec(rxData[1]);
-
-                    if (val <= 9999) {
+                uint16_t val = rxData[0] | (rxData[1] << 8);
+                if (val <= 9999) {
                         mucTieu = val;
                         datMucTieu = false;
                         buzzer.beep(1, 150, 0);
                     }else buzzer.beep(2, 100, 100);
-                }else buzzer.beep(2, 100, 100);
             }
             //0x202 dem hien tai
             else if (rxId == 0x202) {
-                uint16_t val = (rxData[0] << 8) | rxData[1];
+                uint16_t val = rxData[0] | (rxData[1] << 8);
                 if (val <= 9999) {
                     // Cập nhật lại thanh ghi BKP khi set giá trị đếm từ mạng CAN
                     Sensor::productCount = val;
