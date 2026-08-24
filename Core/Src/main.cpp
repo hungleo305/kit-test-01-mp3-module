@@ -203,16 +203,12 @@ int main(void)
   
   fres = f_mount(&fs, "", 1);
   if (fres != FR_OK) {
-      buzzer.beep(3, 100, 100);
-  }
+        buzzer.beep(3, 100, 100);
+    }
 
   if (rtc.isTimeLost()) {
-  
-      buzzer.beep(3, 100, 100); 
-      
-
-      rtcErrorFlag = true;
-  }
+        rtcErrorFlag = true;
+    }
   
   dp.setColon(false);
   dp.setValue(0);

@@ -65,7 +65,7 @@ Mạch được quy định phản hồi các thao tác thông qua số lượng
 | Âm thanh | Tình huống | Ý nghĩa chi tiết |
 | :--- | :--- | :--- |
 | **1 Bíp ngắn** | **Thành công** | - Có sản phẩm chạy qua mắt cảm biến.<br>- Nhận diện thành công có thẻ RFID quẹt qua.<br>- Cập nhật thành công cài đặt mới từ phần mềm máy tính (CAN Bus: Mục tiêu, Bộ đếm, Xem giờ). |
-| **2 Bíp ngắn** | **Lỗi Dữ liệu / Sai thao tác** | - **Khởi động:** Báo hiệu mạch vừa khởi động/cấp điện thành công.<br>- **CAN Bus:** Gửi cài đặt Mục tiêu / Số đếm lớn hơn `9999` (Vượt quá giới hạn màn hình LED).<br>- **Quẹt Thẻ (RFID):** Sai mật khẩu thẻ.<br>- **Quẹt Thẻ (RFID):** Lỗi giao tiếp với chip nhớ trong thẻ (không đọc được Block).<br>- **Quẹt Thẻ (RFID):** Dữ liệu trong thẻ bị sai lệch (VD: Không chứa các lệnh hợp lệ như `RESET_DEM`, `BAT_RELAY`...).<br>- **Quẹt Thẻ (RFID) Thao tác thừa:** Ví dụ thẻ mang lệnh bắt "Bật Relay" nhưng Relay đang bật sẵn, hoặc thẻ mang lệnh "Reset bộ đếm" nhưng số đếm đang là 0 sẵn rồi. |
+| **2 Bíp ngắn** | **Lỗi Dữ liệu / Cảnh báo nhẹ** | - **Khởi động:** Báo hiệu mạch vừa khởi động/cấp điện thành công.<br>- **Thẻ SD (Hot-plug):** Cắm thẻ SD thành công khi mạch đang chạy.<br>- **CAN Bus:** Gửi cài đặt Mục tiêu / Số đếm lớn hơn `9999` (Vượt quá giới hạn màn hình LED).<br>- **Quẹt Thẻ (RFID):** Sai mật khẩu thẻ.<br>- **Quẹt Thẻ (RFID):** Lỗi giao tiếp với chip nhớ trong thẻ (không đọc được Block).<br>- **Quẹt Thẻ (RFID):** Dữ liệu trong thẻ bị sai lệch (VD: Không chứa các lệnh hợp lệ như `RESET_DEM`, `BAT_RELAY`...).<br>- **Quẹt Thẻ (RFID) Thao tác thừa:** Ví dụ thẻ mang lệnh bắt "Bật Relay" nhưng Relay đang bật sẵn, hoặc thẻ mang lệnh "Reset bộ đếm" nhưng số đếm đang là 0 sẵn rồi. |
 | **3 Bíp ngắn** | **Lỗi Phần cứng / Module MP3** | - **Lỗi Thẻ Nhớ SD:** Thẻ nhớ bị lỗi định dạng (yêu cầu FAT32), chưa cắm thẻ nhớ, hoặc khe cắm hỏng tiếp xúc phần cứng.<br>- **Lỗi Module MP3:** Module âm thanh MP3 bị treo không phản hồi, hoặc thẻ nhớ không có tệp `.MP3` tương ứng với hành động. |
 | **1 Bíp Dài**<br>*(Nửa giây)* | **Lỗi Mất Mạng CAN** | - Mạch cảnh báo phần cứng phát hiện đường truyền mạng CAN Bus đang bị đứt cáp hoặc lỗi bộ chuyển đổi máy tính. |
 
@@ -80,7 +80,7 @@ Mạch được quy định phản hồi các thao tác thông qua số lượng
 
 ### 4.4. Hướng dẫn sử dụng Thẻ Nhớ MP3 (Thẻ SD)
 - **Chuẩn bị thẻ:** Rút thẻ ra cắm vào máy tính, Format thẻ với định dạng **FAT32**. Sau đó copy các file âm thanh (đuôi file là `.mp3`) trực tiếp vào thẻ, không bỏ vào thư mục nào cả. 
-- **Rút/Cắm thẻ khi đang chạy (Hot-plug):** Nếu đang phát âm thanh mà vô tình rút thẻ ra -> Mạch lập tức tự động ngắt amply để loa không bị nổ lụp bụp, đồng thời tự động lưu lại vị trí bài hát đang nghe dở. Khi cắm thẻ lại -> Mạch sẽ tự động mount thẻ nhớ và **tự động hát tiếp** đoạn âm thanh vừa bị ngắt.
+- **Rút/Cắm thẻ khi đang chạy (Hot-plug):** Nếu đang phát âm thanh mà vô tình rút thẻ ra -> Mạch sẽ kêu **1 tiếng bíp**, đồng thời tự động ngắt amply để loa không bị nổ lụp bụp và lưu lại vị trí bài hát đang nghe dở. Khi cắm thẻ lại thành công -> Mạch sẽ kêu **2 tiếng bíp**, đồng thời **màn hình LED 7 đoạn sẽ hiển thị thời gian kết nối thẻ (tính bằng mili-giây) trong vòng 3 giây**, sau đó mạch tự động hát tiếp đoạn âm thanh vừa bị ngắt.
 
 ### 4.5. Hướng dẫn Quẹt thẻ Thao tác (RFID)
 Mạch đi kèm bộ thẻ từ. Quẹt các thẻ này vào anten (miếng vuông in chữ RC522) để ra lệnh cho mạch làm việc:
@@ -421,3 +421,15 @@ int main(void) {
     }
 }
 ```
+
+---
+
+## 5. ĐÁNH GIÁ TÀI NGUYÊN HỆ THỐNG (RESOURCE FOOTPRINT)
+Mạch Kit sử dụng vi điều khiển **STM32F103RCT6** (256 KB Flash, 48 KB RAM). Nhờ cấu trúc lập trình Non-blocking và thiết kế hướng đối tượng C++ tối ưu sâu thông qua trình biên dịch của IAR Embedded Workbench, hệ thống quản lý bộ nhớ cực kỳ hiệu quả.
+
+Dựa trên file Memory Map (`EWARM/Firmware/List/Firmware.map`), dưới đây là mức tiêu thụ tài nguyên phần cứng của Firmware hiện tại:
+
+- **Dung lượng Flash (Read-only Code + Data):** `32.290 Bytes` (~31.53 KB) 👉 **Chỉ chiếm 12,31%**
+- **Dung lượng RAM (Read-write Data):** `4.120 Bytes` (~4.02 KB) 👉 **Chỉ chiếm 8,38%**
+
+**Kết luận:** Dù tích hợp đồng thời nhiều module nặng (FatFs File System, giả mã MP3, giao thức CAN Bus và RFID), chương trình vẫn chạy rất nhẹ nhàng, chừa lại tới ~88% Flash và ~91% RAM. Lượng tài nguyên dư dả này đủ sức gánh thêm hàng chục tính năng cao cấp khác (kết nối Wifi/Bluetooth, màn hình LCD đồ họa...) mà không lo bị tràn bộ nhớ hay treo hệ thống (HardFault).
