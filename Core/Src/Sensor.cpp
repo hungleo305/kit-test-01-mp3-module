@@ -1,36 +1,13 @@
-#include "Sensor.h"
+﻿#include "Sensor.h"
 #include "SystemTimer.h"
 
-
-
-void Sensor::enableDiagnosticMode(bool enable) {
-    isDiagnosticMode = enable;
-    if (enable) {
-        EXTI->RTSR |= pin; // Bật thêm ngắt cạnh lên
-    } else {
-        EXTI->RTSR &= ~pin; // Tắt ngắt cạnh lên, trở về bình thường
-    }
-}
-
-bool Sensor::getDiagnosticData(uint16_t& currBlock, uint16_t& currGap, uint16_t& prevBlock, uint16_t& prevGap) {
-    if (newDataReady) {
-        currBlock = (blockDuration > 9999) ? 9999 : blockDuration;
-        currGap = (gapDuration > 9999) ? 9999 : gapDuration;
-        prevBlock = (prevBlockDuration > 9999) ? 9999 : prevBlockDuration;
-        prevGap = (prevGapDuration > 9999) ? 9999 : prevGapDuration;
-        newDataReady = false;
-        return true;
-    }
-    return false;
-}
-
-Sensor::Sensor(GPIO_TypeDef* port, uint16_t pin) : port(port), pin(pin), lastInterruptTick(0), isDiagnosticMode(false), lastEnterTick(0), lastExitTick(0), blockDuration(0), gapDuration(0), prevBlockDuration(0), prevGapDuration(0), newDataReady(false), onDetectCallback(nullptr), isDetected(false) {}
+Sensor::Sensor(GPIO_TypeDef* port, uint16_t pin) : port(port), pin(pin), lastInterruptTick(0), onDetectCallback(nullptr), isDetected(false) {}
 
 void Sensor::setCallback(void (*cb)()) {
     onDetectCallback = cb;
 }
 
-void Sensor::init() {
+void Sensor::init(TriggerEdge edge) {
     if (port == GPIOA) RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
     else if (port == GPIOB) RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
     else if (port == GPIOC) RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
@@ -55,7 +32,12 @@ void Sensor::init() {
     AFIO->EXTICR[pinIndex / 4] |= (portIndex << ((pinIndex % 4) * 4));
     
     EXTI->IMR |= pin;
-    EXTI->FTSR |= pin; //RTSR canh len
+    if (edge == FALLING_EDGE || edge == BOTH_EDGES) {
+        EXTI->FTSR |= pin;
+    }
+    if (edge == RISING_EDGE || edge == BOTH_EDGES) {
+        EXTI->RTSR |= pin;
+    }
     
     IRQn_Type irq;
     if (pinIndex >= 10 && pinIndex <= 15) irq = EXTI15_10_IRQn;
@@ -76,52 +58,10 @@ void Sensor::handleInterrupt(uint16_t extiPin) {
         
         uint32_t currentTick = SystemTimer::getTick();
         
-        // Đọc trạng thái cảm biến PNP
-        bool isPinHigh = (port->IDR & pin) != 0;
-        
-        if (isDiagnosticMode) {
-            // Dùng State Machine và Debounce để chống nhiễu tuyệt đối cho Logic Analyzer
-            static bool lastDiagState = false;
-            static uint32_t lastDiagChangeTick = 0;
-            
-            if (currentTick - lastDiagChangeTick > 20) { // Lọc dội (Bounce)
-                if (isPinHigh != lastDiagState) {
-                    if (isPinHigh) { 
-                        // Cạnh lên (Mức CAO): Bắt đầu che
-                        if (lastExitTick > 0) {
-                            prevGapDuration = gapDuration;
-                            gapDuration = currentTick - lastExitTick; 
-                        }
-                        lastEnterTick = currentTick;
-                    } else {
-                        // Cạnh xuống (Mức THẤP): Rút tay ra
-                        if (lastEnterTick > 0) {
-                            prevBlockDuration = blockDuration;
-                            blockDuration = currentTick - lastEnterTick; 
-                            newDataReady = true; // Rút tay ra mới gửi CAN
-                        }
-                        lastExitTick = currentTick;
-                    }
-                    lastDiagState = isPinHigh;
-                    lastDiagChangeTick = currentTick;
-                }
-            }
-        }
-        bool isPinLow = !isPinHigh;
-        
-        if (isPinLow && (currentTick - lastInterruptTick > 20)) {
-            // Kích hoạt Callback
+        if (currentTick - lastInterruptTick > 20) {
             if (onDetectCallback) onDetectCallback();
             isDetected = true;
             lastInterruptTick = currentTick;
         }
     }
 }
-
-
-
-
-
-
-
-

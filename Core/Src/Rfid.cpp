@@ -1,4 +1,4 @@
-﻿#include "Rfid.h"
+#include "Rfid.h"
 
 Rfid::Rfid(SPI_TypeDef* spi, GPIO_TypeDef* csPort, uint16_t csPin, GPIO_TypeDef* rstPort, uint16_t rstPin)
     : spi(spi), csPort(csPort), csPin(csPin), rstPort(rstPort), rstPin(rstPin) {}
@@ -48,22 +48,7 @@ void Rfid::init() {
     else if (spi == SPI2) RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
     else if (spi == SPI3) RCC->APB1ENR |= RCC_APB1ENR_SPI3EN;
     
-    if (spi == SPI1) {
-        RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
-        GPIOA->CRL &= ~(0xF << 20 | 0xF << 28); GPIOA->CRL |=  (0xB << 20 | 0xB << 28); 
-        GPIOA->CRL &= ~(0xF << 24); GPIOA->CRL |=  (0x8 << 24); GPIOA->ODR |= (1 << 6); 
-    } else if (spi == SPI2) {
-        RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
-        GPIOB->CRH &= ~(0xF << 20 | 0xF << 24 | 0xF << 28);
-        GPIOB->CRH |=  (0xB << 20 | 0x8 << 24 | 0xB << 28);
-        GPIOB->ODR |= (1 << 14); 
-    } else if (spi == SPI3) {
-        RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
-        AFIO->MAPR = (AFIO->MAPR & ~AFIO_MAPR_SWJ_CFG_Msk) | AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
-        
-        GPIOB->CRL &= ~(0xF << 12 | 0xF << 20); GPIOB->CRL |=  (0xB << 12 | 0xB << 20); 
-        GPIOB->CRL &= ~(0xF << 16); GPIOB->CRL |=  (0x8 << 16); GPIOB->ODR |= (1 << 4); 
-    }
+    
     
     GPIO_TypeDef* ports[] = {csPort, rstPort};
     uint16_t pins[] = {csPin, rstPin};
@@ -341,4 +326,5 @@ uint8_t Rfid::selectTag(uint8_t* serial) {
         return 0; 
     }
 }
+
 

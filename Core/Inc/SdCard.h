@@ -1,4 +1,4 @@
-﻿#ifndef __SDCARD_H
+#ifndef __SDCARD_H
 #define __SDCARD_H
 
 #include "stm32f1xx.h"
@@ -6,6 +6,10 @@
 #ifdef __cplusplus
 class SdCard {
 private:
+    GPIO_TypeDef* cdPort;
+    uint16_t cdPin;
+    GPIO_TypeDef* pwrPort;
+    uint16_t pwrPin;
     SPI_TypeDef *spi;
     GPIO_TypeDef *cs_port;
     uint16_t cs_pin;
@@ -23,7 +27,7 @@ private:
     uint8_t sendCmd(uint8_t cmd, uint32_t arg);
 
 public:
-    SdCard(SPI_TypeDef *spi, GPIO_TypeDef *cs_port, uint16_t cs_pin);
+    SdCard(SPI_TypeDef* spi, GPIO_TypeDef* cs_port, uint16_t cs_pin, GPIO_TypeDef* cdPort, uint16_t cdPin, GPIO_TypeDef* pwrPort, uint16_t pwrPin);
     
     void init();
     bool checkPhysicalPresence();
@@ -52,3 +56,5 @@ uint8_t sdCard_ioctl(uint8_t cmd, void *buff);
 #endif
 
 #endif
+
+

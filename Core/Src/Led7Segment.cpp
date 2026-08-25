@@ -1,4 +1,4 @@
-﻿#include "Led7Segment.h"
+#include "Led7Segment.h"
 
 const uint8_t BANG_MA_LED_THUONG[10] = {0x77, 0x11, 0xB6, 0xB3, 0xD1, 0xE3, 0xE7, 0x31, 0xF7, 0xF3};
 
@@ -91,7 +91,7 @@ void Led7Segment::latch()
 }
 
 void Led7Segment::setValue(uint16_t val) {
-    if (val > 9999) val = 9999;
+    
     displayValue = val;
 }
 
@@ -99,7 +99,7 @@ void Led7Segment::setColon(bool state) {
     colonState = state;
 }
 
-void Led7Segment::update(bool isTimeMode)
+void Led7Segment::update(bool padZeroes)
 {
     __disable_irq();
 
@@ -113,7 +113,7 @@ void Led7Segment::update(bool isTimeMode)
         (uint8_t)( displayValue % 10)
     };
     //dem den dau hien thi den do
-      bool isLeadingZero = !isTimeMode;
+      bool isLeadingZero = !padZeroes;
       for (int i =0 ; i<4;i ++){
         if (digits[i] != 0 || i ==3){
           isLeadingZero = false;
@@ -179,7 +179,7 @@ void Led7Segment::showDashes() {
     __disable_irq();
     strobePort->BRR = strobePin; // Lock STROBE screen
     
-    // Segment 'g' (dấu gạch ngang) tương ứng với bit 7 (0x80) cho cả chip chuẩn và SO3
+    // Segment 'g' (d?u g?ch ngang) t��ng ?ng v?i bit 7 (0x80) cho c? chip chu?n v� SO3
     for(int i = 0; i < 4; i++) {
         uint8_t segment = 0x80;
         for (int8_t b = 7; b >= 0; b--) {

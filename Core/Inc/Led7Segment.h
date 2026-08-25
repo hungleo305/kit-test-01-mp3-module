@@ -1,4 +1,4 @@
-﻿#ifndef LED7SEGMENT_H
+#ifndef LED7SEGMENT_H
 #define LED7SEGMENT_H
 
 #include "main.h"
@@ -27,7 +27,7 @@ public:
     void init();
     void setValue(uint16_t val);
     void setColon(bool state);
-    void update(bool isTimeMode = false);
+    void update(bool padZeroes = false);
     void blank();     
     void restore();
     void turnOff();

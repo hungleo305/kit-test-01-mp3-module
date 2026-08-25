@@ -1,4 +1,4 @@
-/* USER CODE BEGIN Header */
+﻿/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
@@ -74,7 +74,7 @@ Led7Segment dp(GPIOC, 1<<5, GPIOC, 1<<7, GPIOC, 1<<6);
 Rtc rtc(I2C1, GPIOB, 1<<6, GPIOB, 1<<7);
 Rfid rfid(SPI3, GPIOA, 1<<15, GPIOC, 1<<14);
 Mp3 mp3(&hspi2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3);
-SdCard sdCard(SPI1, GPIOC, 1<<8);
+SdCard sdCard(SPI1, GPIOC, 1<<8, GPIOB, 1<<0, GPIOB, 1<<1);
 
 extern CAN_HandleTypeDef hcan;
 CanBus myCan(&hcan);
@@ -97,6 +97,18 @@ bool coMatKhauTam = false;
 
 uint32_t lastRelayDao = 0;
 bool choCapNhatManHinh = false;
+
+// Bi?n ph?c v? ch?c nng Diagnostic c?m bi?n
+bool isDiagnosticMode = true; 
+uint32_t lastDiagChangeTick = 0;
+uint32_t lastEnterTick = 0;
+uint32_t lastExitTick = 0;
+uint32_t blockDuration = 0;
+uint32_t gapDuration = 0;
+uint32_t prevBlockDuration = 0;
+uint32_t prevGapDuration = 0;
+bool newDataReady = false;
+
 
 FATFS fs;       
 FIL fil;        
@@ -130,13 +142,44 @@ extern "C" void EXTI15_10_IRQHandler(void) {
 }
 
 void onSensorDetect() {
-    productCount++;
-    if (productCount > 9999) {
-        productCount = 0;
-        cycleCount++;
-        BKP->DR2 = cycleCount;
+    uint32_t currentTick = SystemTimer::getTick();
+    bool isPinHigh = (GPIOC->IDR & (1 << 13)) != 0;
+    
+    if (isDiagnosticMode) {
+        static bool lastDiagState = false;
+        if (currentTick - lastDiagChangeTick > 20) { 
+            if (isPinHigh != lastDiagState) {
+                if (isPinHigh) {
+                  // Cảm biến bị che (HIGH)
+                  if (lastExitTick > 0) {
+                      prevGapDuration = gapDuration;
+                      gapDuration = currentTick - lastExitTick;
+                  }
+                  lastEnterTick = currentTick;
+              } else {
+                  // Cảm biến hết bị che (LOW)
+                  if (lastEnterTick > 0) {
+                      prevBlockDuration = blockDuration;
+                      blockDuration = currentTick - lastEnterTick;
+                      newDataReady = true;
+                  }
+                  lastExitTick = currentTick;
+              }
+                lastDiagState = isPinHigh;
+                lastDiagChangeTick = currentTick;
+            }
+        }
     }
-    BKP->DR1 = productCount;
+    
+    if (isPinHigh) {
+        productCount++;
+        if (productCount > 9999) {
+            productCount = 0;
+            cycleCount++;
+            BKP->DR2 = cycleCount;
+        }
+        BKP->DR1 = productCount;
+    }
 }
 static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
@@ -155,6 +198,31 @@ static void MX_SPI2_Init(void);
   * @brief  The application entry point.
   * @retval int
   */
+void Hardware_GPIO_Init() {
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+    __HAL_RCC_AFIO_CLK_ENABLE();
+    
+    // SPI1 GPIO (PA5=SCK, PA6=MISO, PA7=MOSI)
+    GPIOA->CRL &= ~(0xF << 20 | 0xF << 24 | 0xF << 28);
+    GPIOA->CRL |=  (0xB << 20 | 0x8 << 24 | 0xB << 28);
+    GPIOA->ODR |= (1 << 6); // Pull-up for MISO
+
+    // SPI2 GPIO (PB13=SCK, PB14=MISO, PB15=MOSI)
+    GPIOB->CRH &= ~(0xF << 20 | 0xF << 24 | 0xF << 28);
+    GPIOB->CRH |=  (0xB << 20 | 0x8 << 24 | 0xB << 28);
+    GPIOB->ODR |= (1 << 14); // Pull-up for MISO
+
+    // SPI3 GPIO (PB3=SCK, PB4=MISO, PB5=MOSI)
+    AFIO->MAPR = (AFIO->MAPR & ~AFIO_MAPR_SWJ_CFG_Msk) | AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
+    GPIOB->CRL &= ~(0xF << 12 | 0xF << 20);
+    GPIOB->CRL |=  (0xB << 12 | 0xB << 20);
+    GPIOB->CRL &= ~(0xF << 16);
+    GPIOB->CRL |=  (0x8 << 16);
+    GPIOB->ODR |= (1 << 4);
+}
+
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -178,12 +246,12 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
+  Hardware_GPIO_Init();
   MX_GPIO_Init();
   MX_CAN_Init();
   MX_SPI3_Init();
   MX_SPI2_Init();
   MX_FATFS_Init();
-  MX_CAN_Init();
   /* USER CODE BEGIN 2 */
   //Kích hoạt nguồn và Clock cho Backup Register. Nạp lại biến ầm từ thanh ghi BKP->DR1
   RCC->APB1ENR |= (RCC_APB1ENR_PWREN | RCC_APB1ENR_BKPEN); // Cấp xung nhịp cho PWR và BKP
@@ -193,7 +261,9 @@ int main(void)
   cycleCount = BKP->DR2;
 
   ledOb.init();
-  cb.init();
+  cb.init(Sensor::BOTH_EDGES);
+    EXTI->RTSR |= (1 << 13); // B?t lun ng?t c?nh ln cho ch?c nng Diagnostic
+
   cb.setCallback(onSensorDetect);
   dp.init();
   rtc.init();
@@ -217,7 +287,7 @@ int main(void)
   
   /* ====== BẬT/TẮT BIẾN KIỂM TRA CẢM BIẾN (DIAGNOSTIC TEST) ====== */
   /* Bỏ comment dòng dưới để BẬT chế độ kiểm tra cảm biến qua CAN */
-  cb.enableDiagnosticMode(true);
+  
   
   fres = f_mount(&fs, "", 1);
   if (fres != FR_OK) {
@@ -266,25 +336,29 @@ int main(void)
     
     /* ====== ĐỌC LOG CẢM BIẾN (DIAGNOSTIC) ====== */
     // Chỉ hoạt động khi enableDiagnosticMode(true) được gọi
-    uint16_t currBlock, currGap, prevBlock, prevGap;
-    if (cb.getDiagnosticData(currBlock, currGap, prevBlock, prevGap)) {
-        // Gửi qua CAN ID: 0x124 (định dạng BCD để đọc trực tiếp số thập phân trên Cangaroo)
+    uint16_t currBlock = 0, currGap = 0, prevBlock = 0, prevGap = 0;
+    if (newDataReady) {
+        currBlock = (blockDuration > 9999) ? 9999 : blockDuration;
+        currGap = (gapDuration > 9999) ? 9999 : gapDuration;
+        prevBlock = (prevBlockDuration > 9999) ? 9999 : prevBlockDuration;
+        prevGap = (prevGapDuration > 9999) ? 9999 : prevGapDuration;
+        newDataReady = false;
+        // Gửi qua CAN ID: 0x124 (Định dạng Little-Endian Binary để Cangaroo giải mã chuẩn qua DBC)
         // Byte 0-1: Current Block, Byte 2-3: Current Gap
         // Byte 4-5: Previous Block, Byte 6-7: Previous Gap
         uint8_t canData[8] = {0};
         
-        canData[1] = ((currBlock % 100) / 10 << 4) | (currBlock % 10); currBlock /= 100;
-        canData[0] = ((currBlock % 100) / 10 << 4) | (currBlock % 10);
+        canData[0] = currBlock & 0xFF;
+        canData[1] = (currBlock >> 8) & 0xFF;
         
-        canData[3] = ((currGap % 100) / 10 << 4) | (currGap % 10); currGap /= 100;
-        canData[2] = ((currGap % 100) / 10 << 4) | (currGap % 10);
+        canData[2] = currGap & 0xFF;
+        canData[3] = (currGap >> 8) & 0xFF;
         
-        canData[5] = ((prevBlock % 100) / 10 << 4) | (prevBlock % 10); prevBlock /= 100;
-        canData[4] = ((prevBlock % 100) / 10 << 4) | (prevBlock % 10);
+        canData[4] = prevBlock & 0xFF;
+        canData[5] = (prevBlock >> 8) & 0xFF;
         
-        canData[7] = ((prevGap % 100) / 10 << 4) | (prevGap % 10); prevGap /= 100;
-        canData[6] = ((prevGap % 100) / 10 << 4) | (prevGap % 10);
-        
+        canData[6] = prevGap & 0xFF;
+        canData[7] = (prevGap >> 8) & 0xFF;
         myCan.sendFrame(0x124, canData, 8);
     }
     
@@ -392,10 +466,10 @@ int main(void)
     }
 
     //1:kiem tra cam bien
-    if (cb.isDetected)
-    {
-      buzzer.beep(1, 50, 0, true);
-      cb.isDetected =false;
+    if (cb.isDetected) {
+      cb.isDetected = false;
+      if ((GPIOC->IDR & (1 << 13)) != 0) { // Cảm biến tích cực mức CAO (HIGH) khi có vật cản
+        buzzer.beep(1, 50, 0, true);
       // Chuyển màn hình về đếm số ngay lập tức
       isShowingTime = false;
       lastDisplayToggle = currentTick;
@@ -403,6 +477,7 @@ int main(void)
       dp.setColon(false);
       dp.setValue(productCount);
       dp.update(false); // Cập nhật lại số đếm
+      }
     }
       if(productCount >= mucTieu && !datMucTieu){
         datMucTieu = true;
@@ -996,6 +1071,12 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+
+
+
+
+
+
 
 
 

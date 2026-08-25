@@ -141,15 +141,13 @@ void Mp3::sendDataBlock(uint8_t* data, uint16_t length) {
 }
 
 bool Mp3::play(const char* filename) {
-    // [FIX] Task 1: Khai báo biến bằng static để lưu trên vùng BSS thay vì Stack, khắc phục lỗi tràn Stack gây treo (HardFault)
-    static FIL tempFile;
+        static FIL tempFile;
     // Kiem tra file ton tai de tranh main.cpp bao loi
     FRESULT fres = f_open(&tempFile, filename, FA_READ);
     if (fres == FR_OK) {
         f_close(&tempFile);
         
-        // [FIX] Task 1: Đẩy tên file vào Hàng đợi (Queue) thay vì phát trực tiếp để không cắt ngang bài cũ
-        if (queueCount < 5) {
+                if (queueCount < 5) {
             strncpy(queue[queueTail], filename, 31);
             queue[queueTail][31] = '\0';
             queueTail = (queueTail + 1) % 5;
@@ -174,8 +172,7 @@ uint16_t Mp3::readRegister(uint8_t address) {
 }
 
 void Mp3::process() {
-    // [FIX] Task 1: Nếu chip VS1011E đang rảnh rỗi (!isPlaying) và Hàng đợi (Queue) có file chờ, tự động lôi ra phát tiếp
-    if (!isPlaying) {
+        if (!isPlaying) {
         if (queueCount > 0) {
             FRESULT fres = f_open(&mp3File, queue[queueHead], FA_READ);
             
