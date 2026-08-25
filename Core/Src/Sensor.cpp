@@ -1,25 +1,14 @@
-﻿#include "Sensor.h"
+#include "Sensor.h"
 #include "SystemTimer.h"
 
-volatile uint16_t Sensor::productCount = 0;
-volatile bool Sensor::isDetected = false;
-uint32_t Sensor::lastInterruptTick = 0;
 
-volatile bool Sensor::isDiagnosticMode = false;
-volatile uint32_t Sensor::lastEnterTick = 0;
-volatile uint32_t Sensor::lastExitTick = 0;
-volatile uint32_t Sensor::blockDuration = 0;
-volatile uint32_t Sensor::gapDuration = 0;
-volatile uint32_t Sensor::prevBlockDuration = 0;
-volatile uint32_t Sensor::prevGapDuration = 0;
-volatile bool Sensor::newDataReady = false;
 
 void Sensor::enableDiagnosticMode(bool enable) {
     isDiagnosticMode = enable;
     if (enable) {
-        EXTI->RTSR |= (1 << 13); // Báº­t thĂªm ngáº¯t cáº¡nh lĂªn
+        EXTI->RTSR |= pin; // Bật thêm ngắt cạnh lên
     } else {
-        EXTI->RTSR &= ~(1 << 13); // Táº¯t ngáº¯t cáº¡nh lĂªn, trá»Ÿ vá» bĂ¬nh thÆ°á»ng
+        EXTI->RTSR &= ~pin; // Tắt ngắt cạnh lên, trở về bình thường
     }
 }
 
@@ -35,7 +24,11 @@ bool Sensor::getDiagnosticData(uint16_t& currBlock, uint16_t& currGap, uint16_t&
     return false;
 }
 
-Sensor::Sensor(GPIO_TypeDef* port, uint16_t pin) : port(port), pin(pin) {}
+Sensor::Sensor(GPIO_TypeDef* port, uint16_t pin) : port(port), pin(pin), lastInterruptTick(0), isDiagnosticMode(false), lastEnterTick(0), lastExitTick(0), blockDuration(0), gapDuration(0), prevBlockDuration(0), prevGapDuration(0), newDataReady(false), onDetectCallback(nullptr), isDetected(false) {}
+
+void Sensor::setCallback(void (*cb)()) {
+    onDetectCallback = cb;
+}
 
 void Sensor::init() {
     if (port == GPIOA) RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
@@ -55,7 +48,7 @@ void Sensor::init() {
         port->CRH &= ~(0xF << ((pinIndex - 8) * 4));
         port->CRH |= (0x8 << ((pinIndex - 8) * 4));  
     }
-    port->ODR |= pin; // KĂ©o trá»Ÿ Pull-up
+    port->ODR |= pin; // Kéo trở Pull-up
     
     uint32_t portIndex = (port == GPIOA) ? 0 : (port == GPIOB) ? 1 : (port == GPIOC) ? 2 : 3;
     AFIO->EXTICR[pinIndex / 4] &= ~(0xF << ((pinIndex % 4) * 4));
@@ -83,16 +76,15 @@ void Sensor::handleInterrupt(uint16_t extiPin) {
         
         uint32_t currentTick = SystemTimer::getTick();
         
-        // Đọc trạng thái chân PC13 (0 = bị che, 1 = không bị che) -- Đang giả định NPN
-        // Nhưng thực tế là PNP (1 = Bị che, 0 = Hở)
-        bool isPinHigh = (GPIOC->IDR & (1 << 13)) != 0;
+        // Đọc trạng thái cảm biến PNP
+        bool isPinHigh = (port->IDR & pin) != 0;
         
         if (isDiagnosticMode) {
             // Dùng State Machine và Debounce để chống nhiễu tuyệt đối cho Logic Analyzer
             static bool lastDiagState = false;
             static uint32_t lastDiagChangeTick = 0;
             
-            if (currentTick - lastDiagChangeTick > 20) { // Lọc dội phím (Bounce)
+            if (currentTick - lastDiagChangeTick > 20) { // Lọc dội (Bounce)
                 if (isPinHigh != lastDiagState) {
                     if (isPinHigh) { 
                         // Cạnh lên (Mức CAO): Bắt đầu che
@@ -115,23 +107,21 @@ void Sensor::handleInterrupt(uint16_t extiPin) {
                 }
             }
         }
-        
-        // Phục hồi nguyên bản code của sếp: Đếm sản phẩm khi ngắt cạnh xuống
         bool isPinLow = !isPinHigh;
         
         if (isPinLow && (currentTick - lastInterruptTick > 20)) {
-            // Ghi giá trị đếm mới vào thanh ghi BKP->DR1 để chống mất điện (Task 2)
-            productCount++;
-            BKP->DR1 = productCount;
+            // Kích hoạt Callback
+            if (onDetectCallback) onDetectCallback();
             isDetected = true;
             lastInterruptTick = currentTick;
         }
     }
 }
 
-extern "C" void EXTI15_10_IRQHandler(void) {
-    Sensor::handleInterrupt(1 << 13);
-}
+
+
+
+
 
 
 

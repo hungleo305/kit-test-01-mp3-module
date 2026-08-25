@@ -79,6 +79,8 @@ SdCard sdCard(SPI1, GPIOC, 1<<8);
 extern CAN_HandleTypeDef hcan;
 CanBus myCan(&hcan);
 
+volatile uint16_t productCount = 0;
+volatile uint16_t cycleCount = 0;
 uint16_t mucTieu = 10;
 bool datMucTieu = false;
 uint32_t lastCanSend = 0;
@@ -122,6 +124,20 @@ uint32_t lastSdCheck = 0;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+
+extern "C" void EXTI15_10_IRQHandler(void) {
+    cb.handleInterrupt(1 << 13);
+}
+
+void onSensorDetect() {
+    productCount++;
+    if (productCount > 9999) {
+        productCount = 0;
+        cycleCount++;
+        BKP->DR2 = cycleCount;
+    }
+    BKP->DR1 = productCount;
+}
 static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
 static void MX_SPI3_Init(void);
@@ -173,10 +189,12 @@ int main(void)
   RCC->APB1ENR |= (RCC_APB1ENR_PWREN | RCC_APB1ENR_BKPEN); // Cấp xung nhịp cho PWR và BKP
   PWR->CR |= PWR_CR_DBP; // Mở khóa cho phép ghi vào phần vùng Backup (Disable Backup Domain write protection)
   
-  Sensor::productCount = BKP->DR1;
+  productCount = BKP->DR1;
+  cycleCount = BKP->DR2;
 
   ledOb.init();
   cb.init();
+  cb.setCallback(onSensorDetect);
   dp.init();
   rtc.init();
   buzzer.init();
@@ -199,7 +217,7 @@ int main(void)
   
   /* ====== BẬT/TẮT BIẾN KIỂM TRA CẢM BIẾN (DIAGNOSTIC TEST) ====== */
   /* Bỏ comment dòng dưới để BẬT chế độ kiểm tra cảm biến qua CAN */
-  Sensor::enableDiagnosticMode(true);
+  cb.enableDiagnosticMode(true);
   
   fres = f_mount(&fs, "", 1);
   if (fres != FR_OK) {
@@ -249,7 +267,7 @@ int main(void)
     /* ====== ĐỌC LOG CẢM BIẾN (DIAGNOSTIC) ====== */
     // Chỉ hoạt động khi enableDiagnosticMode(true) được gọi
     uint16_t currBlock, currGap, prevBlock, prevGap;
-    if (Sensor::getDiagnosticData(currBlock, currGap, prevBlock, prevGap)) {
+    if (cb.getDiagnosticData(currBlock, currGap, prevBlock, prevGap)) {
         // Gửi qua CAN ID: 0x124 (định dạng BCD để đọc trực tiếp số thập phân trên Cangaroo)
         // Byte 0-1: Current Block, Byte 2-3: Current Gap
         // Byte 4-5: Previous Block, Byte 6-7: Previous Gap
@@ -374,19 +392,19 @@ int main(void)
     }
 
     //1:kiem tra cam bien
-    if (Sensor::isDetected)
+    if (cb.isDetected)
     {
       buzzer.beep(1, 50, 0, true);
-      Sensor ::isDetected =false;
+      cb.isDetected =false;
       // Chuyển màn hình về đếm số ngay lập tức
       isShowingTime = false;
       lastDisplayToggle = currentTick;
-      lastDisplayValue = Sensor::productCount;
+      lastDisplayValue = productCount;
       dp.setColon(false);
-      dp.setValue(Sensor::productCount);
+      dp.setValue(productCount);
       dp.update(false); // Cập nhật lại số đếm
     }
-      if(Sensor::productCount >= mucTieu && !datMucTieu){
+      if(productCount >= mucTieu && !datMucTieu){
         datMucTieu = true;
         if (!mp3.play("DAT.MP3")) { 
           buzzer.beep(3, 100, 100); 
@@ -443,12 +461,12 @@ int main(void)
           currentBlinkState = (currentTick / 100) % 2 == 0;
       }
       
-      if (Sensor::productCount != lastDisplayValue || currentBlinkState != lastBlinkState) 
+      if (productCount != lastDisplayValue || currentBlinkState != lastBlinkState) 
       {
           dp.setColon(currentBlinkState);   
-          dp.setValue(Sensor::productCount);    
+          dp.setValue(productCount);    
           dp.update(false);
-          lastDisplayValue = Sensor::productCount;
+          lastDisplayValue = productCount;
           lastBlinkState = currentBlinkState;
       }
     }
@@ -518,7 +536,7 @@ int main(void)
                                 
                                 if (status == STATUS_OK) {
                                     if (strncmp((char*)readData, "RESET_DEM", 9) == 0) {
-                                        if (Sensor::productCount == 0) {
+                                        if (productCount == 0) {
                                             buzzer.beep(2, 100, 100); // đã reset rồi, bỏ qua
                                             readStatus = 0x01;
                                         } else {
@@ -527,8 +545,10 @@ int main(void)
                                               buzzer.beep(3, 100, 100); 
                                             }
                                             //Cập nhật lại thanh ghi BKP khi Reset đểm
-                                            Sensor::productCount = 0;
-                                            BKP->DR1 = Sensor::productCount;
+                                            productCount = 0;
+                                            cycleCount = 0;
+                                            BKP->DR1 = productCount;
+                                            BKP->DR2 = cycleCount;
                                             lastDisplayValue = 0xFFFF;
                                             readStatus = 0x00;
                                             datMucTieu = false;
@@ -612,16 +632,18 @@ int main(void)
     
     //6:gui du lieu can rtc vs cam bien
     if(currentTick - lastCanSend >= 500){
-      uint8_t frame102[4] = {0};
-      uint16_t currentCount = Sensor::productCount; 
+      uint8_t frame102[6] = {0};
+      uint16_t currentCount = productCount; 
       uint16_t currentTarget = mucTieu;
       // Đổi sang dạng Little Endian để trùng khớp với Cangaroo (.dbc)
         frame102[0] = currentCount & 0xFF;
         frame102[1] = (currentCount >> 8) & 0xFF;
         frame102[2] = currentTarget & 0xFF;
         frame102[3] = (currentTarget >> 8) & 0xFF;
-      
-      myCan.sendFrame(0x102, frame102, 4);
+        frame102[4] = cycleCount & 0xFF;
+        frame102[5] = (cycleCount >> 8) & 0xFF;
+        
+      myCan.sendFrame(0x102, frame102, 6);
       
       uint8_t h, m, s;
         rtc.getTime(h, m, s);
@@ -883,8 +905,8 @@ extern "C" {
                 uint16_t val = rxData[0] | (rxData[1] << 8);
                 if (val <= 9999) {
                     // Cập nhật lại thanh ghi BKP khi set giá trị đếm từ mạng CAN
-                    Sensor::productCount = val;
-                    BKP->DR1 = Sensor::productCount;
+                    productCount = val;
+                    BKP->DR1 = productCount;
                     datMucTieu = false;
                     buzzer.beep(1, 150, 0);
                 } else {
@@ -974,6 +996,12 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+
+
+
+
+
+
 
 
 

@@ -51,9 +51,10 @@ BO_ 257 UID_The_RFID: 6 Mach_STM32
  SG_ Byte_UID_4 : 32|8@1+ (1,0) [0|255] "" Phan_Mem_PC
  SG_ Trang_Thai_Doc : 40|8@1+ (1,0) [0|255] "" Phan_Mem_PC
 
-BO_ 258 Trang_Thai_Dem_San_Pham: 4 Mach_STM32
+BO_ 258 Trang_Thai_Dem_San_Pham: 6 Mach_STM32
  SG_ Gia_Tri_Dem : 0|16@1+ (1,0) [0|65535] "" Phan_Mem_PC
  SG_ Muc_Tieu : 16|16@1+ (1,0) [0|65535] "" Phan_Mem_PC
+ SG_ So_Vong_Quay : 32|16@1+ (1,0) [0|65535] "" Phan_Mem_PC
 
 BO_ 259 Thoi_Gian_Thuc_RTC: 7 Mach_STM32
  SG_ Gio : 0|8@1+ (1,0) [0|23] "h" Phan_Mem_PC
@@ -118,3 +119,4 @@ BO_ 518 Mat_Khau_Tam_Thoi: 6 Phan_Mem_PC
  SG_ Mat_Khau_Tam_B3 : 24|8@1+ (1,0) [0|255] "" Mach_STM32
  SG_ Mat_Khau_Tam_B4 : 32|8@1+ (1,0) [0|255] "" Mach_STM32
  SG_ Mat_Khau_Tam_B5 : 40|8@1+ (1,0) [0|255] "" Mach_STM32
+
