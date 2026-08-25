@@ -7,6 +7,7 @@
 class Mp3 {
 public:
     Mp3(SPI_HandleTypeDef* hspi,
+        GPIO_TypeDef* pwrPort, uint16_t pwrPin,
         GPIO_TypeDef* xresetPort, uint16_t xresetPin,
         GPIO_TypeDef* dreqPort, uint16_t dreqPin,
         GPIO_TypeDef* xdcsPort, uint16_t xdcsPin,
@@ -29,6 +30,7 @@ private:
     uint32_t savedPosition;
     bool hasSavedState;
     SPI_HandleTypeDef* hspi;
+    GPIO_TypeDef* pwrPort;    uint16_t pwrPin;
     GPIO_TypeDef* xresetPort; uint16_t xresetPin;
     GPIO_TypeDef* dreqPort;   uint16_t dreqPin;
     GPIO_TypeDef* xdcsPort;   uint16_t xdcsPin;

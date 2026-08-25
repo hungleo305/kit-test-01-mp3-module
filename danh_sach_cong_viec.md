@@ -33,13 +33,13 @@ Tài liệu này theo dõi tiến độ các hạng mục cần nâng cấp/sử
 - **Kết quả kỳ vọng:**
   1. Đang chạy bình thường, rút thẻ SD ra. Kết quả mong đợi: Còi báo hiệu thẻ lỗi 1 tiếng bíp ngay lập tức (không cần đợi vài giây).
   2. Cắm thẻ SD tốt vào lại. Kết quả mong đợi: Mạch Mount thành công, bíp 2 tiếng và sẵn sàng.
-  3. Cắm thẻ SD hỏng/chưa format đúng FAT32 vào. Kết quả mong đợi: Mạch báo lỗi (bíp 3 hoặc 5 tiếng) rồi nghỉ, CPU rảnh rỗi tuyệt đối, quẹt thẻ RFID vẫn mượt mà không bị đơ.
+  3. Cắm thẻ SD hỏng/chưa format đúng FAT32 vào. Kết quả mong đợi: Mạch báo lỗi (bíp 3 hoặc 5 tiếng) rồi nghỉ, CPU rảnh rỗi , quẹt thẻ RFID vẫn mượt mà không bị đơ.
 
 ### Task 5: Đo tốc độ nhận diện thẻ SD & Triệt tiêu âm thanh "bụp" khởi động
 - **Công việc:** Dùng SystemTimer::getTick() đo thời gian khởi tạo thẻ và truyền qua CAN. Chặn tiếng bụp bằng cách cấu hình chân MUTE của Amply (PA4) đóng ngay khi khởi động và trong lúc reset thẻ.
 - **Kết quả kỳ vọng:**
   1. Cấp nguồn hoặc bấm Reset hệ thống. Kết quả mong đợi: Loa hoàn toàn im lặng, không có tiếng bụp.
-  2. Rút thẻ SD và cắm lại nóng. Kết quả mong đợi: Đèn LED hiển thị thời gian kết nối (ms), loa im lặng tuyệt đối không xẹt nhiễu, sau đó báo 2 bíp và phát nhạc bình thường. Dữ liệu trên CAN sniffer báo đúng BCD frame 0x125.
+  2. Rút thẻ SD và cắm lại nóng. Kết quả mong đợi: Đèn LED hiển thị thời gian kết nối (ms), loa im lặng không xẹt nhiễu, sau đó báo 2 bíp và phát nhạc bình thường. Dữ liệu trên CAN báo đúng BCD frame 0x125.
 
 ---
 
@@ -56,12 +56,12 @@ Tài liệu này theo dõi tiến độ các hạng mục cần nâng cấp/sử
 ### Task 7: Tối ưu mạng CAN và Cảnh báo lỗi
 - **Công việc:**
   - Tối ưu hóa băng thông (chỉ gửi frame định kỳ/sự kiện).
-  - Kích hoạt chế độ AutoBusOff (Tự phục hồi sau khi đứt dây).
-  - Viết file database.dbc để hiển thị tiếng Việt trên Cangaroo.
+  - Kích hoạt chế độ tự phục hồi sau khi mất kết nối.
+  - Viết file kit_vna_can.dbc để hiển thị tiếng Việt và trạng thái trên Cangaroo.
   - Bổ sung chớp màn hình ---- và báo còi khi đứt mạng.
 - **Kết quả kỳ vọng:**
-  1. Đứt cáp CAN. Kết quả mong đợi: Loa bíp 3 lần, màn hình chớp ---- trong 3 giây.
-  2. Cắm lại cáp CAN. Kết quả mong đợi: Mạch tự động đẩy lại các gói tin bị kẹt, hệ thống hoạt động trơn tru không bị nghẽn.
+  1. Mất kết nối CAN. Kết quả mong đợi: Còi bíp dài 1 lần, màn hình chớp ---- trong 3 giây.
+  2. Cắm lại cáp CAN. Kết quả mong đợi: Mạch hoạt động bình thường
   3. Mở Cangaroo bằng file .dbc. Kết quả mong đợi: Đọc được các bản tin cảnh báo bằng tiếng Việt.
 
 ---

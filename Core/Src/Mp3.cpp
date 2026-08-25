@@ -21,11 +21,13 @@
 
 
 Mp3::Mp3(SPI_HandleTypeDef* hspi,
+        GPIO_TypeDef* pwrPort, uint16_t pwrPin,
         GPIO_TypeDef* xresetPort, uint16_t xresetPin,
         GPIO_TypeDef* dreqPort, uint16_t dreqPin,
         GPIO_TypeDef* xdcsPort, uint16_t xdcsPin,
         GPIO_TypeDef* xcsPort, uint16_t xcsPin) : 
         hspi(hspi),
+        pwrPort(pwrPort), pwrPin(pwrPin),
         xresetPort(xresetPort), xresetPin(xresetPin),
         dreqPort(dreqPort), dreqPin(dreqPin),
         xdcsPort(xdcsPort), xdcsPin(xdcsPin),
@@ -85,10 +87,10 @@ void Mp3::reset() {
 }
 
 void Mp3::init() {
-    GPIO_TypeDef* ports[] = {xresetPort, xdcsPort, xcsPort};
-    uint16_t pins[] = {xresetPin, xdcsPin, xcsPin};
+    GPIO_TypeDef* ports[] = {pwrPort, xresetPort, xdcsPort, xcsPort};
+    uint16_t pins[] = {pwrPin, xresetPin, xdcsPin, xcsPin};
     
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 4; i++) {
         if (ports[i] == GPIOA) RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
         if (ports[i] == GPIOB) RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
         if (ports[i] == GPIOC) RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
@@ -119,8 +121,9 @@ void Mp3::init() {
     xcsPort->BSRR = xcsPin;
     xdcsPort->BSRR = xdcsPin;
     xresetPort->BSRR = xresetPin;
+    pwrPort->BRR = pwrPin; // Keo xuong LOW de mo PNP Transistor cap nguon 3V3
     
-    HAL_Delay(50);
+    HAL_Delay(100); // Cho nguon on dinh truoc khi truyen SPI
     uint8_t dummy = 0xFF;
     HAL_SPI_Transmit(hspi, &dummy, 1, 100);
     

@@ -7,7 +7,7 @@ Dự án mạch Kit STM32F103RCT6 điều khiển đa năng giao tiếp CAN Bus,
 ## 1. MÔI TRƯỜNG & PHẦN MỀM SỬ DỤNG
 Để lập trình, biên dịch và giao tiếp với mạch, dự án sử dụng các phần mềm chuyên dụng sau:
 
-- **STM32CubeMX (Phiên bản 6.17.0):** Công cụ sinh code tự động (C code) và cấu hình phần cứng (Clock, GPIO, SPI, I2C, CAN...). File cấu hình dự án là `Firmware.ioc`. Khi bạn thay đổi sơ đồ chân mạch, hãy dùng CubeMX để Generate Code ban đầu.
+- **STM32CubeMX (Phiên bản 6.17.0):** Công cụ sinh code tự động (C code) và cấu hình phần cứng (Clock, GPIO, SPI, I2C, CAN...). File cấu hình dự án là `Firmware.ioc`. Khi muốn thay đổi sơ đồ chân mạch, hãy dùng CubeMX để Generate Code ban đầu.
 - **IAR Embedded Workbench (Phiên bản 8.40.1.21539):** Trình biên dịch (Compiler) và Môi trường phát triển (IDE) chính để viết code C++ và nạp chương trình. Sử dụng Workspace `Project.eww` nằm trong thư mục `EWARM/`. Mã nguồn của dự án được tối ưu rất sâu trên IAR, tận dụng trình biên dịch DLib và kiến trúc tối ưu bộ nhớ.
 - **Cangaroo (Phiên bản 0.6.3):** Phần mềm giả lập màn hình HMI/PC mã nguồn mở. Dùng để gửi và nhận tín hiệu mạng CAN Bus giữa máy tính và mạch. Hỗ trợ import Database trực tiếp qua file `.dbc` để hiển thị tiếng Việt thay cho các mã Hexa khó đọc.
 
@@ -41,15 +41,14 @@ kit-test-01-mp3-module/
 ├── Middlewares/            # Các mã nguồn phần mềm trung gian liên quan đến FatFs
 ├── Firmware.ioc            # File cấu hình đồ họa hệ thống cho STM32CubeMX
 ├── kit_vna_can.dbc         # Database ánh xạ dữ liệu CAN sang tiếng Việt (Cho Cangaroo)
-└── README.md               # Tài liệu bạn đang đọc
+└── README.md               # Tài liệu đang đọc
 ```
 
 ---
 
 ## 3. HƯỚNG DẪN SỬ DỤNG DÀNH CHO NGƯỜI DÙNG
 
-Phần này hướng dẫn chi tiết cách vận hành mạch từ lúc cắm điện đến lúc sử dụng các tính năng. Bạn chỉ cần làm theo các bước dưới đây.
-
+Phần này hướng dẫn chi tiết cách vận hành mạch từ lúc cắm điện đến lúc sử dụng các tính năng. 
 ### 3.1. Cắm điện và Khởi động
 - **Cắm điện:** Ngay khi vừa cấp nguồn, mạch sẽ khởi động hệ thống và kêu **2 tiếng Bíp** để báo hiệu đã có điện và sẵn sàng.
 - **Đèn LED Onboard :** Đèn LED nhỏ trên thân mạch sẽ chớp nháy liên tục rất nhanh (chu kỳ 0.1 giây sáng / 0.1 giây tắt - tức là chớp 5 lần/giây). Đèn này nháy đều đặn chứng tỏ  vi xử lý đang chạy cực kỳ trơn tru, vòng lặp hoạt động không bị treo .
@@ -75,12 +74,12 @@ Mạch được quy định phản hồi các thao tác thông qua số lượng
 
 ### 3.3. Hướng dẫn đếm sản phẩm bằng Cảm biến
 - **Cách đếm:** Khi có sản phẩm chạy ngang qua mắt cảm biến, còi kêu 1 tiếng **Bíp** và số trên màn hình tăng lên 1. 
-- **Tính năng lấn át:** Nếu màn hình đang ở chế độ "Xem giờ" mà cảm biến bắt được sản phẩm, màn hình sẽ **lập tức nhảy về chế độ Số Đếm** để dễ dàng theo dõi.
+- **Khi màn hình đang hiển thị chế độ "Xem giờ":** Nếu cảm biến bắt được sản phẩm, màn hình sẽ **lập tức nhảy về chế độ Số Đếm** để dễ dàng theo dõi.
 - **Đạt mục tiêu:** Khi số lượng sản phẩm đếm được bằng với con số "Mục tiêu" (có thể cài đặt qua máy tính bằng canbus), loa sẽ tự động phát âm thanh "Đã đạt mục tiêu" (tên file là `DAT.MP3`).
 
 ### 3.4. Hướng dẫn sử dụng Thẻ Nhớ MP3 (Thẻ SD)
 - **Chuẩn bị thẻ:** Rút thẻ ra cắm vào máy tính, Format thẻ với định dạng **FAT32**. Sau đó copy các file âm thanh (đuôi file là `.mp3`) trực tiếp vào thẻ, không bỏ vào thư mục nào cả. 
-- **Rút/Cắm thẻ khi đang chạy (Hot-plug):** Nếu đang phát âm thanh mà vô tình rút thẻ ra -> Mạch sẽ kêu **1 tiếng bíp**, đồng thời tự động ngắt amply để loa không bị nổ lụp bụp và lưu lại vị trí bài hát đang nghe dở. Khi cắm thẻ lại thành công -> Mạch sẽ kêu **2 tiếng bíp**, đồng thời **màn hình LED 7 đoạn sẽ hiển thị thời gian kết nối thẻ (tính bằng mili-giây) trong vòng 3 giây**, sau đó mạch tự động hát tiếp đoạn âm thanh vừa bị ngắt.
+- **Rút/Cắm thẻ khi đang chạy (Hot-plug):** Nếu đang phát âm thanh mà vô tình rút thẻ ra -> Mạch sẽ kêu **1 tiếng bíp**, đồng thời tự động ngắt amply để loa không bị nổ lụp bụp và lưu lại vị trí bài hát đang nghe dở. Khi cắm thẻ lại thành công -> Mạch sẽ kêu **2 tiếng bíp** nếu kết nối thành công, đồng thời **màn hình LED 7 đoạn sẽ hiển thị thời gian kết nối thẻ (tính bằng mili-giây) trong vòng 3 giây**, sau đó mạch tự động phát tiếp đoạn âm thanh vừa bị ngắt.
 
 ### 3.5. Hướng dẫn Quẹt thẻ Thao tác (RFID)
 Mạch đi kèm bộ thẻ từ. Quẹt các thẻ này vào anten (miếng vuông in chữ RC522) để ra lệnh cho mạch làm việc:
@@ -91,7 +90,7 @@ Mạch đi kèm bộ thẻ từ. Quẹt các thẻ này vào anten (miếng vuô
 *( Có thể quẹt liên tục nhiều thẻ khác nhau, các âm thanh sẽ tự động xếp hàng và phát lần lượt).*
 
 ### 3.6. Hướng dẫn dùng phần mềm máy tính (Cangaroo qua CAN Bus)
-Bạn cắm mạch vào máy tính qua bộ chuyển đổi CAN. Mở phần mềm **Cangaroo** trên máy tính:
+Cắm mạch vào máy tính qua bộ chuyển đổi CAN. Mở phần mềm **Cangaroo** trên máy tính:
 1. Load file có sẵn tên là `kit_vna_can.dbc` (có sẵn trong thư mục dự án) vào phần mềm.
 2. Lúc này toàn bộ các ID kỹ thuật sẽ tự động biến thành tiếng Việt (Ví dụ: *Thoi_Gian_Thuc_RTC, Muc_Tieu...*).
 3. **Cách đổi số lượng Mục Tiêu:** Tìm đến khung CAN TX (ID `0x201`), nhập một số thập phân bình thường (ví dụ: `100`) rồi bấm nút Gửi (Send). Mạch sẽ nhớ con số 100 này làm mục tiêu.
@@ -105,14 +104,14 @@ Bạn cắm mạch vào máy tính qua bộ chuyển đổi CAN. Mở phần m�
      - `2`: Bật Relay (`BAT_RELAY`)
      - `3`: Đảo Relay (`DAO_RELAY`)
      - `4`: Phát nhạc (`PHAT_NHAC`)
-   - Bấm Gửi. Mạch sẽ kêu **2 bíp ngắn dồn dập (50ms)** báo hiệu đang ở chế độ chờ ghi thẻ. Lúc này bạn quẹt thẻ từ vào mâm đọc, mạch sẽ nạp lệnh mới vào thẻ. (Quẹt xong sẽ có tiếng bíp dài báo thành công).
+   - Bấm Gửi. Mạch sẽ kêu **2 bíp ngắn dồn dập (50ms)** báo hiệu đang ở chế độ chờ ghi thẻ. Lúc này quẹt thẻ từ vào anten, mạch sẽ nạp lệnh mới vào thẻ. (Quẹt xong sẽ có tiếng bíp dài báo thành công).
    *(Lưu ý : Để có thể thay đổi tính năng thẻ thì yêu cầu mật khẩu (key A) của thẻ phải là **0x11 0x22 0x33 0x44 0x55 0x66**)
 7. **Đổi mật khẩu / Xóa trắng thẻ RFID:**
    - Mở khung CAN TX **`ID 0x205 (Cai_Dat_Mat_Khau_The)`**.
    - Cột **Lenh_Dieu_Khien (Byte 0):** Nhập `0` nếu muốn Xóa tính năng của thẻ , hoặc nhập `1` nếu muốn Đổi mật khẩu mới.
    - **Cách điền Mật khẩu mới:**
-     - Nếu bạn muốn nhập mật khẩu bằng hệ **Hexa**, hãy click đúp chuột trực tiếp vào khung **Data** (chữ số ngoài cùng) và sửa trực tiếp chuỗi Hex (Ví dụ: `01 0F FF FF FF FF FF` rồi ấn Enter). 
-     - Nếu nhập từng cột Value, hãy quy đổi ra số Thập phân (Ví dụ `0xFF` thì gõ là `255`, `0x0F` thì gõ là `15`). Cangaroo không hiểu chữ "F" nếu gõ chay.
+     - Nếu muốn nhập mật khẩu bằng hệ **Hexa**, hãy click đúp chuột trực tiếp vào khung **Data** (chữ số ngoài cùng) và sửa trực tiếp chuỗi Hex (Ví dụ: `01 0F FF FF FF FF FF` rồi ấn Enter). 
+     - Nếu nhập từng cột Value, hãy quy đổi ra số Thập phân (Ví dụ `0xFF` thì gõ là `255`, `0x0F` thì gõ là `15`). 
    - Bấm Gửi. Mạch kêu **2 bíp dồn dập** chờ thẻ. Quẹt thẻ để hoàn tất quá trình đổi mật khẩu.
     *(Lưu ý : Để có thể đổi mật khẩu mới cho thẻ cần biết mật khẩu hiện tại của thẻ)*
 
@@ -125,181 +124,202 @@ Bạn cắm mạch vào máy tính qua bộ chuyển đổi CAN. Mở phần m�
 9. **Quan sát Dữ liệu Mạch gửi lên PC (Monitor):**
    - Chuyển sang bảng **CAN RX** (Hoặc tab Monitor) để xem mạch báo cáo trạng thái theo thời gian thực:
    - **`ID 0x101`**: Thông báo có thẻ vừa quẹt. Xem được mã ID của thẻ (5 byte đầu) và trạng thái đọc thẻ (Byte cuối: `0` là Đọc thành công, `1-3` là có lỗi).
-   - **`ID 0x102`**: Gửi liên tục thông số Số đếm hiện tại và Mục tiêu. (Bạn có thể thấy số đếm nhảy lên ngay lập tức trên máy tính khi che tay qua cảm biến).
-   - **`ID 0x103`**: Gửi liên tục Thời gian thực (giờ,phút,giây,ngày,tháng,năm,thứ) từ vi điều khiển để bạn đồng bộ.
-   - **`ID 0x104 & 0x105`**: Chứa chuỗi ký tự dữ liệu thô mạch đọc được từ Thẻ RFID khi bạn quẹt thẻ.
+   - **`ID 0x102`**: Gửi liên tục thông số Số đếm hiện tại, Mục tiêu và Chu kỳ (số lần đếm được 10000 ). (Có thể thấy số đếm nhảy lên ngay lập tức trên máy tính khi che tay qua cảm biến).
+   - **`ID 0x103`**: Gửi liên tục Thời gian thực (giờ,phút,giây,ngày,tháng,năm,thứ) từ vi điều khiển để đồng bộ.
+   - **`ID 0x104 & 0x105`**: Chứa chuỗi ký tự dữ liệu (16 byte) mạch đọc được từ Thẻ RFID khi quẹt thẻ.
+   - **`ID 0x124`**: (Chế độ Diagnostic) Liên tục cập nhật thời gian che và thời gian khoảng trống của cảm biến (ms). Dùng để gỡ lỗi khi có nhiễu.
+   - **`ID 0x125`**: Báo cáo thời gian khởi tạo thẻ nhớ SD (Mount Time - tính bằng ms) ngay khi thẻ được cắm nóng.
 
 ---
 
-## 4. HƯỚNG DẪN DÀNH CHO LẬP TRÌNH VIÊN
+## 4. HƯỚNG DẪN SỬ DỤNG THƯ VIỆN CHO LẬP TRÌNH (BẢN CHI TIẾT & CHUYÊN SÂU TỪNG MODULE)
 
-Mã nguồn được tổ chức theo cấu trúc Hướng đối tượng (OOP) C++. Các class ngoại vi được thiết kế theo mô hình Non-blocking, không sử dụng hàm trễ `HAL_Delay`, đảm bảo mạch có thể đa nhiệm mượt mà.
+Mã nguồn được tổ chức theo cấu trúc Hướng đối tượng (OOP) C++. Tất cả các class thư viện được thiết kế theo mô hình **Non-blocking**, tuyệt đối không sử dụng hàm trễ `HAL_Delay` trong vòng lặp chính. Nhờ đó, mạch có thể thực thi đa nhiệm cực kỳ mượt mà. 
 
-**Lưu ý:** Bộ thư viện này viết trên nền tảng STM32 HAL (cụ thể là chip **STM32F1**).
+**Lưu ý:** Bộ thư viện này được tối ưu trên nền tảng STM32 HAL (Chip **STM32F1**). Tất cả các thiết lập chân (Pin/Port) đều được truyền thẳng qua hàm khởi tạo (Constructor), giúp tái sử dụng với project khác.
+
 ---
 
 ### 4.1. Cấu hình Hệ thống & Xung nhịp (System Core & Clock Tree)
-
-![Sơ đồ Xung nhịp CubeMX](docs/cubemx_clock.png)
-
-Để vi điều khiển hoạt động chính xác với các giao thức tốc độ cao (như CAN, SPI), bạn bắt buộc phải cấu hình xung nhịp gốc (Clock Tree) trong CubeMX như sau:
+Để vi điều khiển hoạt động chính xác với các giao thức tốc độ cao (như CAN, SPI), bắt buộc phải cấu hình xung nhịp gốc trong STM32CubeMX như sau:
 - **Chuẩn nạp (SYS):** Cấu hình Serial Wire (`PA13` - SWDIO, `PA14` - SWCLK).
-- **Thạch anh (RCC):** Kích hoạt High Speed Clock (HSE) ở dạng Crystal/Ceramic Resonator (`PD0`, `PD1`).
+- **Thạch anh (RCC):** Kích hoạt High Speed Clock (HSE) ở dạng Crystal/Ceramic Resonator.
 - **Clock Tree:** 
-  - Input Frequency HSE: **8 MHz**.
+  - Input HSE: **8 MHz**.
   - PLL Source Mux: Chọn **HSE**.
   - PLLMul: Đặt hệ số nhân **X9** (8 x 9 = 72).
   - System Clock Mux: Chọn **PLLCLK** để đẩy SYSCLK lên **72 MHz**.
   - **AHB Prescaler:** `/1` (HCLK = 72 MHz).
-  - **APB1 Prescaler:** Bắt buộc `/2` (PCLK1 = 36 MHz) để không làm quá tải bus tĩnh.
-  - **APB2 Prescaler:** Đặt `/1` (PCLK2 = 72 MHz) để chạy ngoại vi SPI/CAN tốc độ tối đa.
+  - **APB1 Prescaler:** Bắt buộc `/2` (PCLK1 = 36 MHz) để không làm quá tải bus I2C/CAN.
+  - **APB2 Prescaler:** Đặt `/1` (PCLK2 = 72 MHz) để chạy ngoại vi SPI tốc độ tối đa.
 
-### 4.2. Thư viện `Buzzer`
-**Hướng dẫn Setup (Cài đặt):**
-- **Include:** `#include "Buzzer.h"`
-- **Vị trí khai báo:** Khai báo đối tượng ở Global (đầu file `main.cpp`).
-- **Khởi tạo (`init`):** Gọi hàm `.init()` trong vùng `USER CODE BEGIN 2` để nạp cấu hình chân.
-- **Duy trì thời gian:** Bạn BẮT BUỘC phải đặt hàm tĩnh `buzzer.update()` vào một ngắt Timer định kỳ 1ms (thường là hàm `SysTick_Handler` trong file `stm32f1xx_it.c`). Nếu thiếu, hàm bíp theo hàng đợi sẽ bị liệt.
+---
 
-**Ví dụ Code:**
+### 4.2. Thư viện `Buzzer` (Còi Chip)
+Thư viện quản lý còi thông qua hàng chờ (Queue), cho phép đẩy nhiều tín hiệu bíp mà không làm treo hệ thống.
+
+**Cách hoạt động:** Khi gọi lệnh kêu, thư viện chỉ lưu số liệu vào mảng hàng chờ. Hàm `update()` được đặt ngầm trong bộ đếm ngắt sẽ liên tục trừ lùi thời gian để điều khiển điện áp ngõ ra (Bật/Tắt).
+
+**Hàm API chi tiết:**
+- `Buzzer(GPIO_TypeDef* port, uint16_t pin)`: Constructor truyền vào chân kết nối.
+- `void init()`: Cấu hình chân GPIO thành Output Push-Pull. (Nên cấu hình thẳng bằng Register trong `main.cpp` để tăng tốc độ).
+- `void beep(uint8_t count, uint32_t onTime, uint32_t offTime, bool force)`:
+  - `count`: Số lần kêu (VD: 3 lần).
+  - `onTime`: Độ dài thời gian kêu (mili-giây).
+  - `offTime`: Độ dài thời gian im lặng (mili-giây).
+  - `force` (Mặc định = false): Nếu set là `true`, lập tức xóa bỏ hàng chờ cũ và kêu ngay lệnh này.
+- `void update()`: **BẮT BUỘC**. Hàm đếm thời gian.
+
+**Ví dụ Code hoàn chỉnh:**
 ```cpp
-/* --- Trong file main.cpp --- */
+/* --- Khai báo toàn cục --- */
 #include "Buzzer.h"
-
-// 1. Khai báo Global (Tham số: Port, Pin)
 Buzzer buzzer(GPIOC, GPIO_PIN_15); 
 
 int main(void) {
-    // ... code HAL_Init ...
-    
-    // 2. Khởi tạo
     buzzer.init();
     
-    // 3. Sử dụng lệnh phát âm thanh 
-    buzzer.beep(3, 100, 100);       // Kêu 3 lần, nghỉ 100ms (nối tiếp vào hàng đợi)
-    buzzer.beep(1, 100, 0, true);   // Kêu ngay lập tức (Xóa hàng đợi cũ)
+    // Kêu 3 lần, mỗi tiếng 100ms, nghỉ 100ms. Sẽ chạy ngầm.
+    buzzer.beep(3, 100, 100);       
     
-    while(1) { /* ... */ }
+    // Nếu dùng force=true, tiếng bíp này sẽ cắt ngang tiếng bíp ở trên!
+    // buzzer.beep(1, 100, 0, true); 
+    
+    while(1) { /* Main rảnh rỗi */ }
 }
 
-// 4. Duy trì thời gian (Ghi đè hàm của HAL ngay trong main.cpp)
-// Trong project này, thay vì viết vào stm32f1xx_it.c, chúng ta ghi đè trực tiếp hàm HAL_IncTick:
-void HAL_IncTick(void) {
-    uwTick += uwTickFreq;
-    buzzer.update();  // Bộ đếm thời gian cho còi
+/* --- DUY TRÌ THỜI GIAN --- */
+// Phải ghi đè hàm đếm mili-giây của HAL và bỏ update() vào đây!
+extern "C" {
+    void HAL_IncTick(void) {
+        uwTick += uwTickFreq;
+        buzzer.update(); 
+    }
 }
 ```
 
-### 4.3. Thư viện `Mp3` (VS1011e)
-**Hướng dẫn Setup (Cài đặt):**
-- **Include:** `#include "Mp3.h"`
-- **Phụ thuộc:** Yêu cầu thư viện `FatFs` phải được kích hoạt trước (chạy lệnh `f_mount`).
-- **Duy trì luồng:** Hàm `mp3.play()` chỉ dò tìm mở file, không tự phát nhạc ra loa. Bắt buộc đặt `mp3.process()` vào vòng lặp `while(1)` để duy trì tác vụ đọc byte thẻ nhớ và bơm sang SPI.
+**Tại sao lại ghi đè hàm HAL_IncTick?**
+Hàm HAL_IncTick() là hàm ngắt Timer hệ thống (SysTick) của vi điều khiển, tự động kích hoạt 1000 lần mỗi giây (tương đương mỗi mili-giây).
+Việc đặt `buzzer.update()` vào trong hàm ngắt này có ý nghĩa cực kỳ quan trọng:
+- **Đếm thời gian siêu chuẩn:** Đảm bảo còi luôn được cập nhật trạng thái (bật/tắt) chính xác tới từng mili-giây, bất kể hàm main() đang bận làm việc gì (đọc thẻ nhớ, xử lý LED, v.v.).
+- **Chạy ngầm độc lập (Background Task):** Chuyển thư viện Còi thành hệ thống chạy ngầm. Chỉ cần ra lệnh `buzzer.beep(...)` một lần duy nhất, ngắt SysTick sẽ tự động lo việc trừ lùi thời gian và tắt còi đúng lúc mà không cần dùng `HAL_Delay`, giúp chương trình không bao giờ bị treo cứng.
 
-**Lưu ý kỹ thuật:**
-- **Về mạch Amply ngoài (Dành riêng cho Kit hiện tại):** Bản thân thư viện `Mp3` (VS1011e) xuất trực tiếp ra tín hiệu âm thanh. Tuy nhiên, phần cứng của Kit này có gắn thêm một IC khuếch đại (MIX2018A) nối với loa, và được điều khiển (Mute) qua chân `PA4`. Do đó ở ví dụ dưới, bạn phải kéo chân `PA4` xuống LOW thì loa mới kêu. Nếu bạn ứng dụng thư viện này sang đồ án/mạch điện khác không có mạch Amply này, bạn hoàn toàn có thể bỏ qua bước điều khiển chân `PA4`!
-- Hàm `saveState()` và `resumeState()` hỗ trợ chức năng ghi nhớ vị trí file âm thanh khi bạn bị tuột/cắm nóng thẻ nhớ.
+---
 
-**Ví dụ Code:**
+### 4.3. Thư viện `Mp3` (IC Giải mã VS1011e) & Thẻ nhớ (`SdCard`)
+Sự kết hợp giữa `SdCard` (đọc thẻ vật lý) và `Mp3` (giải mã tín hiệu số). Quá trình diễn ra như sau: Vi điều khiển (MCU) đọc luồng Byte từ thẻ nhớ (SPI) vào bộ đệm (Buffer) trong RAM, sau đó MCU bơm liên tục dữ liệu từ bộ đệm này sang chip giải mã VS1011 (SPI)."
+
+**Hàm API chi tiết thư viện `Mp3`:**
+- Mp3(...): Constructor truyền vào con trỏ SPI (&hspi2) và 5 chân điều khiển: PWR_EN (chân cấp nguồn), XRESET, DREQ, XDCS, XCS.
+- void init(): Bật IC giải mã và cấu hình thanh ghi nội bộ.
+  > **Bên trong init():** Thư viện sẽ tự động cấu cho 5 chân GPIO. 
+  > - PWR_EN, XRESET, XDCS, XCS được cấu hình thành **Output Push-Pull** (Mức cao = 3.3V, Mức thấp = 0V) với tốc độ xuất 50MHz để điều khiển IC.
+  > - DREQ (Data Request) được cấu hình thành **Input Floating** để lắng nghe tín hiệu báo "đói dữ liệu" từ chip VS1011 gửi về vi điều khiển.
+  > - Sau khi set GPIO, hàm sẽ kéo PWR_EN xuống LOW để bật nguồn cho mạch MP3, delay 100ms cho điện áp ổn định rồi mới nạp thanh ghi qua SPI.
+- `void play(const char* filename)`: Tìm và mở file MP3. Hỗ trợ hàng chờ (Playlist). Nếu đang hát mà gọi tiếp `play()`, file mới sẽ đợi file cũ hát xong.
+- `void setVolume(uint8_t left, uint8_t right)`: Chỉnh âm lượng (0 = Max, 254 = Min/Tắt, 255 = Power down).
+- `void process()`: **QUAN TRỌNG NHẤT**. Đặt trong `while(1)`. Hàm này sẽ kiểm tra chân `DREQ`. Chân này ở mức CAO nghĩa là IC VS1011 chưa có dữ liệu. Hàm sẽ tự lấy 32 bytes từ Buffer đẩy qua SPI. Nếu quên hàm này, âm sẽ thanh không kêu.
+- `void saveState()` và `resumeState()`: **Hot-Plug (Cắm/rút nóng thẻ)**. Giúp ghi nhớ bài hát đang hát dở để khi cắm thẻ lại, bài hát tự hát tiếp vị trí vừa đứt.
+
+**Chi tiết thư viện SdCard và cầu nối FatFs:**
+Thư viện SdCard dành riêng cho thư viện hệ thống file FatFs.
+Khi gọi các hàm cấp cao của FatFs (như `f_mount`, `f_open`, `f_read`), FatFs sẽ mượn các hàm API vật lý của thư viện SdCard để tương tác trực tiếp với thẻ nhớ qua giao thức SPI. Cụ thể cơ chế như sau:
+- `SdCard::disk_initialize()`: FatFs gọi hàm này tự động khi chạy `f_mount`. Kéo chân CS xuống, bắn các chuỗi lệnh SPI sau để kích hoạt thẻ:
+  > - **CMD0 (GO_IDLE_STATE):** Reset thẻ và ép nó chuyển sang giao thức SPI.
+  > - **CMD8 (SEND_IF_COND):** Kiểm tra điều kiện điện áp hoạt động và phiên bản thẻ (SD V1/V2).
+  > - **CMD55 (APP_CMD):** Báo cho thẻ biết lệnh tiếp theo là lệnh chuyên dụng (ACMD).
+  > - **ACMD41 (SD_SEND_OP_COND):** Yêu cầu thẻ bắt đầu khởi động nội bộ và vòng lặp chờ nó sẵn sàng.
+  > - **CMD58 (READ_OCR):** Đọc thanh ghi OCR để phân biệt thẻ là SDSC (dung lượng chuẩn) hay SDHC/SDXC (dung lượng cao), từ đó thư viện sẽ lưu biến cờ cardType để tính địa chỉ Sector cho các lệnh đọc/ghi.
+- `SdCard::disk_status()`: FatFs gọi để kiểm tra xem thẻ còn cắm hay đã bị rút ra (dựa trên cờ flag).
+- `SdCard::disk_read()` / `disk_write()`: FatFs gọi khi cần đọc/ghi Data vào từng Sector (mỗi block 512 Bytes). Hàm này xử lý các mã lệnh vật lý là **CMD17 (READ_SINGLE_BLOCK)** để đọc 1 Sector, và **CMD24 (WRITE_BLOCK)** để ghi 1 Sector. Phải chờ tín hiệu token 0xFE (chuẩn bị đọc/ghi thành công).
+- `SdCard::disk_ioctl()`: Lấy thông số thẻ (Dung lượng, Sector count, Block size) để FatFs tính toán không gian đĩa FAT32.
+
+**Lưu ý phần cứng đặc biệt:** 
+Kit hiện tại gắn thêm mạch khuếch đại (Amply) rời MIX2018A để kéo loa công suất cao. Nguồn Amply được điều khiển Mute bằng chân `PA4`. Phải bật chân `PA4` này lên (Bằng thanh ghi: `GPIOA->BRR = (1 << 4);`) trước khi phát nhạc.
+
+**Ví dụ Code hoàn chỉnh:**
 ```cpp
 #include "Mp3.h"
-
-// 1. Khai báo Global (SPI_Handle, XRESET, DREQ, XDCS, XCS)
-Mp3 mp3(&hspi2, 
-        GPIOA, GPIO_PIN_0,  // XRESET
-        GPIOA, GPIO_PIN_1,  // DREQ
-        GPIOB, GPIO_PIN_12, // XDCS
-        GPIOC, GPIO_PIN_3   // XCS
-);
-
-int main(void) {
-    // ...
-    mp3.init();
-    
-    // Bật Amply (PA4) trước khi chơi nhạc
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
-    
-    // 2. Phải Mount thẻ nhớ thành công mới mở được file
-    FATFS fs;
-    if (f_mount(&fs, "", 1) == FR_OK) {
-        mp3.play("DAT.MP3"); 
-    }
-
-    // 3. Vòng lặp chính
-    while (1) {
-        mp3.process(); // Hàm nòng cốt để loa phát ra tiếng liên tục
-    }
-}
-```
-
-### 4.4. Thư viện `SdCard`
-**Hướng dẫn Setup (Cài đặt):**
-- **Include:** Không cần include vào `main.cpp` nếu bạn chỉ thao tác đọc/ghi file. 
-- **Cách hoạt động:** Lớp `SdCard` chỉ phụ trách gửi lệnh vật lý (CMD) qua SPI. Các hàm của nó đã được nhúng thẳng vào file `diskio.c` của thư viện `FatFs`. 
-- **Sử dụng:** Bạn thao tác 100% thông qua các lệnh chuẩn của FatFs (như `f_mount`, `f_open`). Thư viện FatFs sẽ tự động gọi ngược lại thư viện `SdCard` để điều khiển chip.
-
-**Ví dụ Code:**
-```cpp
-#include "ff.h" // Thư viện hệ thống file FatFs
 #include "SdCard.h"
+#include "ff.h" // FatFs
 
-// 1. Khai báo (SPI_Hardware, CS_Port, CS_Pin) 
-// Khai báo bằng thanh ghi SPI1, không dùng cấu trúc &hspi1 của HAL
-SdCard sdCard(SPI1, GPIOC, GPIO_PIN_8);
+// Khai báo thẻ SD ở SPI1
+SdCard sdCard(SPI1, GPIOC, 1<<8, GPIOB, 1<<0, GPIOB, 1<<1);
+
+// Khai báo MP3 ở SPI2
+Mp3 mp3(&hspi2, GPIOC, 1<<2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3);
+
+FATFS fs;
 
 int main(void) {
-    // ...
-    sdCard.init(); // Cấu hình chân IO CS
+    sdCard.init();
+    mp3.init();
+    mp3.setVolume(250, 250);
     
-    FATFS fs;
-    // 2. Hàm f_mount sẽ tự động gọi sdCard.initialize() ẩn bên dưới để khởi động SPI
+    // Tắt Amply ban đầu bằng Register
+    GPIOA->BSRR = (1 << 4);
+
+    // Dùng hàm f_mount để mount thẻ. FatFs sẽ tự gọi khởi tạo vật lý của SdCard.
     if (f_mount(&fs, "", 1) == FR_OK) {
-        // SD Card đã sẵn sàng
+        GPIOA->BRR = (1 << 4); // Bật Mạch Amply
+        
+        mp3.play("XINCHAO.MP3"); 
+        mp3.play("SONG.MP3"); // Tự động hát nối đuôi
     }
-    
-    while(1) {}
+
+    while (1) {
+        // Nhồi dữ liệu liên tục. Nếu không, loa sẽ tắt họng.
+        mp3.process(); 
+    }
 }
 ```
 
-### 4.5. Thư viện `Rfid` (MFRC522)
-**Hướng dẫn Setup (Cài đặt):**
-- **Include:** `#include "Rfid.h"`
-- **Giao thức:** Yêu cầu bus SPI ổn định. Nếu phát hiện mạch bị mất module hoặc cắm rút nóng thẻ nhớ chung bus SPI, bắt buộc phải gọi lại `rfid.init()` để thiết lập lại dao động.
+---
 
-**Ví dụ Code quy trình chuẩn:**
+### 4.4. Thư viện `Rfid` (MFRC522)
+Giao tiếp thẻ từ tần số 13.56 MHz (MIFARE). 
+
+**Hàm API chi tiết:**
+- `Rfid(...)`: Cấu hình nhận `SPI_TypeDef*` (Ví dụ `SPI3`) và chân CS, RESET.
+- `void init()`: Đánh thức module, bật dao động Anten.
+- `bool checkCard()`: Bắn sóng hỏi xem có thẻ không.
+- `bool readCardSerial(uint8_t* uid)`: Lưu 5 bytes mã UID của thẻ vào mảng.
+- `void selectTag(uint8_t* uid)`: Khóa cứng (Select) mục tiêu thẻ này để chuẩn bị đọc/ghi sâu hơn.
+- `uint8_t PCD_Authenticate(...)`: **Xác thực mật khẩu (Bắt buộc).** Bộ nhớ thẻ MIFARE được chia thành nhiều khu vực (Sector). Mỗi Sector bị khóa bởi một mật khẩu dài 6-byte (Mặc định nhà máy là 6 byte 0xFF). Bắt buộc phải gọi hàm này để gửi mật khẩu mở khóa Sector, nếu đúng thì thẻ mới cho phép dùng hàm đọc/ghi dữ liệu ở các bước tiếp theo.
+- `void MIFARE_Read(uint8_t blockAddr, uint8_t* recvData, uint8_t* recvLen)`: Rút 16-bytes nội dung từ một Sector cụ thể.
+- `void PICC_HaltA()`: Đẩy thẻ vào chế độ Ngủ sâu. Nếu đọc xong mà không ép thẻ ngủ, con chip sẽ liên tục bắt đọc lại gây lặp lệnh.
+
+**Ví dụ Code hoàn chỉnh:**
 ```cpp
 #include "Rfid.h"
 
-// 1. Khai báo Global (SPI_Hardware, CS_Port, RST_Port)
-Rfid rfid(SPI3, 
-          GPIOA, GPIO_PIN_15, // CS (SDA)
-          GPIOC, GPIO_PIN_14  // RST
-);
+Rfid rfid(SPI3, GPIOA, 1<<15, GPIOC, 1<<14);
 
 int main(void) {
-    // ...
-    rfid.init(); // Reset IC và bật anten
+    rfid.init(); // Bật Anten quét
     
     while (1) {
-        // 2. Vòng lặp Quét và Đọc thẻ
         if (rfid.checkCard()) {
             uint8_t uid[5];
             
-            // Lấy mã UID của thẻ
             if (rfid.readCardSerial(uid)) {
-                rfid.selectTag(uid); // Khóa thẻ mục tiêu
+                rfid.selectTag(uid); // Chuẩn bị tương tác sâu
                 
-                // Xác thực bộ mã (Key) để truy cập Block 1
+                // Mật khẩu nhà máy
                 uint8_t key[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-                if (rfid.authenticate(MFRC522_CMD_MF_AUTH_KEY_A, 1, key, uid) == MI_OK) {
-                    
-                    // Thao tác đọc dữ liệu (16 bytes)
+                
+                // Cố gắng mở khóa Block số 1
+                if (rfid.PCD_Authenticate(MFRC522_CMD_MF_AUTH_KEY_A, 1, key, uid) == MI_OK) {
                     uint8_t data[16]; 
                     uint8_t size = 16;
+                    
+                    // Rút 16 bytes dữ liệu ẩn từ thẻ
                     rfid.MIFARE_Read(1, data, &size);
                 }
                 
-                // Cực kỳ quan trọng: Ép thẻ ngủ sau khi làm xong
+                buzzer.beep(1, 100, 0); // Báo tít 
+                
+                // NGỦ ĐÔNG THẺ! Tránh bị đọc liên hồi
                 rfid.PICC_HaltA(); 
             }
         }
@@ -307,137 +327,180 @@ int main(void) {
 }
 ```
 
-### 4.6. Thư viện `Rtc` (DS1307)
-**Hướng dẫn Setup (Cài đặt):**
-- **Include:** `#include "Rtc.h"`
-- **Cấu hình I2C:** Thư viện giao tiếp qua bus I2C. Bạn cần truyền chuẩn xác thanh ghi phần cứng (`I2C1` hoặc `I2C2`) cùng với các chân SCL và SDA tương ứng vào constructor để thư viện tự động khởi tạo.
-- **Báo lỗi mất thời gian:** Hàm `isTimeLost()` quét bit Clock Halt (CH). Nếu pin CMOS cạn nguồn, RTC sẽ dừng đếm, hàm này trả về `true` để bạn cảnh báo lên UI.
+---
 
-**Ví dụ Code:**
+### 4.5. Thư viện `Sensor` (Ngắt Ngoại vi) & `Relay`
+Giúp đọc tín hiệu từ cảm biến nhanh chóng mặt nhờ hệ thống Ngắt Phần Cứng (EXTI).
+
+**Thư viện `Relay`:** Đảo trạng thái Output đơn giản.
+- Khởi tạo: `Relay relay(GPIOA, GPIO_PIN_3);`
+- API: `init()`, `on()`, `off()`, `toggle()`.
+
+**Thư viện `Sensor`:**
+- File `Sensor.cpp` đã lập trình sẵn ruột hàm ngắt `EXTI15_10_IRQHandler`. Nó còn chứa sẵn bộ triệt tiêu nhiễu phần cứng (Debounce 20ms) để không bị đếm đúp khi phát sinh nhiễu cạnh sườn điện áp.
+- **API `init(TriggerEdge edge)`**:
+  - `Sensor::FALLING_EDGE`: Phản xạ khi mức điện áp rơi từ Cao -> Thấp.
+  - `Sensor::RISING_EDGE`: Phản xạ khi mức Thấp -> Cao.
+  - `Sensor::BOTH_EDGES` (Diagnostic Mode): Chế độ đo đạc nhiễu.
+- **Diagnostic Mode:** Gọi `Sensor::enableDiagnosticMode(true)` và dùng ngắt `BOTH_EDGES`. Lúc này, hàm ngắt sẽ tính toán thời gian cảm biến Bị Che là bao nhiêu mili-giây, và Bị Trống là bao nhiêu mili-giây. Các thông số này được đẩy qua CAN Bus để thợ bảo trì phân tích và cắt nhiễu rung lắc của băng tải.
+
+**Ví dụ Code hoàn chỉnh:**
 ```cpp
-#include "Rtc.h"
-
-// 1. Khai báo (I2C_Hardware, SCL_Port, SCL_Pin, SDA_Port, SDA_Pin)
-Rtc rtc(I2C1, GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);
-
-int main(void) {
-    // ...
-    rtc.init();
-    
-    // Báo lỗi: Thời gian sai, cần đồng bộ lại
-    if (rtc.isTimeLost()) {
-        // Xử lý báo lỗi
-    }
-    
-    while(1) {
-        uint8_t h, m, s, dow, date, month, year;
-        
-        // Cập nhật dữ liệu ra biến
-        rtc.getTime(h, m, s);
-        rtc.getDate(dow, date, month, year);
-        
-        // Set dữ liệu mới (ví dụ lúc 12:30:00)
-        // rtc.setTime(12, 30, 0); 
-    }
-}
-```
-
-### 4.7. Thư viện `Led7Segment` (CD4094)
-**Hướng dẫn Setup (Cài đặt):**
-- **Include:** `#include "Led7Segment.h"`
-- **Giao tiếp:** Chuẩn 3 dây IC dịch `CD4094` (Data, Clock, Strobe).
-- **Luồng dữ liệu:** Hàm `setValue()` chỉ nạp dữ liệu tạm vào RAM. Bắt buộc gọi hàm `update()` để chip Dịch và Strobe chốt xuất dữ liệu ra chân LED.
-
-**Ví dụ Code:**
-```cpp
-#include "Led7Segment.h"
-
-// 1. Khai báo Global (DATA, CLOCK, STROBE)
-Led7Segment dp(
-    GPIOB, GPIO_PIN_5, // DATA
-    GPIOB, GPIO_PIN_4, // CLOCK
-    GPIOB, GPIO_PIN_3  // STROBE
-);
-
-int main(void) {
-    // ...
-    dp.init();
-    
-    while(1) {
-        dp.setValue(1234); // Nạp 1234
-        dp.setColon(true); // Bật dấu (:) 
-        
-        // Gọi lệnh kết xuất ra LED. 
-        // Truyền false để xóa số 0 vô nghĩa (chỉ hiện ' 123' thay vì '0123')
-        dp.update(false); 
-    }
-}
-```
-
-### 4.8. Thư viện `CanBus`
-**Hướng dẫn Setup (Cài đặt):**
-- **Include:** `#include "CanBus.h"` 
-- **Quy tắc ghép Byte :** Giao thức CAN gửi dữ liệu thành các đoạn cắt nhỏ 8-bit (1 byte). Phần mềm trên PC (ví dụ Cangaroo) sử dụng kiến trúc Little-Endian, nghĩa là khi một số lớn (như số 16-bit) bị cắt đôi gửi đi, **Byte thấp (Low Byte)** sẽ được gửi trước nằm ở `rxData[0]`, và **Byte cao (High Byte)** gửi sau nằm ở `rxData[1]`.
-  *Cách khôi phục:* Để ghép chúng lại thành số gốc, cần lấy byte cao dịch sang trái 8 bit (`rxData[1] << 8`) rồi dùng phép toán OR (`|`) gộp với byte thấp (`rxData[0]`). Cú pháp: `uint16_t value = rxData[0] | (rxData[1] << 8);`
-
-**Ví dụ Code:**
-```cpp
-#include "CanBus.h"
-
-CanBus myCan(&hcan); // Dùng HAL handle có sẵn
-
-int main(void) {
-    // ...
-    myCan.init(); // Áp dụng bộ lọc cơ bản nhất (Chấp nhận tất cả ID)
-    
-    // Gửi đi (ID = 0x123, Dài = 2 byte)
-    uint8_t txData[2] = {0x01, 0x02};
-    myCan.sendFrame(0x123, txData, 2);
-    
-    while (1) {
-        uint32_t rxId;
-        uint8_t rxData[8], rxLen;
-        
-        // Vòng lặp lấy Data không trễ (Non-blocking)
-        if (myCan.readFrame(&rxId, rxData, &rxLen)) {
-            // Ghép 2 byte đầu tiên thành biến 16-bit
-            uint16_t value = rxData[0] | (rxData[1] << 8);
-        }
-    }
-}
-```
-
-### 4.9. Các class `Sensor` và `Relay`
-**Hướng dẫn Setup (Cài đặt):**
-- **Relay:** `Relay.h` dùng để đảo trạng thái Output cơ bản.
-- **Sensor:** `Sensor.h` BẮT BUỘC bạn cấu hình phần cứng chân cảm biến ở chế độ **Ngắt ngoài EXTI**.
-- Logic ngắt (hàm `EXTI15_10_IRQHandler`) đã được lập trình sẵn bên trong file `Sensor.cpp`. Bên trong thư viện đã tích hợp code triệt tiêu nhiễu cơ học (Debounce = 20ms).
-- **Chế độ Diagnostic Mode (Đo đạc nhiễu):** Kích hoạt bằng `Sensor::enableDiagnosticMode(true)`. EXTI sẽ được cấu hình để bắt cả cạnh lên và cạnh xuống. Giúp vi điều khiển đo được thời gian (mili-giây) sản phẩm che qua cảm biến và thời gian trống giữa 2 sản phẩm. Tính năng này cực kỳ hữu ích để gỡ lỗi khi đếm các sản phẩm trong suốt hoặc hình dạng bất thường gây ra xung giả.
-**Ví dụ Code:**
-```cpp
-/* --- Trong file main.cpp --- */
 #include "Relay.h"
 #include "Sensor.h"
 
 Relay relay(GPIOA, GPIO_PIN_1);
-Sensor sensor(GPIOC, GPIO_PIN_13);
+Sensor cb(GPIOC, GPIO_PIN_13);
+
+// Hàm Callback (Nó sẽ nhảy vào đây tự động khi có đồ vật che cảm biến)
+void cb_Detected() {
+    relay.on();     
+    productCount++; 
+}
 
 int main(void) {
-    // ...
     relay.init();
-    sensor.init();
     
-    // (Tùy chọn) Kích hoạt chế độ đo đạc độ rộng xung cảm biến 
+    // Kích hoạt ngắt khi có vật che (Mức Cao -> Thấp)
+    cb.init(Sensor::FALLING_EDGE);
+    cb.setCallback(cb_Detected); // Nạp hàm
+    
+    // Kích hoạt chế độ chẩn đoán đo độ rộng xung
     Sensor::enableDiagnosticMode(true);
     
     while(1) {
-        relay.toggle();
-        HAL_Delay(1000);
+        // Cảm biến được xử lý ngầm trong ngắt
     }
 }
 ```
 
 ---
+
+### 4.6. Thư viện `Rtc` (Đồng hồ I2C DS1307) & Thanh ghi Sao lưu (BKP)
+DS1307 là chip đồng hồ giao tiếp I2C. Trên MCU STM32F1 có cụm 42 thanh ghi 16-bit (`BKP->DR1` đến `BKP->DR42`) sử dụng chung nguồn của Pin CMOS 3V cấp cho RTC.
+
+**Hàm API chi tiết thư viện `Rtc`:**
+- `Rtc(...)`: Yêu cầu truyền vào khối phần cứng `I2C1` hoặc `I2C2` cùng chân SCL/SDA.
+- `bool isTimeLost()`: Trả về `true` nếu thanh ghi giờ chứa lỗi Clock Halt (Nghĩa là IC từng bị ngắt pin 3V hoàn toàn). Người dùng phải cài lại giờ.
+- Các hàm Data: `getTime()`, `getDate()`, `setTime()`, `setDate()`. 
+
+**Ví dụ Code hoàn chỉnh:**
+```cpp
+#include "Rtc.h"
+#include <stdio.h>
+
+// Khởi tạo RTC dùng I2C1 (SCL=PB6, SDA=PB7)
+Rtc rtc(I2C1, GPIOB, 6, 7); 
+
+int main(void) {
+    rtc.init();
+    
+    // Kiểm tra xem đồng hồ có bị reset (do rút cả nguồn + hết pin CMOS) hay không
+    if (rtc.isTimeLost()) {
+        rtc.setDate(25, 8, 26, 3); // Cài mặc định: Thứ 3, ngày 25/08/2026
+        rtc.setTime(14, 30, 0);    // Cài mặc định: 14:30:00
+    }
+    
+    while(1) {
+        uint8_t d, m, y, dow, h, min, s;
+        
+        rtc.getDate(&d, &m, &y, &dow);
+        rtc.getTime(&h, &min, &s);
+        
+        printf("%02d:%02d:%02d - %02d/%02d/20%02d\n", h, min, s, d, m, y);
+        SystemTimer::delay_ms(1000);
+    }
+}
+`
+
+**Sử dụng vùng Backup Registers (BKP) để chống mất nguồn:**
+Trong dự án này, Số đếm sản phẩm liên tục được thay đổi, lưu vào RAM thì mất nguồn đồng nghĩa với các giá trị đếm sẽ mất. Giải pháp là ghi thẳng vào BKP! Mất nguồn không mất (nhờ pin CMOS nuôi).
+```cpp
+// 1. Cấp Clock và Bẻ khóa thanh ghi BKP
+RCC->APB1ENR |= (RCC_APB1ENR_PWREN | RCC_APB1ENR_BKPEN);
+PWR->CR |= PWR_CR_DBP; 
+
+// 2. Khởi động máy, lấy lại số đếm lưu trữ trong BKP DR1
+uint16_t savedCount = BKP->DR1; 
+
+// 3. Ghi dữ liệu vào thanh ghi BKP để chống cúp điện
+BKP->DR1 = ++savedCount;
+```
+
+---
+
+### 4.7. Thư viện `CanBus`
+Giao tiếp mạng theo chuẩn Data Frame cực kỳ chống nhiễu. Sử dụng ngắt `FIFO0` siêu nhẹ.
+
+**Hàm API chi tiết:**
+- `init()`: Cài đặt tốc độ Baudrate, mở bộ lọc (chấp nhận mọi ID) và kích hoạt ngắt.
+- `sendFrame(uint32_t id, uint8_t* data, uint8_t len)`: Đẩy bản tin. Tối đa 8 byte.
+- `readFrame(uint32_t* id, uint8_t* data, uint8_t* len)`: Hàm lấy bản tin từ biến nội bộ. (Được gọi bên trong ngắt RxFifo0).
+
+**Quy Tắc Tách Ghép Byte (Little-Endian):**
+CAN Bus chỉ truyền theo từng byte. Nếu muốn gửi số 16-bit, phải cắt làm đôi. Nguyên tắc: Đuôi số (Low Byte) gửi trước (vào `data[0]`), Đầu số (High Byte) gửi sau (vào `data[1]`).
+
+**Ví dụ Code hoàn chỉnh:**
+```cpp
+#include "CanBus.h"
+CanBus myCan(&hcan); // &hcan lấy từ CubeMX sinh ra
+
+int main() {
+    myCan.init();
+    
+    // GỬI BIẾN 16-BIT:
+    uint16_t mucTieu = 5000;
+    uint8_t txData[2];
+    txData[0] = mucTieu & 0xFF;         // Low byte
+    txData[1] = (mucTieu >> 8) & 0xFF;  // High byte
+    
+    myCan.sendFrame(0x202, txData, 2); 
+    
+    while(1) {}
+}
+
+// NHẬN VÀ GHÉP TRONG NGẮT:
+void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
+    uint32_t rxId;
+    uint8_t rxData[8], rxLen;
+
+    if (myCan.readFrame(&rxId, rxData, &rxLen)) {
+        if (rxId == 0x202) {
+            // Lắp ráp lại thành số 16-bit
+            uint16_t val = rxData[0] | (rxData[1] << 8);
+        }
+    }
+}
+```
+
+---
+
+### 4.8. Thư viện `Led7Segment` (CD4094 Multiplexing)
+Thư viện quét với IC thanh ghi dịch 3 chân (Data, Clock, Strobe/Latch).
+
+**Hàm API chi tiết:**
+- Cấu hình 3 chân điều khiển trong Constructor.
+- `init()`: Chuyển 3 chân điều khiển sang GPIO Output.
+- `void display(uint16_t number)`: Cập nhật biến dữ liệu muốn xuất lên 4 bóng LED.
+- `void setColon(bool on)`: Bật tắt dấu hai chấm giữa LED.
+- `void process()`: **BẮT BUỘC ĐỂ VÀO WHILE(1)**. Hàm này sẽ thay phiên chớp tắt lần lượt 4 chữ số ở tốc độ siêu cao, tạo ảo giác cho mắt người (Lưu ảnh). Nếu thiếu, LED sẽ đứng hình và tối thui!
+
+**Ví dụ Code hoàn chỉnh:**
+```cpp
+Led7Segment dp(GPIOC, 1<<5, GPIOC, 1<<7, GPIOC, 1<<6);
+
+int main(void) {
+    dp.init();
+    dp.display(9999);
+    dp.setColon(true);
+    
+    while(1) {
+        // Liên tục cập nhật để duy trì trạng thái sáng của 4 số
+        dp.process(); 
+    }
+}
+```
+
 
 ## 5. ĐÁNH GIÁ TÀI NGUYÊN HỆ THỐNG (RESOURCE FOOTPRINT)
 Mạch Kit sử dụng vi điều khiển **STM32F103RCT6** (256 KB Flash, 48 KB RAM). Nhờ cấu trúc lập trình Non-blocking và thiết kế hướng đối tượng C++ tối ưu sâu thông qua trình biên dịch của IAR Embedded Workbench, hệ thống quản lý bộ nhớ cực kỳ hiệu quả.
@@ -447,4 +510,4 @@ Dựa trên file Memory Map (`EWARM/Firmware/List/Firmware.map`), dưới đây 
 - **Dung lượng Flash (Read-only Code + Data):** `32.290 Bytes` (~31.53 KB) **Chỉ chiếm 12,31%**
 - **Dung lượng RAM (Read-write Data):** `4.120 Bytes` (~4.02 KB) **Chỉ chiếm 8,38%**
 
-**Kết luận:** Dù tích hợp đồng thời nhiều module nặng (FatFs File System, giả mã MP3, giao thức CAN Bus và RFID), chương trình vẫn chạy rất nhẹ nhàng, chừa lại tới ~88% Flash và ~91% RAM. Lượng tài nguyên dư dả này đủ sức gánh thêm các tính năng khác (kết nối Wifi/Bluetooth, màn hình LCD đồ họa...) mà không lo bị tràn bộ nhớ hay treo hệ thống (HardFault).
+**Kết luận:** Dù tích hợp đồng thời nhiều module nặng (FatFs File System, giả mã MP3, giao thức CAN Bus và RFID), chương trình vẫn chạy rất nhẹ nhàng, chừa lại tới ~88% Flash và ~91% RAM. Lượng tài nguyên này đủ sức tích hợp thêm các tính năng khác (kết nối Wifi/Bluetooth, màn hình LCD đồ họa...) mà không lo bị tràn bộ nhớ hay treo hệ thống (HardFault).

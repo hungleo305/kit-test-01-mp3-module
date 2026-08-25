@@ -73,7 +73,7 @@ volatile bool rtcErrorFlag = false;
 Led7Segment dp(GPIOC, 1<<5, GPIOC, 1<<7, GPIOC, 1<<6);
 Rtc rtc(I2C1, GPIOB, 1<<6, GPIOB, 1<<7);
 Rfid rfid(SPI3, GPIOA, 1<<15, GPIOC, 1<<14);
-Mp3 mp3(&hspi2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3);
+Mp3 mp3(&hspi2, GPIOC, 1<<2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3);
 SdCard sdCard(SPI1, GPIOC, 1<<8, GPIOB, 1<<0, GPIOB, 1<<1);
 
 extern CAN_HandleTypeDef hcan;
@@ -98,7 +98,7 @@ bool coMatKhauTam = false;
 uint32_t lastRelayDao = 0;
 bool choCapNhatManHinh = false;
 
-// Bi?n ph?c v? ch?c nng Diagnostic c?m bi?n
+// Biến phục vụ chức năng Diagnostic cảm biến
 bool isDiagnosticMode = true; 
 uint32_t lastDiagChangeTick = 0;
 uint32_t lastEnterTick = 0;
@@ -119,7 +119,7 @@ DIR rootDir;
 
 
 bool daNhanTheSD = false;
-volatile bool sdCardChanged = true; // Ban đầu b?ng true để tự động check lần đầu
+volatile bool sdCardChanged = true; // Ban đầu bằng true để tự động check lần đầu
 volatile uint32_t sdChangeTick = 0;
 bool sdCardInSlot = false; // Biến theo dõi trạng thái vật lý của thẻ trong khe
 uint32_t showMountTimeUntil = 0; // Biến lưu thời điểm kết thúc hiển thị thời gian kết nối thẻ
@@ -382,7 +382,7 @@ int main(void)
             if (!cardPresent) {
                 // Rút thẻ
                 if (daNhanTheSD || sdCardInSlot) {
-                    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // Tắt Amply (Mute) để chống tiếng bíp
+                    GPIOA->BSRR = (1 << 4); // Tắt Amply (Mute) để chống tiếng bíp
                     daNhanTheSD = false;
                     sdCardInSlot = false;
                     mp3.saveState(); // Lưu trạng thái bị ngắt để phát tiếp
@@ -390,12 +390,12 @@ int main(void)
                     f_mount(NULL, "", 0); 
                     buzzer.beep(1, 100, 0, true); // Kêu 1 tiếng bíp hiệu rút thẻ
                     SystemTimer::delay_ms(100);
-                    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // Bật lại Amply
+                    GPIOA->BRR = (1 << 4); // Bật lại Amply
                 }
             } else {
                 // Cắm thẻ
                 if (!sdCardInSlot) {
-                    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // Tắt Amply (Mute) để chống nhiễu điện khi cắm nóng
+                    GPIOA->BSRR = (1 << 4); // Tắt Amply (Mute) để chống nhiễu điện khi cắm nóng
                     sdCardInSlot = true; // đánh dấu là đã cắm vào (tránh lặp và tiếng nổ nếu thẻ hỏng)
                     uint32_t startMount = SystemTimer::getTick();
                 
@@ -455,7 +455,7 @@ int main(void)
                     }
                     
                     SystemTimer::delay_ms(100);
-                    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // Bật lại Amply sau khi nạp thẻ xong
+                    GPIOA->BRR = (1 << 4); // Bật lại Amply sau khi nạp thẻ xong
                 } // Kết thúc if (!sdCardInSlot)
             }
         }
@@ -909,29 +909,17 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE(); 
 
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-  // Cau hinh chan PC8
-  GPIO_InitStruct.Pin = GPIO_PIN_8;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW; 
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_8, GPIO_PIN_SET);
+  // Cau hinh chan PC8 (Output Push-Pull, 2MHz)
+  GPIOC->CRH = (GPIOC->CRH & ~(0xF << 0)) | (0x2 << 0);
+  GPIOC->BSRR = (1 << 8);
   
-  // Cau hinh chan PB1 
-  GPIO_InitStruct.Pin = GPIO_PIN_1;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
+  // Cau hinh chan PB1 (Output Push-Pull, 2MHz)
+  GPIOB->CRL = (GPIOB->CRL & ~(0xF << 4)) | (0x2 << 4);
+  GPIOB->BRR = (1 << 1);
   
-  //Cau hinh PA4
-  GPIO_InitStruct.Pin = GPIO_PIN_4;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET); // Khởi động mặc định ở trạng thái Tắt Amply (Mute) để triệt tiêu tiếng bíp
+  //Cau hinh PA4 (Output Push-Pull, 2MHz)
+  GPIOA->CRL = (GPIOA->CRL & ~(0xF << 16)) | (0x2 << 16);
+  GPIOA->BSRR = (1 << 4); // Khởi động mặc định ở trạng thái Tắt Amply (Mute) để triệt tiêu tiếng bíp
   
   /* USER CODE END MX_GPIO_Init_2 */
 }
