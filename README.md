@@ -1,4 +1,4 @@
-# TÀI LIỆU HƯỚNG DẪN SỬ DỤNG VÀ PHÁT TRIỂN FIRMWARE - KIT VNA
+﻿# TÀI LIỆU HƯỚNG DẪN SỬ DỤNG VÀ PHÁT TRIỂN FIRMWARE - KIT VNA
 
 Dự án mạch Kit STM32F103RCT6 điều khiển đa năng giao tiếp CAN Bus, tích hợp đọc thẻ RFID, thẻ nhớ SD (phát nhạc MP3), cảm biến đếm sản phẩm, và LED 7 đoạn.
 
@@ -198,7 +198,7 @@ extern "C" {
 }
 ```
 
-**Tại sao lại ghi đè hàm HAL_IncTick?**
+**Ghi đè hàm HAL_IncTick**
 Hàm HAL_IncTick() là hàm ngắt Timer hệ thống (SysTick) của vi điều khiển, tự động kích hoạt 1000 lần mỗi giây (tương đương mỗi mili-giây).
 Việc đặt `buzzer.update()` vào trong hàm ngắt này có ý nghĩa cực kỳ quan trọng:
 - **Đếm thời gian siêu chuẩn:** Đảm bảo còi luôn được cập nhật trạng thái (bật/tắt) chính xác tới từng mili-giây, bất kể hàm main() đang bận làm việc gì (đọc thẻ nhớ, xử lý LED, v.v.).
@@ -502,12 +502,43 @@ int main(void) {
 ```
 
 
+---
+
+### 4.9. Thư viện `SystemTimer` (Bộ đếm thời gian Non-blocking)
+Thư viện quản lý bộ đếm Tick của hệ thống (dựa trên ngắt SysTick của STM32). Đây là cốt lõi để tạo ra các hàm delay và kiểm tra thời gian mà không làm treo chương trình (Non-blocking).
+
+**Hàm API chi tiết:**
+- `init()`: Khởi tạo bộ đếm SysTick (thường được gọi ngầm trong HAL_Init).
+- `update()`: Tăng biến đếm Tick. Phải được đưa vào ngắt SysTick_Handler() trong stm32f1xx_it.c.
+- `getTick()`: Trả về giá trị đếm hiện tại (số mili-giây kể từ lúc khởi động).
+- `delay_ms(uint32_t ms)`: Hàm delay cơ bản (Blocking). Dùng trong lúc khởi tạo phần cứng.
+
+**Mẫu code Non-blocking điển hình:**
+Sử dụng getTick() để kiểm tra xem đã hết thời gian chờ chưa, trong lúc chờ MCU vẫn rảnh rang chạy các tác vụ khác.
+```cpp
+#include "SystemTimer.h"
+
+uint32_t lastTick = 0;
+
+int main() {
+    while(1) {
+        if (SystemTimer::getTick() - lastTick >= 1000) {
+            // Cứ sau 1000ms (1 giây) thì vào đây 1 lần
+            // Làm gì đó...
+            lastTick = SystemTimer::getTick();
+        }
+        
+        // Vẫn xử lý Led, MP3, CanBus thoải mái bên dưới...
+    }
+}
+```
+
 ## 5. ĐÁNH GIÁ TÀI NGUYÊN HỆ THỐNG (RESOURCE FOOTPRINT)
 Mạch Kit sử dụng vi điều khiển **STM32F103RCT6** (256 KB Flash, 48 KB RAM). Nhờ cấu trúc lập trình Non-blocking và thiết kế hướng đối tượng C++ tối ưu sâu thông qua trình biên dịch của IAR Embedded Workbench, hệ thống quản lý bộ nhớ cực kỳ hiệu quả.
 
-Dựa trên file Memory Map (`EWARM/Firmware/List/Firmware.map`), dưới đây là mức tiêu thụ tài nguyên phần cứng của Firmware hiện tại:
+Dựa trên file Memory Map (EWARM/Firmware/List/Firmware.map), dưới đây là mức tiêu thụ tài nguyên phần cứng của Firmware hiện tại:
 
-- **Dung lượng Flash (Read-only Code + Data):** `32.290 Bytes` (~31.53 KB) **Chỉ chiếm 12,31%**
-- **Dung lượng RAM (Read-write Data):** `4.120 Bytes` (~4.02 KB) **Chỉ chiếm 8,38%**
+- **Dung lượng Flash (Read-only Code + Data):** `32.314 Bytes` (~31.56 KB) **Chỉ chiếm 12,33%**
+- **Dung lượng RAM (Read-write Data):** `7.225 Bytes` (~7.06 KB) **Chỉ chiếm 14,70%**
 
-**Kết luận:** Dù tích hợp đồng thời nhiều module nặng (FatFs File System, giả mã MP3, giao thức CAN Bus và RFID), chương trình vẫn chạy rất nhẹ nhàng, chừa lại tới ~88% Flash và ~91% RAM. Lượng tài nguyên này đủ sức tích hợp thêm các tính năng khác (kết nối Wifi/Bluetooth, màn hình LCD đồ họa...) mà không lo bị tràn bộ nhớ hay treo hệ thống (HardFault).
+**Kết luận:** Dù tích hợp đồng thời nhiều module nặng (FatFs File System, giải mã MP3, giao thức CAN Bus và RFID), chương trình vẫn chạy nhẹ nhàng, chừa lại tới ~87% Flash và ~85% RAM. Lượng tài nguyên nhàn rỗi vẫn đủ sức tích hợp thêm các tính năng khác (kết nối Wifi/Bluetooth, màn hình LCD đồ họa...).
