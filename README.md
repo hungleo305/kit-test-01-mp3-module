@@ -153,6 +153,8 @@ Mã nguồn được tổ chức theo cấu trúc Hướng đối tượng (OOP)
   - **APB1 Prescaler:** Bắt buộc `/2` (PCLK1 = 36 MHz) để không làm quá tải bus I2C/CAN.
   - **APB2 Prescaler:** Đặt `/1` (PCLK2 = 72 MHz) để chạy ngoại vi SPI tốc độ tối đa.
 
+![Cấu hình Clock Tree trong STM32CubeMX](docs/cubemx_clock.png)
+
 ---
 
 ### 4.2. Thư viện `Buzzer` (Còi Chip)
