@@ -99,15 +99,15 @@ uint32_t lastRelayDao = 0;
 bool choCapNhatManHinh = false;
 
 // Biến phục vụ chức năng Diagnostic cảm biến
-bool isDiagnosticMode = true; 
-uint32_t lastDiagChangeTick = 0;
-uint32_t lastEnterTick = 0;
-uint32_t lastExitTick = 0;
-uint32_t blockDuration = 0;
-uint32_t gapDuration = 0;
-uint32_t prevBlockDuration = 0;
-uint32_t prevGapDuration = 0;
-bool newDataReady = false;
+bool cheDoChanDoan = true; 
+uint32_t thoiDiemDoiTrangThai = 0;
+uint32_t thoiDiemVao = 0;
+uint32_t thoiDiemRa = 0;
+uint32_t thoiGianBiChe = 0;
+uint32_t thoiGianTrong = 0;
+uint32_t thoiGianBiCheTruoc = 0;
+uint32_t thoiGianTrongTruoc = 0;
+bool coDuLieuMoi = false;
 
 
 FATFS fs;       
@@ -145,28 +145,28 @@ void onSensorDetect() {
     uint32_t currentTick = SystemTimer::getTick();
     bool isPinHigh = (GPIOC->IDR & (1 << 13)) != 0;
     
-    if (isDiagnosticMode) {
+    if (cheDoChanDoan) {
         static bool lastDiagState = false;
-        if (currentTick - lastDiagChangeTick > 20) { 
+        if (currentTick - thoiDiemDoiTrangThai > 20) { 
             if (isPinHigh != lastDiagState) {
                 if (isPinHigh) {
                   // Cảm biến bị che (HIGH)
-                  if (lastExitTick > 0) {
-                      prevGapDuration = gapDuration;
-                      gapDuration = currentTick - lastExitTick;
+                  if (thoiDiemRa > 0) {
+                      thoiGianTrongTruoc = thoiGianTrong;
+                      thoiGianTrong = currentTick - thoiDiemRa;
                   }
-                  lastEnterTick = currentTick;
+                  thoiDiemVao = currentTick;
               } else {
                   // Cảm biến hết bị che (LOW)
-                  if (lastEnterTick > 0) {
-                      prevBlockDuration = blockDuration;
-                      blockDuration = currentTick - lastEnterTick;
-                      newDataReady = true;
+                  if (thoiDiemVao > 0) {
+                      thoiGianBiCheTruoc = thoiGianBiChe;
+                      thoiGianBiChe = currentTick - thoiDiemVao;
+                      coDuLieuMoi = true;
                   }
-                  lastExitTick = currentTick;
+                  thoiDiemRa = currentTick;
               }
                 lastDiagState = isPinHigh;
-                lastDiagChangeTick = currentTick;
+                thoiDiemDoiTrangThai = currentTick;
             }
         }
     }
@@ -253,6 +253,7 @@ int main(void)
   MX_SPI2_Init();
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
+
   //Kích hoạt nguồn và Clock cho Backup Register. Nạp lại biến ầm từ thanh ghi BKP->DR1
   RCC->APB1ENR |= (RCC_APB1ENR_PWREN | RCC_APB1ENR_BKPEN); // Cấp xung nhịp cho PWR và BKP
   PWR->CR |= PWR_CR_DBP; // Mở khóa cho phép ghi vào phần vùng Backup (Disable Backup Domain write protection)
@@ -262,7 +263,7 @@ int main(void)
 
   ledOb.init();
   cb.init(Sensor::BOTH_EDGES);
-    EXTI->RTSR |= (1 << 13); // B?t lun ng?t c?nh ln cho ch?c nng Diagnostic
+    EXTI->RTSR |= (1 << 13); // Bật luôn ngắt cạnh lên cho chức năng Diagnostic
 
   cb.setCallback(onSensorDetect);
   dp.init();
@@ -282,13 +283,11 @@ int main(void)
   EXTI->FTSR |= (1 << 0); // Ngắt cạnh xuống (Cắm thẻ)
   NVIC_EnableIRQ(EXTI0_IRQn);
   NVIC_SetPriority(EXTI0_IRQn, 5); // Ưu tiên trung bình
+
+  //còi khởi động
   buzzer.beep(2, 50, 100, true);
     SystemTimer::delay_ms(300); // Chờ tiếng bíp khởi động hơn tắt
-  
-  /* ====== BẬT/TẮT BIẾN KIỂM TRA CẢM BIẾN (DIAGNOSTIC TEST) ====== */
-  /* Bỏ comment dòng dưới để BẬT chế độ kiểm tra cảm biến qua CAN */
-  
-  
+
   fres = f_mount(&fs, "", 1);
   if (fres != FR_OK) {
         buzzer.beep(3, 100, 100);
@@ -323,7 +322,7 @@ int main(void)
     if (currentCanError && !lastCanError) {
         buzzer.beep(1, 500, 0); // Bao mat CAN 1 tieng bip dai
     }
-    // Fix: Tự động xóa cờ lỗi của thư viện HAL khi phần cứng CAN đã kết nối lại thành công (ABOM)
+    // xóa cờ lỗi khi can kết nối lại
     if (!currentCanError && lastCanError) {
         hcan.ErrorCode = HAL_CAN_ERROR_NONE;
         hcan.State = HAL_CAN_STATE_LISTENING;
@@ -334,16 +333,15 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     
-    /* ====== ĐỌC LOG CẢM BIẾN (DIAGNOSTIC) ====== */
-    // Chỉ hoạt động khi enableDiagnosticMode(true) được gọi
+    //ĐỌC LOG CẢM BIẾN (DIAGNOSTIC)
     uint16_t currBlock = 0, currGap = 0, prevBlock = 0, prevGap = 0;
-    if (newDataReady) {
-        currBlock = (blockDuration > 9999) ? 9999 : blockDuration;
-        currGap = (gapDuration > 9999) ? 9999 : gapDuration;
-        prevBlock = (prevBlockDuration > 9999) ? 9999 : prevBlockDuration;
-        prevGap = (prevGapDuration > 9999) ? 9999 : prevGapDuration;
-        newDataReady = false;
-        // Gửi qua CAN ID: 0x124 (Định dạng Little-Endian Binary để Cangaroo giải mã chuẩn qua DBC)
+    if (coDuLieuMoi) {
+        currBlock = (thoiGianBiChe > 9999) ? 9999 : thoiGianBiChe;
+        currGap = (thoiGianTrong > 9999) ? 9999 : thoiGianTrong;
+        prevBlock = (thoiGianBiCheTruoc > 9999) ? 9999 : thoiGianBiCheTruoc;
+        prevGap = (thoiGianTrongTruoc > 9999) ? 9999 : thoiGianTrongTruoc;
+        coDuLieuMoi = false;
+        // Gửi qua CAN ID: 0x124 
         // Byte 0-1: Current Block, Byte 2-3: Current Gap
         // Byte 4-5: Previous Block, Byte 6-7: Previous Gap
         uint8_t canData[8] = {0};
@@ -371,9 +369,9 @@ int main(void)
             choCapNhatManHinh = false;
         }
     }
-    //kiem tra the nho bằng cờ ngắt (Zero-delay)
+    //kiem tra the nho
     if (sdCardChanged) { 
-        // Lọc nhiễu chống rung (Debounce) 100ms cho tiếp điểm thẻ nhớ
+        // Lọc nhiễu chống rung 100ms cho tiếp điểm thẻ nhớ
         if (currentTick - sdChangeTick >= 100) {
             sdCardChanged = false;
             
@@ -396,7 +394,7 @@ int main(void)
                 // Cắm thẻ
                 if (!sdCardInSlot) {
                     GPIOA->BSRR = (1 << 4); // Tắt Amply (Mute) để chống nhiễu điện khi cắm nóng
-                    sdCardInSlot = true; // đánh dấu là đã cắm vào (tránh lặp và tiếng nổ nếu thẻ hỏng)
+                    sdCardInSlot = true; // đánh dấu là đã cắm vào
                     uint32_t startMount = SystemTimer::getTick();
                 
                     sdCard.init();
@@ -424,22 +422,13 @@ int main(void)
                           lastDisplayValue = mountTime;
                           showMountTimeUntil = SystemTimer::getTick() + 3000;
                           
-                          // Chuyển đổi thời gian (ms) sang định dạng BCD để hiển thị "giờ" thập phân trên CAN Monitor
-                          uint32_t bcdTime = 0;
-                          uint32_t tempVal = mountTime;
-                          int shift = 0;
-                          while (tempVal > 0 && shift < 32) {
-                              bcdTime |= (tempVal % 10) << shift;
-                              tempVal /= 10;
-                              shift += 4;
-                          }
-                          
-                          // Gửi 4 byte qua mạng CAN (ID 0x125)
+                          // Gửi thời gian kết nối (ms) qua mạng CAN (ID 0x125)
+                          // Định dạng Little-Endian 32-bit Integer để Cangaroo DBC giải mã chuẩn
                           uint8_t canData[4];
-                          canData[0] = (bcdTime >> 24) & 0xFF;
-                          canData[1] = (bcdTime >> 16) & 0xFF;
-                          canData[2] = (bcdTime >> 8) & 0xFF;
-                          canData[3] = bcdTime & 0xFF;
+                          canData[0] = mountTime & 0xFF;
+                          canData[1] = (mountTime >> 8) & 0xFF;
+                          canData[2] = (mountTime >> 16) & 0xFF;
+                          canData[3] = (mountTime >> 24) & 0xFF;
                           myCan.sendFrame(0x125, canData, 4);
                           
                           // Khi phục hồi biết đang nghe dở
@@ -533,7 +522,7 @@ int main(void)
     {
       bool currentBlinkState = false;
       if (CAN1->ESR & (CAN_ESR_BOFF | CAN_ESR_EPVF)) {
-          currentBlinkState = (currentTick / 100) % 2 == 0;
+          currentBlinkState = (currentTick / 100) % 2 == 0; //chớp dấu : mode đếm cảnh báo mất canbus
       }
       
       if (productCount != lastDisplayValue || currentBlinkState != lastBlinkState) 
