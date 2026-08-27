@@ -282,11 +282,14 @@ int main(void) {
 Giao tiếp thẻ từ tần số 13.56 MHz (MIFARE). 
 
 **Hàm API chi tiết:**
-- `Rfid(...)`: Cấu hình nhận `SPI_TypeDef*` (Ví dụ `SPI3`) và chân CS, RESET.
+- `Rfid(...)`: Cấu hình linh hoạt :
+    1.HAL(CubeMX) : Truyền `(&hspi1, csPort, csPin, rstPort, rsPin)`.
+    2.Thanh ghi(không cần cấu hình từ CubeMX) : Truyền `(SPI1, sckPort, sckPin, misoPort, misoPin, mosiPort, mosiPin, csPort, csPin, rstPort, rstPin)` nhập đủ 5 chân thư viện sẽ tự ép xung và cấu hình.
+    3.SPI mềm với chân bất kỳ : Truyền `(NULL, sckPort, sckPin, misoPort, misoPin, mosiPort, mosiPin, csPort, csPin, rstPort, rstPin)` nhập đủ 5 chân thư viện sẽ tự ép xung và cấu hình.
 - `void init()`: Đánh thức module, bật dao động Anten.
 - `bool checkCard()`: Bắn sóng hỏi xem có thẻ không.
 - `bool readCardSerial(uint8_t* uid)`: Lưu 5 bytes mã UID của thẻ vào mảng.
-- `void selectTag(uint8_t* uid)`: Khóa cứng (Select) mục tiêu thẻ này để chuẩn bị đọc/ghi sâu hơn.
+- `void selectTag(uint8_t* uid)`: Khóa cứng mục tiêu thẻ để chuẩn bị đọc/ghi sâu hơn.
 - `uint8_t PCD_Authenticate(...)`: **Xác thực mật khẩu (Bắt buộc).** Bộ nhớ thẻ MIFARE được chia thành nhiều khu vực (Sector). Mỗi Sector bị khóa bởi một mật khẩu dài 6-byte (Mặc định nhà máy là 6 byte 0xFF). Bắt buộc phải gọi hàm này để gửi mật khẩu mở khóa Sector, nếu đúng thì thẻ mới cho phép dùng hàm đọc/ghi dữ liệu ở các bước tiếp theo.
 - `void MIFARE_Read(uint8_t blockAddr, uint8_t* recvData, uint8_t* recvLen)`: Rút 16-bytes nội dung từ một Sector cụ thể.
 - `void PICC_HaltA()`: Đẩy thẻ vào chế độ Ngủ sâu. Nếu đọc xong mà không ép thẻ ngủ, con chip sẽ liên tục bắt đọc lại gây lặp lệnh.
@@ -294,11 +297,21 @@ Giao tiếp thẻ từ tần số 13.56 MHz (MIFARE).
 **Ví dụ Code hoàn chỉnh:**
 ```cpp
 #include "Rfid.h"
-
-Rfid rfid(SPI3, GPIOA, 1<<15, GPIOC, 1<<14);
-
+// 1. Khai báo dùng SPI cứng trực tiếp (Bare-metal)
+Rfid rfid(SPI1, GPIOA, 1<<5, GPIOA, 1<<6, GPIOA, 1<<7, GPIOB, 1<<15, GPIOA, 1<<9);
+/* 
+// 2. Nếu dùng SPI Mềm, chỉ cần thay SPI1 thành NULL:
+Rfid rfid(NULL, GPIOA, 1<<5, GPIOA, 1<<6, GPIOA, 1<<7, GPIOB, 1<<15, GPIOA, 1<<9);
+// 3. Nếu dùng CubeMX, chỉ truyền chân CS và RST:
+extern "C" SPI_HandleTypeDef hspi1;
+Rfid rfid(&hspi1, GPIOB, 1<<15, GPIOA, 1<<9);
+*/
 int main(void) {
-    rfid.init(); // Bật Anten quét
+    HAL_Init();
+    SystemClock_Config();
+    
+    // Thư viện tự động bật Clock và cấu hình chân I/O
+    rfid.init(); 
     
     while (1) {
         if (rfid.checkCard()) {
@@ -307,19 +320,17 @@ int main(void) {
             if (rfid.readCardSerial(uid)) {
                 rfid.selectTag(uid); // Chuẩn bị tương tác sâu
                 
-                // Mật khẩu nhà máy
+                // Mật khẩu mặc định nhà máy
                 uint8_t key[] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
                 
-                // Cố gắng mở khóa Block số 1
-                if (rfid.PCD_Authenticate(MFRC522_CMD_MF_AUTH_KEY_A, 1, key, uid) == MI_OK) {
+                // Mở khóa Block 1 (PICC_AUTHENT1A = 0x60)
+                if (rfid.PCD_Authenticate(0x60, 1, key, uid) == 0) { // 0 = STATUS_OK
                     uint8_t data[16]; 
                     uint8_t size = 16;
                     
                     // Rút 16 bytes dữ liệu ẩn từ thẻ
                     rfid.MIFARE_Read(1, data, &size);
                 }
-                
-                buzzer.beep(1, 100, 0); // Báo tít 
                 
                 // NGỦ ĐÔNG THẺ! Tránh bị đọc liên hồi
                 rfid.PICC_HaltA(); 
