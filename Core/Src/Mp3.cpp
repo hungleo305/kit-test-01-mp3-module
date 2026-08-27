@@ -1,4 +1,4 @@
-﻿#include "Mp3.h"
+#include "Mp3.h"
 #include <string.h>
 #include "ff_gen_drv.h"
 
@@ -20,13 +20,13 @@
 #define SCI_AICTRL3     0x0F
 
 
-Mp3::Mp3(SPI_HandleTypeDef* hspi,
+Mp3::Mp3(SpiBus* spi_bus,
         GPIO_TypeDef* pwrPort, uint16_t pwrPin,
         GPIO_TypeDef* xresetPort, uint16_t xresetPin,
         GPIO_TypeDef* dreqPort, uint16_t dreqPin,
         GPIO_TypeDef* xdcsPort, uint16_t xdcsPin,
         GPIO_TypeDef* xcsPort, uint16_t xcsPin) : 
-        hspi(hspi),
+        spi_bus(spi_bus),
         pwrPort(pwrPort), pwrPin(pwrPin),
         xresetPort(xresetPort), xresetPin(xresetPin),
         dreqPort(dreqPort), dreqPin(dreqPin),
@@ -56,7 +56,7 @@ void Mp3::writeRegister(uint8_t address, uint16_t data) {
     cmd[2] = (data >> 8) & 0xFF; 
     cmd[3] = data & 0xFF;        
     
-    HAL_SPI_Transmit(hspi, cmd, 4, 100);
+    spi_bus->TransferBuffer(cmd, nullptr, 4);
     xcsPort->BSRR = xcsPin;               
 }
 
@@ -67,13 +67,7 @@ void Mp3::reset() {
     HAL_Delay(20);
     
     // Khoi phuc SPI2 bi loi do nhieu dien khi rut/cam the nho
-    __HAL_SPI_DISABLE(hspi);
-    hspi->Instance->CR1 |= SPI_CR1_MSTR | SPI_CR1_SSI | SPI_CR1_SSM;
-    __HAL_SPI_ENABLE(hspi);
-    volatile uint32_t dummy = hspi->Instance->DR;
-    dummy = hspi->Instance->SR;
-    (void)dummy;
-    HAL_Delay(20);
+    // Đã được xử lý ở tầng dưới hoặc không cần thiết nữa.
     
     writeRegister(SCI_MODE, 0x0804);
     HAL_Delay(20);
@@ -87,6 +81,7 @@ void Mp3::reset() {
 }
 
 void Mp3::init() {
+    spi_bus->Init(); // Khởi tạo SPI và các chân GPIO của SPI
     GPIO_TypeDef* ports[] = {pwrPort, xresetPort, xdcsPort, xcsPort};
     uint16_t pins[] = {pwrPin, xresetPin, xdcsPin, xcsPin};
     
@@ -125,7 +120,7 @@ void Mp3::init() {
     
     HAL_Delay(100); // Cho nguon on dinh truoc khi truyen SPI
     uint8_t dummy = 0xFF;
-    HAL_SPI_Transmit(hspi, &dummy, 1, 100);
+    spi_bus->Transfer(dummy);
     
     reset();
     isPlaying = false;
@@ -139,7 +134,7 @@ void Mp3::setVolume(uint8_t left, uint8_t right) {
 void Mp3::sendDataBlock(uint8_t* data, uint16_t length) {
     if (!waitReady()) return; 
     xdcsPort->BRR = xdcsPin;               
-    HAL_SPI_Transmit(hspi, data, length, 100); 
+    spi_bus->TransferBuffer(data, nullptr, length); 
     xdcsPort->BSRR = xdcsPin;
 }
 
@@ -167,7 +162,7 @@ uint16_t Mp3::readRegister(uint8_t address) {
     
     uint8_t tx[4] = {0x03, address, 0xFF, 0xFF};
     uint8_t rx[4] = {0, 0, 0, 0};
-    HAL_SPI_TransmitReceive(hspi, tx, rx, 4, 100);
+    spi_bus->TransferBuffer(tx, rx, 4);
     
     xcsPort->BSRR = xcsPin;
     
@@ -219,7 +214,7 @@ void Mp3::process() {
                 
                 for (int i = 0; i < 65; i++) { if (!waitReady()) break;
                     xdcsPort->BRR = xdcsPin;               
-                    HAL_SPI_Transmit(hspi, endFill, 32, 100); 
+                    spi_bus->TransferBuffer(endFill, nullptr, 32); 
                     xdcsPort->BSRR = xdcsPin;
                 }
                 
@@ -229,7 +224,7 @@ void Mp3::process() {
                 
                 for (int i = 0; i < 64; i++) { if (!waitReady()) break;
                     xdcsPort->BRR = xdcsPin;               
-                    HAL_SPI_Transmit(hspi, endFill, 32, 100); 
+                    spi_bus->TransferBuffer(endFill, nullptr, 32); 
                     xdcsPort->BSRR = xdcsPin;
                     
                     mode = readRegister(SCI_MODE);
@@ -248,7 +243,7 @@ void Mp3::process() {
         if (chunk > 32) chunk = 32;
 
         xdcsPort->BRR = xdcsPin;               
-        HAL_SPI_Transmit(hspi, &audioBuffer[bufferIndex], chunk, 100); 
+        spi_bus->TransferBuffer(&audioBuffer[bufferIndex], nullptr, chunk); 
         xdcsPort->BSRR = xdcsPin;
         
         bufferIndex += chunk;
@@ -264,7 +259,7 @@ void Mp3::testAudio() {
     
     waitReady();
     xdcsPort->BRR = xdcsPin;               
-    HAL_SPI_Transmit(hspi, sineCmd, 8, 100); 
+    spi_bus->TransferBuffer(sineCmd, nullptr, 8); 
     xdcsPort->BSRR = xdcsPin;
 
     HAL_Delay(2000); 
@@ -272,7 +267,7 @@ void Mp3::testAudio() {
     uint8_t exitCmd[] = {0x45, 0x78, 0x69, 0x74, 0x00, 0x00, 0x00, 0x00};
     waitReady();
     xdcsPort->BRR = xdcsPin;
-    HAL_SPI_Transmit(hspi, exitCmd, 8, 100);
+    spi_bus->TransferBuffer(exitCmd, nullptr, 8);
     xdcsPort->BSRR = xdcsPin;
     
     writeRegister(SCI_MODE, 0x0804); 

@@ -1,12 +1,13 @@
-﻿#ifndef MP3_H
+#ifndef MP3_H
 #define MP3_H
 
 #include "stm32f1xx_hal.h"
 #include "fatfs.h"
+#include "SpiBus.h"
 
 class Mp3 {
 public:
-    Mp3(SPI_HandleTypeDef* hspi,
+    Mp3(SpiBus* spi_bus,
         GPIO_TypeDef* pwrPort, uint16_t pwrPin,
         GPIO_TypeDef* xresetPort, uint16_t xresetPin,
         GPIO_TypeDef* dreqPort, uint16_t dreqPin,
@@ -29,7 +30,7 @@ private:
     char savedFilename[32];
     uint32_t savedPosition;
     bool hasSavedState;
-    SPI_HandleTypeDef* hspi;
+    SpiBus* spi_bus;
     GPIO_TypeDef* pwrPort;    uint16_t pwrPin;
     GPIO_TypeDef* xresetPort; uint16_t xresetPin;
     GPIO_TypeDef* dreqPort;   uint16_t dreqPin;
