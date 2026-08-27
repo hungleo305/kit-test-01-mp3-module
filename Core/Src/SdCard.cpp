@@ -1,12 +1,12 @@
-﻿#include "SdCard.h"
+#include "SdCard.h"
 #include "SystemTimer.h"
 
 #define SD_DUMMY_BYTE 0xFF
 
-static uint32_t current_spi_baudrate = SPI_BAUDRATEPRESCALER_256;
+SdCard* SdCard::instance = nullptr;
 
-SdCard::SdCard(SPI_TypeDef *spi, GPIO_TypeDef *cs_port, uint16_t cs_pin, GPIO_TypeDef* cdPort, uint16_t cdPin, GPIO_TypeDef* pwrPort, uint16_t pwrPin) {
-    this->spi = spi;
+SdCard::SdCard(SpiBus* spi_bus, GPIO_TypeDef* cs_port, uint16_t cs_pin, GPIO_TypeDef* cdPort, uint16_t cdPin, GPIO_TypeDef* pwrPort, uint16_t pwrPin) {
+    this->spi_bus = spi_bus;
     this->cs_port = cs_port;
     this->cs_pin = cs_pin;
     this->cdPort = cdPort;
@@ -18,16 +18,13 @@ SdCard::SdCard(SPI_TypeDef *spi, GPIO_TypeDef *cs_port, uint16_t cs_pin, GPIO_Ty
 }
 
 void SdCard::init() {
+    spi_bus->Init(); // Khởi tạo SPI và các chân GPIO của SPI
     if (cs_port == GPIOA || cdPort == GPIOA || pwrPort == GPIOA) RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
     if (cs_port == GPIOB || cdPort == GPIOB || pwrPort == GPIOB) RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
     if (cs_port == GPIOC || cdPort == GPIOC || pwrPort == GPIOC) RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
     if (cs_port == GPIOD || cdPort == GPIOD || pwrPort == GPIOD) RCC->APB2ENR |= RCC_APB2ENR_IOPDEN;
     
     RCC->APB2ENR |= RCC_APB2ENR_AFIOEN;
-    
-    if (spi == SPI1) RCC->APB2ENR |= RCC_APB2ENR_SPI1EN;
-    else if (spi == SPI2) RCC->APB1ENR |= RCC_APB1ENR_SPI2EN;
-    else if (spi == SPI3) RCC->APB1ENR |= RCC_APB1ENR_SPI3EN;
 
     GPIO_TypeDef* outPorts[] = {cs_port, pwrPort};
     uint16_t outPins[] = {cs_pin, pwrPin};
@@ -78,52 +75,29 @@ void SdCard::powerOff() {
     SystemTimer::delay_ms(50);
 }
 
-static void applySpiSettings(SPI_TypeDef *spi) {
-    uint32_t timeout = 10000;
-    while ((spi->SR & SPI_SR_BSY) && --timeout);
-    
-    spi->CR1 &= ~SPI_CR1_SPE;
-    spi->CR1 = SPI_CR1_MSTR | SPI_CR1_SSI | SPI_CR1_SSM | current_spi_baudrate;
-    spi->CR1 |= SPI_CR1_SPE;
-
-    
-}
-
 void SdCard::csLow() {
-    applySpiSettings(spi);
-    spiTxRx(SD_DUMMY_BYTE);
+    spi_bus->Transfer(SD_DUMMY_BYTE);
     cs_port->BRR = cs_pin;
 }
 
 void SdCard::csHigh() {
     cs_port->BSRR = cs_pin;
-    spiTxRx(SD_DUMMY_BYTE);
+    spi_bus->Transfer(SD_DUMMY_BYTE);
 }
 
 void SdCard::setSpiSpeedSlow() {
-    current_spi_baudrate = SPI_BAUDRATEPRESCALER_256;
-    applySpiSettings(spi);
+    spi_bus->SetPrescaler(SPI_BAUDRATEPRESCALER_256);
 }
 
 void SdCard::setSpiSpeedFast() {
-    current_spi_baudrate = SPI_BAUDRATEPRESCALER_8;
-    applySpiSettings(spi);
-}
-
-uint8_t SdCard::spiTxRx(uint8_t data) {
-    *((volatile uint8_t *)&spi->DR) = data;
-    uint32_t timeout = 10000;
-    while (!(spi->SR & SPI_SR_TXE) && --timeout);
-    timeout = 10000;
-    while (!(spi->SR & SPI_SR_RXNE) && --timeout);
-    return *((volatile uint8_t *)&spi->DR);
+    spi_bus->SetPrescaler(SPI_BAUDRATEPRESCALER_8);
 }
 
 uint8_t SdCard::waitReady() {
     uint8_t res;
     uint32_t tickstart = SystemTimer::getTick();
     do {
-        res = spiTxRx(SD_DUMMY_BYTE);
+        res = spi_bus->Transfer(SD_DUMMY_BYTE);
     } while (res != 0xFF && (SystemTimer::getTick() - tickstart) < 500);
     return res;
 }
@@ -145,21 +119,21 @@ uint8_t SdCard::sendCmd(uint8_t cmd, uint32_t arg) {
         waitReady();
     }
 
-    spiTxRx(0x40 | cmd);
-    spiTxRx((uint8_t)(arg >> 24));
-    spiTxRx((uint8_t)(arg >> 16));
-    spiTxRx((uint8_t)(arg >> 8));
-    spiTxRx((uint8_t)arg);
+    spi_bus->Transfer(0x40 | cmd);
+    spi_bus->Transfer((uint8_t)(arg >> 24));
+    spi_bus->Transfer((uint8_t)(arg >> 16));
+    spi_bus->Transfer((uint8_t)(arg >> 8));
+    spi_bus->Transfer((uint8_t)arg);
 
     n = 0x01;
     if (cmd == 0) n = 0x95;
     if (cmd == 8) n = 0x87;
-    spiTxRx(n);
+    spi_bus->Transfer(n);
 
-    if (cmd == 12) spiTxRx(SD_DUMMY_BYTE);
+    if (cmd == 12) spi_bus->Transfer(SD_DUMMY_BYTE);
 
     n = 100;
-    do { res = spiTxRx(SD_DUMMY_BYTE); } while ((res & 0x80) && --n);
+    do { res = spi_bus->Transfer(SD_DUMMY_BYTE); } while ((res & 0x80) && --n);
     return res;
 }
 
@@ -175,7 +149,7 @@ uint8_t SdCard::initialize() {
     SystemTimer::delay_ms(10); 
     
     for (int i = 0; i < 100; i++) {
-        spiTxRx(SD_DUMMY_BYTE);
+        spi_bus->Transfer(SD_DUMMY_BYTE);
     }
     
     uint8_t cmd0_res = 0xFF;
@@ -191,7 +165,7 @@ uint8_t SdCard::initialize() {
     if (cmd0_res == 1) {
         if (sendCmd(8, 0x1AA) == 1) { 
             uint8_t ocr[4];
-            for (int i = 0; i < 4; i++) ocr[i] = spiTxRx(SD_DUMMY_BYTE); 
+            for (int i = 0; i < 4; i++) ocr[i] = spi_bus->Transfer(SD_DUMMY_BYTE); 
             
             if (ocr[2] == 0x01 && ocr[3] == 0xAA) {
                 uint32_t tickstart = SystemTimer::getTick();
@@ -204,7 +178,7 @@ uint8_t SdCard::initialize() {
                 } while ((SystemTimer::getTick() - tickstart) < 2000);
                 
                 if (!(stat & 0x01) && sendCmd(58, 0) == 0) {
-                    for (int i = 0; i < 4; i++) ocr[i] = spiTxRx(SD_DUMMY_BYTE);
+                    for (int i = 0; i < 4; i++) ocr[i] = spi_bus->Transfer(SD_DUMMY_BYTE);
                     if (ocr[0] & 0x40) {
                         cardType = 1;
                     }
@@ -238,11 +212,11 @@ uint8_t SdCard::read(uint8_t *buff, uint32_t sector, uint32_t count) {
     while (count > 0) {
         if (sendCmd(17, sector) == 0) { 
             uint32_t tickstart = SystemTimer::getTick();
-            while (spiTxRx(SD_DUMMY_BYTE) != 0xFE) {
+            while (spi_bus->Transfer(SD_DUMMY_BYTE) != 0xFE) {
                 if ((SystemTimer::getTick() - tickstart) > 500) { csHigh(); return 1; }
             }
-            for (int i = 0; i < 512; i++) buff[i] = spiTxRx(SD_DUMMY_BYTE);
-            spiTxRx(SD_DUMMY_BYTE); spiTxRx(SD_DUMMY_BYTE); 
+            for (int i = 0; i < 512; i++) buff[i] = spi_bus->Transfer(SD_DUMMY_BYTE);
+            spi_bus->Transfer(SD_DUMMY_BYTE); spi_bus->Transfer(SD_DUMMY_BYTE); 
             if (cardType == 0) sector += 512; else sector += 1;
             buff += 512; count--; res = 0; 
         } else { res = 1; break; }
@@ -258,10 +232,10 @@ uint8_t SdCard::write(const uint8_t *buff, uint32_t sector, uint32_t count) {
     csLow();
     while (count > 0) {
         if (sendCmd(24, sector) == 0) { 
-            spiTxRx(0xFE);
-            for (int i = 0; i < 512; i++) spiTxRx(buff[i]);
-            spiTxRx(SD_DUMMY_BYTE); spiTxRx(SD_DUMMY_BYTE); 
-            if ((spiTxRx(SD_DUMMY_BYTE) & 0x1F) == 0x05) {
+            spi_bus->Transfer(0xFE);
+            for (int i = 0; i < 512; i++) spi_bus->Transfer(buff[i]);
+            spi_bus->Transfer(SD_DUMMY_BYTE); spi_bus->Transfer(SD_DUMMY_BYTE); 
+            if ((spi_bus->Transfer(SD_DUMMY_BYTE) & 0x1F) == 0x05) {
                 waitReady();
                 if (cardType == 0) sector += 512; else sector += 1;
                 buff += 512; count--; res = 0; 
