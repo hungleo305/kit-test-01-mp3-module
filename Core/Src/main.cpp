@@ -1,4 +1,4 @@
-﻿/* USER CODE BEGIN Header */
+/* USER CODE BEGIN Header */
 /**
   ******************************************************************************
   * @file           : main.c
@@ -34,6 +34,8 @@
 #include "Mp3.h"
 #include "ff.h"
 #include "CanBus.h"
+#include "SpiBus.h"
+#include "I2cBus.h"
 #include "user_diskio.h"
 #include "SdCard.h"
 
@@ -70,10 +72,17 @@ Relay relay(GPIOC, 1<<7);
 bool getRelayState() { return relay.isOn(); }
 volatile bool rtcErrorFlag = false;
 Led7Segment dp(GPIOC, 1<<5, GPIOC, 1<<7, GPIOC, 1<<6);
-Rtc rtc(I2C1, GPIOB, 1<<6, GPIOB, 1<<7);
-Rfid rfid(SPI3, GPIOB, GPIO_PIN_3, GPIOB, GPIO_PIN_4, GPIOB, GPIO_PIN_5, GPIOA, GPIO_PIN_15, GPIOC, GPIO_PIN_14);
-Mp3 mp3(&hspi2, GPIOC, 1<<2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3);
-SdCard sdCard(SPI1, GPIOC, 1<<8, GPIOB, 1<<0, GPIOB, 1<<1);
+
+I2cBus i2c1(I2C1, GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);
+Rtc rtc(&i2c1);
+
+SpiBus spi1_bus(SPI1, GPIOA, GPIO_PIN_5, GPIOA, GPIO_PIN_6, GPIOA, GPIO_PIN_7); // Cho SdCard (PA5=SCK, PA6=MISO, PA7=MOSI)
+SpiBus spi2_bus(SPI2); // Cho Mp3 (Được cấu hình bởi CubeMX MX_SPI2_Init)
+SpiBus spi3_bus(SPI3, GPIOB, GPIO_PIN_3, GPIOB, GPIO_PIN_4, GPIOB, GPIO_PIN_5); // Cho Rfid (PB3=SCK, PB4=MISO, PB5=MOSI)
+
+Rfid rfid(&spi3_bus, GPIOA, GPIO_PIN_15, GPIOC, GPIO_PIN_14);
+Mp3 mp3(&spi2_bus, GPIOC, 1<<2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3);
+SdCard sdCard(&spi1_bus, GPIOC, 1<<8, GPIOB, 1<<0, GPIOB, 1<<1);
 
 extern CAN_HandleTypeDef hcan;
 CanBus myCan(&hcan);
