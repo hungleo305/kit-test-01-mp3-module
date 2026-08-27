@@ -2,6 +2,7 @@
 #define RFID_H
 
 #include "stm32f1xx.h"
+#include "stm32f1xx_hal.h"
 
 // --- REGISTERS ---
 #define MFRC522_REG_COMMAND       0x01
@@ -20,6 +21,7 @@
 #define MFRC522_REG_MODE          0x11
 #define MFRC522_REG_TX_CONTROL    0x14
 #define MFRC522_REG_TX_AUTO       0x15
+#define MFRC522_REG_RF_CFG        0x26
 #define MFRC522_REG_CRC_RESULT_M  0x21
 #define MFRC522_REG_CRC_RESULT_L  0x22
 #define MFRC522_REG_T_MODE        0x2A
@@ -45,13 +47,22 @@
 #define STATUS_OK                 1
 #define STATUS_ERROR              0
 
+enum SpiMode { MODE_HAL, MODE_BAREMETAL, MODE_SOFT };
+
 class Rfid {
 private:
+    SpiMode spiMode;
+    #ifdef HAL_SPI_MODULE_ENABLED
+    SPI_HandleTypeDef* hspi;
+#else
+    void* hspi;
+#endif
     SPI_TypeDef* spi;
-    GPIO_TypeDef* csPort;
-    uint16_t csPin;
-    GPIO_TypeDef* rstPort;
-    uint16_t rstPin;
+    GPIO_TypeDef* sckPort;  uint16_t sckPin;
+    GPIO_TypeDef* misoPort; uint16_t misoPin;
+    GPIO_TypeDef* mosiPort; uint16_t mosiPin;
+    GPIO_TypeDef* csPort;   uint16_t csPin;
+    GPIO_TypeDef* rstPort;  uint16_t rstPin;
 
     void csLow();
     void csHigh();
@@ -69,7 +80,19 @@ private:
     void calculateCRC(uint8_t *data, uint8_t length, uint8_t *result);
 
 public:
-    Rfid(SPI_TypeDef* spi, GPIO_TypeDef* csPort, uint16_t csPin, GPIO_TypeDef* rstPort, uint16_t rstPin);
+    // 1. Hardware SPI via HAL
+    #ifdef HAL_SPI_MODULE_ENABLED
+    Rfid(SPI_HandleTypeDef* hspi, GPIO_TypeDef* csPort, uint16_t csPin, GPIO_TypeDef* rstPort, uint16_t rstPin);
+#endif
+    
+    // 2. Hardware SPI via Bare-metal, OR Software SPI (if spi == NULL)
+    Rfid(SPI_TypeDef* spi, 
+         GPIO_TypeDef* sckPort, uint16_t sckPin,
+         GPIO_TypeDef* misoPort, uint16_t misoPin,
+         GPIO_TypeDef* mosiPort, uint16_t mosiPin,
+         GPIO_TypeDef* csPort, uint16_t csPin, 
+         GPIO_TypeDef* rstPort, uint16_t rstPin);
+
     void init();
     bool checkCard();
     bool readCardSerial(uint8_t* serial);
@@ -82,3 +105,4 @@ public:
 };
 
 #endif
+
