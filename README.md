@@ -91,9 +91,23 @@ Mạch đi kèm bộ thẻ từ. Quẹt các thẻ này vào anten (miếng vuô
 
 ### 3.6. Hướng dẫn dùng phần mềm máy tính (Cangaroo qua CAN Bus)
 Cắm mạch vào máy tính qua bộ chuyển đổi CAN. Mở phần mềm **Cangaroo** trên máy tính:
-1. Load file có sẵn tên là `kit_vna_can.dbc` (có sẵn trong thư mục dự án) vào phần mềm.
-2. Lúc này toàn bộ các ID kỹ thuật sẽ tự động biến thành tiếng Việt (Ví dụ: *Thoi_Gian_Thuc_RTC, Muc_Tieu...*).
-3. **Cách đổi số lượng Mục Tiêu:** Tìm đến khung CAN TX (ID `0x201`), nhập một số thập phân bình thường (ví dụ: `100`) rồi bấm nút Gửi (Send). Mạch sẽ nhớ con số 100 này làm mục tiêu.
+
+**Cấu hình kết nối phần cứng:**
+1. Trên thanh Menu Cangaroo, vào **Measurement -> Measurement Setup...**
+2. Tại mục **Interfaces**, chọn cổng COM tương ứng của bộ chuyển đổi CAN (ví dụ: `COM6`).
+3. Đặt **Bitrate** là `250000` (đây là tốc độ baud mặc định của firmware).
+4. Bấm **Start Measurement** (nút màu xanh hình nút Play) để bắt đầu quét mạng CAN.
+
+![Cấu hình Cangaroo](docs/cangaroo_setup.png)
+
+**Sử dụng Cangaroo để Gửi/Nhận dữ liệu:**
+1. Vào thanh Menu **View -> Generator** để mở bảng Gửi lệnh (Generator View).
+2. Tại bảng **Available Messages (DBC)**, bấm nút **Add DBC Message**, tìm file `kit_vna_can.dbc` (có sẵn trong thư mục dự án) để Load vào phần mềm.
+3. Lúc này toàn bộ các ID kỹ thuật sẽ tự động biến thành tiếng Việt (Ví dụ: *Thoi_Gian_Thuc_RTC, Muc_Tieu...*).
+
+![Giao diện Generator](docs/cangaroo_generator.png)
+
+4. **Cách đổi số lượng Mục Tiêu:** Tìm đến khung CAN TX (ID `0x201`), nhập một số thập phân bình thường (ví dụ: `100`) rồi bấm nút Gửi (Send). Mạch sẽ nhớ con số 100 này làm mục tiêu.
 4. **Cách chỉnh giờ khi đồng hồ sai:** Tìm đến khung CAN TX (ID `0x203`), nhập đúng thứ tự: *Ngày(1->31), Tháng(1->12), NăM(0->99), Thứ(1->7)*. Khung giờ nhập *Giờ(0->23), Phút(0->59), Giây(0->59)* (Dưới dạng số thập phân thông thường), rồi bấm Gửi (Send). Mạch sẽ nhận giờ lập tức, hết nhấp nháy chữ `----`.
 5. **Cách đặt số đếm bất kỳ:** Tìm khung CAN TX (ID `0x202`), nhập một số bất kỳ (ví dụ: `50`), bấm Gửi, mạch sẽ lập tức nhảy số đếm về 50.
 
@@ -132,7 +146,7 @@ Cắm mạch vào máy tính qua bộ chuyển đổi CAN. Mở phần mềm **C
 
 ---
 
-## 4. HƯỚNG DẪN SỬ DỤNG THƯ VIỆN CHO LẬP TRÌNH (BẢN CHI TIẾT & CHUYÊN SÂU TỪNG MODULE)
+## 4. HƯỚNG DẪN SỬ DỤNG THƯ VIỆN CHO LẬP TRÌNH
 
 Mã nguồn được tổ chức theo cấu trúc Hướng đối tượng (OOP) C++. Tất cả các class thư viện được thiết kế theo mô hình **Non-blocking**, tuyệt đối không sử dụng hàm trễ `HAL_Delay` trong vòng lặp chính. Nhờ đó, mạch có thể thực thi đa nhiệm cực kỳ mượt mà. 
 
