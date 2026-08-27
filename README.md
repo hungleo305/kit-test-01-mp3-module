@@ -1,4 +1,4 @@
-﻿# TÀI LIỆU HƯỚNG DẪN SỬ DỤNG VÀ PHÁT TRIỂN FIRMWARE - KIT VNA
+# TÀI LIỆU HƯỚNG DẪN SỬ DỤNG VÀ PHÁT TRIỂN FIRMWARE - KIT VNA
 
 Dự án mạch Kit STM32F103RCT6 điều khiển đa năng giao tiếp CAN Bus, tích hợp đọc thẻ RFID, thẻ nhớ SD (phát nhạc MP3), cảm biến đếm sản phẩm, và LED 7 đoạn.
 
@@ -208,7 +208,17 @@ Việc đặt `buzzer.update()` vào trong hàm ngắt này có ý nghĩa cực 
 
 ---
 
-### 4.3. Thư viện `Mp3` (IC Giải mã VS1011e) & Thẻ nhớ (`SdCard`)
+### 4.3. Kiến trúc cốt lõi SPI Đa năng (`SpiBus`)
+Thư viện `SpiBus` đóng vai trò là một lớp trừu tượng để quản lý toàn bộ giao tiếp SPI của hệ thống (như thẻ nhớ SD, module MP3, thẻ từ RFID). Thay vì viết code giao tiếp SPI lặp lại cho từng cảm biến, hệ thống sẽ sử dụng chung `SpiBus`.
+
+Thư viện hỗ trợ 3 chế độ hoạt động:
+- **Chế độ 1 - Cấu hình từ CubeMX:** (Ví dụ: `SpiBus spi2_bus(SPI2);`) - Phù hợp khi bạn tự cấu hình xung nhịp và chân cắm trên CubeMX.
+- **Chế độ 2 - Cấu hình Bare-metal tự động:** (Ví dụ: `SpiBus spi1_bus(SPI1, GPIOA, GPIO_PIN_5, GPIOA, GPIO_PIN_6, GPIOA, GPIO_PIN_7);`) - Tự động thiết lập cấu hình chân (Alternate Function) và bật nguồn cho SPI. 
+- **Chế độ 3 - SPI Mềm (Bit-banging):** Truyền trực tiếp các chân vào mà không cần bộ SPI cứng. Tuy nhiên **Không nên dùng cho MP3 và SD Card** vì quá chậm.
+
+---
+
+### 4.4. Thư viện `Mp3` (IC Giải mã VS1011e) & Thẻ nhớ (`SdCard`)
 Sự kết hợp giữa `SdCard` (đọc thẻ vật lý) và `Mp3` (giải mã tín hiệu số). Quá trình diễn ra như sau: Vi điều khiển (MCU) đọc luồng Byte từ thẻ nhớ (SPI) vào bộ đệm (Buffer) trong RAM, sau đó MCU bơm liên tục dữ liệu từ bộ đệm này sang chip giải mã VS1011 (SPI)."
 
 **Hàm API chi tiết thư viện `Mp3`:**
@@ -236,6 +246,12 @@ Khi gọi các hàm cấp cao của FatFs (như `f_mount`, `f_open`, `f_read`), 
 - `SdCard::disk_read()` / `disk_write()`: FatFs gọi khi cần đọc/ghi Data vào từng Sector (mỗi block 512 Bytes). Hàm này xử lý các mã lệnh vật lý là **CMD17 (READ_SINGLE_BLOCK)** để đọc 1 Sector, và **CMD24 (WRITE_BLOCK)** để ghi 1 Sector. Phải chờ tín hiệu token 0xFE (chuẩn bị đọc/ghi thành công).
 - `SdCard::disk_ioctl()`: Lấy thông số thẻ (Dung lượng, Sector count, Block size) để FatFs tính toán không gian đĩa FAT32.
 
+> [!WARNING]
+> **KHUYẾN CÁO VỀ SPI MỀM (BIT-BANGING)**
+> Thư viện `SpiBus` hỗ trợ SPI Mềm, tuy nhiên **TUYỆT ĐỐI KHÔNG NÊN** dùng SPI Mềm cho `SdCard` hoặc `Mp3` trừ trường hợp bất khả kháng.
+> - **Lý do 1:** Đọc thẻ nhớ (FatFs) và giải mã âm thanh đòi hỏi băng thông cực kỳ lớn (Mỗi sector 512 bytes). SPI Cứng có thể chạy ở tốc độ 18MHz ~ 36MHz (Gửi 1 byte mất chưa tới 1 microsecond). Trong khi đó, SPI Mềm sử dụng vòng lặp CPU `for` và `GPIO BSRR` tốn ít nhất 10-20 microseconds cho mỗi byte, làm CPU bị nghẽn hoàn toàn, không thể xử lý các task khác.
+> - **Lý do 2:** Khi CPU nghẽn ở vòng lặp SPI Mềm để đọc thẻ SD, bộ đệm (buffer) của chip VS1011 (MP3) sẽ bị cạn, gây ra hiện tượng giật cục, vấp tiếng (âm thanh rè, đứt quãng).
+
 **Lưu ý phần cứng đặc biệt:** 
 Kit hiện tại gắn thêm mạch khuếch đại (Amply) rời MIX2018A để kéo loa công suất cao. Nguồn Amply được điều khiển Mute bằng chân `PA4`. Phải bật chân `PA4` này lên (Bằng thanh ghi: `GPIOA->BRR = (1 << 4);`) trước khi phát nhạc.
 
@@ -245,11 +261,13 @@ Kit hiện tại gắn thêm mạch khuếch đại (Amply) rời MIX2018A để
 #include "SdCard.h"
 #include "ff.h" // FatFs
 
-// Khai báo thẻ SD ở SPI1
-SdCard sdCard(SPI1, GPIOC, 1<<8, GPIOB, 1<<0, GPIOB, 1<<1);
+// 1. Khai báo các đường bus SPI chung
+SpiBus spi1_bus(SPI1, GPIOA, 1<<5, GPIOA, 1<<6, GPIOA, 1<<7); // SPI Cứng Bare-metal
+SpiBus spi2_bus(SPI2); // SPI Cứng đã cấu hình qua CubeMX (MX_SPI2_Init)
 
-// Khai báo MP3 ở SPI2
-Mp3 mp3(&hspi2, GPIOC, 1<<2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3);
+// 2. Truyền bus SPI vào module
+SdCard sdCard(&spi1_bus, GPIOC, 1<<8, GPIOB, 1<<0, GPIOB, 1<<1);
+Mp3 mp3(&spi2_bus, GPIOC, 1<<2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3);
 
 FATFS fs;
 
@@ -278,14 +296,12 @@ int main(void) {
 
 ---
 
-### 4.4. Thư viện `Rfid` (MFRC522)
+### 4.5. Thư viện `Rfid` (MFRC522)
 Giao tiếp thẻ từ tần số 13.56 MHz (MIFARE). 
 
 **Hàm API chi tiết:**
-- `Rfid(...)`: Cấu hình linh hoạt :
-    1.HAL(CubeMX) : Truyền `(&hspi1, csPort, csPin, rstPort, rsPin)`.
-    2.Thanh ghi(không cần cấu hình từ CubeMX) : Truyền `(SPI1, sckPort, sckPin, misoPort, misoPin, mosiPort, mosiPin, csPort, csPin, rstPort, rstPin)` nhập đủ 5 chân thư viện sẽ tự ép xung và cấu hình.
-    3.SPI mềm với chân bất kỳ : Truyền `(NULL, sckPort, sckPin, misoPort, misoPin, mosiPort, mosiPin, csPort, csPin, rstPort, rstPin)` nhập đủ 5 chân thư viện sẽ tự ép xung và cấu hình.
+- `Rfid(...)`: Truyền vào con trỏ `SpiBus*` cùng với các chân điều khiển CS và RST. Thư viện sẽ tự động giao tiếp qua Bus SPI (Cứng hoặc Mềm) đã được định nghĩa.
+  > Ví dụ: `Rfid(&spi_bus, csPort, csPin, rstPort, rstPin)`
 - `void init()`: Đánh thức module, bật dao động Anten.
 - `bool checkCard()`: Bắn sóng hỏi xem có thẻ không.
 - `bool readCardSerial(uint8_t* uid)`: Lưu 5 bytes mã UID của thẻ vào mảng.
@@ -297,15 +313,13 @@ Giao tiếp thẻ từ tần số 13.56 MHz (MIFARE).
 **Ví dụ Code hoàn chỉnh:**
 ```cpp
 #include "Rfid.h"
-// 1. Khai báo dùng SPI cứng trực tiếp (Bare-metal)
-Rfid rfid(SPI1, GPIOA, 1<<5, GPIOA, 1<<6, GPIOA, 1<<7, GPIOB, 1<<15, GPIOA, 1<<9);
-/* 
-// 2. Nếu dùng SPI Mềm, chỉ cần thay SPI1 thành NULL:
-Rfid rfid(NULL, GPIOA, 1<<5, GPIOA, 1<<6, GPIOA, 1<<7, GPIOB, 1<<15, GPIOA, 1<<9);
-// 3. Nếu dùng CubeMX, chỉ truyền chân CS và RST:
-extern "C" SPI_HandleTypeDef hspi1;
-Rfid rfid(&hspi1, GPIOB, 1<<15, GPIOA, 1<<9);
-*/
+// 1. Cấu hình SpiBus trước (Hỗ trợ cả SPI Cứng và Mềm)
+SpiBus spi1_bus(SPI1, GPIOA, 1<<5, GPIOA, 1<<6, GPIOA, 1<<7); // Cứng
+// SpiBus spi_soft(GPIOA, 1<<5, GPIOA, 1<<6, GPIOA, 1<<7); // Mềm
+// SpiBus spi_cube(SPI1); // CubeMX
+
+// 2. Truyền vào Rfid
+Rfid rfid(&spi1_bus, GPIOB, 1<<15, GPIOA, 1<<9);
 int main(void) {
     HAL_Init();
     SystemClock_Config();
@@ -342,7 +356,7 @@ int main(void) {
 
 ---
 
-### 4.5. Thư viện `Sensor` (Ngắt Ngoại vi) & `Relay`
+### 4.6. Thư viện `Sensor` (Ngắt Ngoại vi) & `Relay`
 Giúp đọc tín hiệu từ cảm biến nhanh chóng mặt nhờ hệ thống Ngắt Phần Cứng (EXTI).
 
 **Thư viện `Relay`:** Đảo trạng thái Output đơn giản.
@@ -389,23 +403,32 @@ int main(void) {
 
 ---
 
-### 4.6. Thư viện `Rtc` (Đồng hồ I2C DS1307) & Thanh ghi Sao lưu (BKP)
-DS1307 là chip đồng hồ giao tiếp I2C. Trên MCU STM32F1 có cụm 42 thanh ghi 16-bit (`BKP->DR1` đến `BKP->DR42`) sử dụng chung nguồn của Pin CMOS 3V cấp cho RTC.
+### 4.7. Giao thức I2C đa năng (`I2cBus`), Module Thời gian thực DS1307 (`Rtc`) & Thanh ghi Sao lưu (BKP)
 
-**Hàm API chi tiết thư viện `Rtc`:**
-- `Rtc(...)`: Yêu cầu truyền vào khối phần cứng `I2C1` hoặc `I2C2` cùng chân SCL/SDA.
-- `bool isTimeLost()`: Trả về `true` nếu thanh ghi giờ chứa lỗi Clock Halt (Nghĩa là IC từng bị ngắt pin 3V hoàn toàn). Người dùng phải cài lại giờ.
+**Kiến trúc cốt lõi xử lý mọi giao tiếp I2C cho hệ thống (`I2cBus`):**
+Tương tự như `SpiBus`, thư viện này hỗ trợ 3 chế độ hoạt động:
+- **Chế độ 1 - Dựa dẫm CubeMX:** (Ví dụ: `I2cBus i2c1(I2C1);`) - Bạn tự cấu hình Clock, GPIO, I2C trên CubeMX.
+- **Chế độ 2 - Cấu hình Bare-metal tự động:** (Ví dụ: `I2cBus i2c1(I2C1, GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);`) - Tự cấu hình thanh ghi Clock và Open-Drain cho chuẩn I2C 100kHz.
+- **Chế độ 3 - I2C Mềm (Bit-banging):** (Ví dụ: `I2cBus i2c_soft(GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);`) - Truyền duy nhất cặp chân GPIO. Thư viện sẽ dùng CPU đóng ngắt liên tục để tạo ra xung I2C.
+
+**Thư viện DS1307 (`Rtc`) & BKP:**
+DS1307 là chip đồng hồ giao tiếp I2C. Trên MCU STM32F1 có cụm 42 thanh ghi 16-bit (`BKP->DR1` đến `BKP->DR42`) sử dụng chung nguồn của Pin CMOS 3V cấp cho RTC.
+- `Rtc(I2cBus* i2c_bus)`: Nhận con trỏ `I2cBus` đã cấu hình để đẩy dữ liệu I2C.
+- `bool isTimeLost()`: Trả về `true` nếu thanh ghi giờ chứa lỗi Clock Halt (Nghĩa là IC từng bị ngắt pin 3V hoàn toàn).
 - Các hàm Data: `getTime()`, `getDate()`, `setTime()`, `setDate()`. 
 
 **Ví dụ Code hoàn chỉnh:**
 ```cpp
+#include "I2cBus.h"
 #include "Rtc.h"
 #include <stdio.h>
 
-// Khởi tạo RTC dùng I2C1 (SCL=PB6, SDA=PB7)
-Rtc rtc(I2C1, GPIOB, 6, 7); 
+// Khởi tạo RTC dùng I2cBus (SCL=PB6, SDA=PB7)
+I2cBus i2c1(I2C1, GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);
+Rtc rtc(&i2c1); 
 
 int main(void) {
+    // Không cần gọi i2c1.Init() vì rtc.init() sẽ tự động mượn con trỏ để gọi
     rtc.init();
     
     // Kiểm tra xem đồng hồ có bị reset (do rút cả nguồn + hết pin CMOS) hay không
@@ -424,7 +447,7 @@ int main(void) {
         SystemTimer::delay_ms(1000);
     }
 }
-`
+```
 
 **Sử dụng vùng Backup Registers (BKP) để chống mất nguồn:**
 Trong dự án này, Số đếm sản phẩm liên tục được thay đổi, lưu vào RAM thì mất nguồn đồng nghĩa với các giá trị đếm sẽ mất. Giải pháp là ghi thẳng vào BKP! Mất nguồn không mất (nhờ pin CMOS nuôi).
@@ -442,7 +465,7 @@ BKP->DR1 = ++savedCount;
 
 ---
 
-### 4.7. Thư viện `CanBus`
+### 4.8. Thư viện `CanBus`
 Giao tiếp mạng theo chuẩn Data Frame cực kỳ chống nhiễu. Sử dụng ngắt `FIFO0` siêu nhẹ.
 
 **Hàm API chi tiết:**
@@ -488,7 +511,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 
 ---
 
-### 4.8. Thư viện `Led7Segment` (CD4094 Multiplexing)
+### 4.9. Thư viện `Led7Segment` (CD4094 Multiplexing)
 Thư viện quét với IC thanh ghi dịch 3 chân (Data, Clock, Strobe/Latch).
 
 **Hàm API chi tiết:**
@@ -517,7 +540,7 @@ int main(void) {
 
 ---
 
-### 4.9. Thư viện `SystemTimer` (Bộ đếm thời gian Non-blocking)
+### 4.10. Thư viện `SystemTimer` (Bộ đếm thời gian Non-blocking)
 Thư viện quản lý bộ đếm Tick của hệ thống (dựa trên ngắt SysTick của STM32). Đây là cốt lõi để tạo ra các hàm delay và kiểm tra thời gian mà không làm treo chương trình (Non-blocking).
 
 **Hàm API chi tiết:**
