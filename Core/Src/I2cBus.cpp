@@ -224,3 +224,58 @@ uint8_t I2cBus::ReadMem(uint8_t devAddr, uint8_t memAddr) {
         return data;
     }
 }
+
+bool I2cBus::WriteByte(uint8_t devAddr, uint8_t data) {
+    if (isSoftware) {
+        startCond();
+        if (!sendByte(devAddr)) { stopCond(); return false; }
+        if (!sendByte(data)) { stopCond(); return false; }
+        stopCond();
+        return true;
+    } else {
+        uint32_t t = 10000;
+        while ((hi2c->SR2 & I2C_SR2_BUSY) && --t); if(!t) return false;
+
+        hi2c->CR1 |= I2C_CR1_START;
+        t = 10000; while (!(hi2c->SR1 & I2C_SR1_SB) && --t); if(!t) return false;
+
+        hi2c->DR = devAddr;
+        t = 10000; while (!(hi2c->SR1 & I2C_SR1_ADDR) && --t); if(!t) return false;
+        (void)hi2c->SR2;
+
+        hi2c->DR = data;
+        t = 10000; while (!(hi2c->SR1 & I2C_SR1_TXE) && --t); if(!t) return false;
+        t = 10000; while (!(hi2c->SR1 & I2C_SR1_BTF) && --t); if(!t) return false;
+
+        hi2c->CR1 |= I2C_CR1_STOP;
+        return true;
+    }
+}
+
+uint8_t I2cBus::ReadByteDirect(uint8_t devAddr) {
+    if (isSoftware) {
+        startCond();
+        if (!sendByte(devAddr | 0x01)) { stopCond(); return 0; }
+        uint8_t data = readByte(false); // NACK on last byte
+        stopCond();
+        return data;
+    } else {
+        uint8_t data = 0;
+        uint32_t t = 10000;
+        while ((hi2c->SR2 & I2C_SR2_BUSY) && --t); if(!t) return 0;
+
+        hi2c->CR1 |= I2C_CR1_START;
+        t = 10000; while (!(hi2c->SR1 & I2C_SR1_SB) && --t); if(!t) return 0;
+
+        hi2c->DR = devAddr | 0x01;
+        t = 10000; while (!(hi2c->SR1 & I2C_SR1_ADDR) && --t); if(!t) return 0;
+        
+        hi2c->CR1 &= ~I2C_CR1_ACK;
+        (void)hi2c->SR2;
+        hi2c->CR1 |= I2C_CR1_STOP;
+
+        t = 10000; while (!(hi2c->SR1 & I2C_SR1_RXNE) && --t); if(t) data = hi2c->DR;
+
+        return data;
+    }
+}

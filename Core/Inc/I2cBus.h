@@ -37,9 +37,11 @@ public:
     
     // Ghi 1 byte vào một thanh ghi của thiết bị
     bool WriteMem(uint8_t devAddr, uint8_t memAddr, uint8_t data);
-    
-    // Đọc 1 byte từ một thanh ghi của thiết bị
     uint8_t ReadMem(uint8_t devAddr, uint8_t memAddr);
+
+    // Ghi trực tiếp 1 byte (Không qua thanh ghi, dùng cho PCF8574 LCD...)
+    bool WriteByte(uint8_t devAddr, uint8_t data);
+    uint8_t ReadByteDirect(uint8_t devAddr);
 };
 
 #endif // I2C_BUS_H
