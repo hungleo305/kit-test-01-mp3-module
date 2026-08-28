@@ -484,16 +484,16 @@ int main(void) {
 
 **Bước 1: Khai báo đối tượng (Chọn 1 trong 3 chế độ)**
 Tương tự như `SpiBus`, thư viện này hỗ trợ 3 chế độ hoạt động để phù hợp với mọi project:
-- **Chế độ 1 - Dựa dẫm CubeMX:** (Ví dụ: `I2cBus i2c1(I2C1);`) - Dành cho ai đã tự cấu hình sẵn Clock, GPIO, I2C trên giao diện CubeMX.
-- **Chế độ 2 - Tự động 100% (Bare-metal):** (Ví dụ: `I2cBus i2c1(I2C1, GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);`) - Cực kỳ rảnh tay. Thư viện sẽ tự chọc thẳng vào thanh ghi để bật Clock và cấu hình chân Open-Drain chuẩn I2C 100kHz. Bạn không cần làm gì trên phần mềm CubeMX cả.
-- **Chế độ 3 - I2C Mềm (Bit-banging):** (Ví dụ: `I2cBus i2c_soft(GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);`) - Cứu cánh khi hết chân I2C cứng. Chỉ cần truyền vào 2 chân GPIO bất kỳ, thư viện sẽ tự dùng CPU nhấp nháy tạo ra xung I2C.
+- **Chế độ 1 - Cấu hình từ CubeMX:** (Ví dụ: `I2cBus i2c1(I2C1);`) - Tự cấu hình sẵn Clock, GPIO, I2C trên giao diện CubeMX.
+- **Chế độ 2 - Tự động hoàn toàn (Bare-metal):** (Ví dụ: `I2cBus i2c1(I2C1, GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);`) - Thư viện sẽ tự chọc thẳng vào thanh ghi để bật Clock và cấu hình chân Open-Drain chuẩn I2C 100kHz.
+- **Chế độ 3 - I2C Mềm (Bit-banging):** (Ví dụ: `I2cBus i2c_soft(GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);`) - Chỉ cần truyền vào 2 chân GPIO bất kỳ, thư viện sẽ dùng CPU nhấp nháy tạo ra xung I2C.
 
 **Bước 2: Khởi tạo phần cứng (Gọi hàm Init)**
 - Bắt buộc phải gọi hàm `i2c1.Init();` một lần duy nhất ở trong hàm `main()` (trước khi vào vòng lặp `while(1)`) để các cấu hình ở Bước 1 thực sự được ghi vào chip.
 
 **Bước 3: Chia sẻ Bus cho các thiết bị con (Dependency Injection)**
-- Kiến trúc chuẩn OOP cho phép nhiều thiết bị dùng chung 1 đường truyền I2C.
-- Thay vì cấu hình I2C lộn xộn trong từng file con, bạn chỉ cần ném con trỏ (Pointer) của đường truyền vào cho chúng:
+- Cho phép nhiều thiết bị dùng chung 1 đường truyền I2C.
+- Thay vì cấu hình I2C lộn xộn trong từng file con, chỉ cần ném con trỏ (Pointer) của đường truyền vào cho chúng:
   Ví dụ: `Rtc rtc(&i2c1);` hoặc `Eeprom eeprom(&i2c1);`. Các hàm bên trong `Rtc` sẽ tự động mượn con trỏ này để gọi các hàm gửi/nhận ở Bước 4.
 
 **Bước 4: Sử dụng API Đọc/Ghi Dữ liệu**
@@ -562,7 +562,21 @@ BKP->DR1 = ++savedCount;
 ### 4.8. Thư viện `CanBus`
 Giao tiếp mạng theo chuẩn Data Frame cực kỳ chống nhiễu. Sử dụng ngắt `FIFO0` siêu nhẹ.
 
-**Hàm API chi tiết:**
+**1. Hướng dẫn cấu hình CAN trên CubeMX (Tốc độ 250kbps):**
+Vì bộ thư viện này giao phó việc thiết lập phần cứng cho HAL, bạn phải cấu hình chuẩn xác các thông số trên CubeMX trước khi nạp code:
+- **Tại mục Connectivity -> CAN**: Tích chọn `Activated`.
+- **Tại tab Parameter Settings**: Cấu hình các thông số Bitrate. Để đạt được tốc độ **250 kbps** (Giả sử xung nhịp APB1 của bạn đang là 36MHz), hãy thiết lập như sau:
+  - Prescaler (for Time Quantum): `9`
+  - Time Quanta in Bit Segment 1: `13 Times`
+  - Time Quanta in Bit Segment 2: `2 Times`
+  - ReSynchronization Jump Width: `1 Time`
+  > *(Công thức tính: `36MHz / 9 / (1 + 13 + 2) = 250,000 Hz = 250 kbps`)*
+- **Tại tab NVIC Settings**: Bắt buộc phải tích bật ngắt **`USB low priority or CAN RX0 interrupts`** thì thư viện mới có thể tự động hứng dữ liệu chạy ngầm được.
+
+*(Ảnh minh họa cấu hình Parameter của CubeMX:)*
+![Cấu hình CubeMX CAN](docs/cubemx_can.png)
+
+**2. Hàm API chi tiết:**
 - `init()`: Cài đặt tốc độ Baudrate, mở bộ lọc (chấp nhận mọi ID) và kích hoạt ngắt.
 - `sendFrame(uint32_t id, uint8_t* data, uint8_t len)`: Đẩy bản tin. Tối đa 8 byte.
 - `readFrame(uint32_t* id, uint8_t* data, uint8_t* len)`: Hàm lấy bản tin từ biến nội bộ. (Được gọi bên trong ngắt RxFifo0).
