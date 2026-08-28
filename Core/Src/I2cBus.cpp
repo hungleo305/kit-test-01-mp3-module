@@ -149,8 +149,6 @@ uint8_t I2cBus::readByte(bool ack) {
     return data;
 }
 
-// ==== UNIVERSAL API ====
-
 bool I2cBus::WriteMem(uint8_t devAddr, uint8_t memAddr, uint8_t data) {
     if (isSoftware) {
         startCond();
