@@ -63,26 +63,26 @@ extern uint8_t FATFS_LinkDriver(Diskio_drvTypeDef *drv, char *path);
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan;
 
-SPI_HandleTypeDef hspi2;
+// Đã xóa hspi2 vì sử dụng SpiBus Bare-metal
 /* USER CODE BEGIN PV */
 Led ledOb(GPIOB, 1<<2);
 Buzzer buzzer(GPIOC, 1<<15);
 Sensor cb(GPIOC, 1<<13);
 Relay relay(GPIOC, 1<<7);
-bool getRelayState() { return relay.isOn(); }
+
 volatile bool rtcErrorFlag = false;
 Led7Segment dp(GPIOC, 1<<5, GPIOC, 1<<7, GPIOC, 1<<6);
 
 I2cBus i2c1(I2C1, GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);
 Rtc rtc(&i2c1);
 
-SpiBus spi1_bus(SPI1, GPIOA, GPIO_PIN_5, GPIOA, GPIO_PIN_6, GPIOA, GPIO_PIN_7); // Cho SdCard (PA5=SCK, PA6=MISO, PA7=MOSI)
-SpiBus spi2_bus(SPI2); // Cho Mp3 (Được cấu hình bởi CubeMX MX_SPI2_Init)
-SpiBus spi3_bus(SPI3, GPIOB, GPIO_PIN_3, GPIOB, GPIO_PIN_4, GPIOB, GPIO_PIN_5); // Cho Rfid (PB3=SCK, PB4=MISO, PB5=MOSI)
+SpiBus spi1_bus(SPI1, GPIOA, GPIO_PIN_5, GPIOA, GPIO_PIN_6, GPIOA, GPIO_PIN_7); // Cho SdCard
+SpiBus spi2_bus(SPI2, GPIOB, GPIO_PIN_13, GPIOB, GPIO_PIN_14, GPIOB, GPIO_PIN_15); // Cho Mp3
+SpiBus spi3_bus(SPI3, GPIOB, GPIO_PIN_3, GPIOB, GPIO_PIN_4, GPIOB, GPIO_PIN_5); // Cho Rfid
 
-Rfid rfid(&spi3_bus, GPIOA, GPIO_PIN_15, GPIOC, GPIO_PIN_14);
-Mp3 mp3(&spi2_bus, GPIOC, 1<<2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3);
-SdCard sdCard(&spi1_bus, GPIOC, 1<<8, GPIOB, 1<<0, GPIOB, 1<<1);
+Rfid rfid(&spi3_bus, GPIOA, GPIO_PIN_15, GPIOC, GPIO_PIN_14); // cs,rst
+Mp3 mp3(&spi2_bus, GPIOC, 1<<2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3); //pwr,xrs,xdcs,xcs
+SdCard sdCard(&spi1_bus, GPIOC, 1<<8, GPIOB, 1<<0, GPIOB, 1<<1); // cs,sd_dt,pwr
 
 extern CAN_HandleTypeDef hcan;
 CanBus myCan(&hcan);
@@ -191,7 +191,7 @@ void onSensorDetect() {
 }
 static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
-static void MX_SPI2_Init(void);
+// Đã xóa MX_SPI2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -205,31 +205,6 @@ static void MX_SPI2_Init(void);
   * @brief  The application entry point.
   * @retval int
   */
-void Hardware_GPIO_Init() {
-    __HAL_RCC_GPIOA_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
-    __HAL_RCC_GPIOC_CLK_ENABLE();
-    __HAL_RCC_AFIO_CLK_ENABLE();
-    
-    // SPI1 GPIO (PA5=SCK, PA6=MISO, PA7=MOSI)
-    GPIOA->CRL &= ~(0xF << 20 | 0xF << 24 | 0xF << 28);
-    GPIOA->CRL |=  (0xB << 20 | 0x8 << 24 | 0xB << 28);
-    GPIOA->ODR |= (1 << 6); // Pull-up for MISO
-
-    // SPI2 GPIO (PB13=SCK, PB14=MISO, PB15=MOSI)
-    GPIOB->CRH &= ~(0xF << 20 | 0xF << 24 | 0xF << 28);
-    GPIOB->CRH |=  (0xB << 20 | 0x8 << 24 | 0xB << 28);
-    GPIOB->ODR |= (1 << 14); // Pull-up for MISO
-
-    // SPI3 GPIO (PB3=SCK, PB4=MISO, PB5=MOSI)
-    AFIO->MAPR = (AFIO->MAPR & ~AFIO_MAPR_SWJ_CFG_Msk) | AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
-    GPIOB->CRL &= ~(0xF << 12 | 0xF << 20);
-    GPIOB->CRL |=  (0xB << 12 | 0xB << 20);
-    GPIOB->CRL &= ~(0xF << 16);
-    GPIOB->CRL |=  (0x8 << 16);
-    GPIOB->ODR |= (1 << 4);
-}
-
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -253,10 +228,9 @@ int main(void)
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
-  Hardware_GPIO_Init();
   MX_GPIO_Init();
   MX_CAN_Init();
-    MX_SPI2_Init();
+  // Đã xóa MX_SPI2_Init();
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 
@@ -812,44 +786,7 @@ static void MX_CAN_Init(void)
 }
 
 
-/**
-  * @brief SPI2 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI2_Init(void)
-{
-  __HAL_RCC_SPI2_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
-
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
-  GPIO_InitStruct.Pin = GPIO_PIN_13 | GPIO_PIN_15;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  GPIO_InitStruct.Pin = GPIO_PIN_14;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  hspi2.Instance = SPI2;
-  hspi2.Init.Mode = SPI_MODE_MASTER;
-  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
-  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi2.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi2) != HAL_OK)
-  {
-    Error_Handler();
-  }
-}
+// Đã xóa toàn bộ hàm MX_SPI2_Init vì thư viện SpiBus đã tự cấu hình Bare-metal
 
 /**
   * @brief GPIO Initialization Function
@@ -869,14 +806,6 @@ static void MX_GPIO_Init(void)
   /* USER CODE BEGIN MX_GPIO_Init_2 */
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE(); 
-
-  // Cau hinh chan PC8 (Output Push-Pull, 2MHz)
-  GPIOC->CRH = (GPIOC->CRH & ~(0xF << 0)) | (0x2 << 0);
-  GPIOC->BSRR = (1 << 8);
-  
-  // Cau hinh chan PB1 (Output Push-Pull, 2MHz)
-  GPIOB->CRL = (GPIOB->CRL & ~(0xF << 4)) | (0x2 << 4);
-  GPIOB->BRR = (1 << 1);
   
   //Cau hinh PA4 (Output Push-Pull, 2MHz)
   GPIOA->CRL = (GPIOA->CRL & ~(0xF << 16)) | (0x2 << 16);
