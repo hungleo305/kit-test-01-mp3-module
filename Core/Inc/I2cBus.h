@@ -21,15 +21,15 @@ private:
     uint8_t readByte(bool ack);
 
 public:
-    // 1a. Khởi tạo Hardware I2C (Dùng cấu hình có sẵn từ CubeMX)
+    // 1a. Khởi tạo Hardware I2C (Cấu hình sẵn Clock, GPIO, I2C qua CubeMX)
     I2cBus(I2C_TypeDef* i2c_instance);
     
-    // 1b. Khởi tạo Hardware I2C (Tự động cấu hình GPIO & I2C bằng Bare-metal)
+    // 1b. Khởi tạo Hardware I2C (Cấu hình GPIO & I2C qua thư viện)
     I2cBus(I2C_TypeDef* i2c_instance, 
            GPIO_TypeDef* sclPort, uint16_t sclPin,
            GPIO_TypeDef* sdaPort, uint16_t sdaPin);
     
-    // 2. Khởi tạo Software I2C
+    // 2. Khởi tạo I2C Mềm (Bit-banging)
     I2cBus(GPIO_TypeDef* sclPort, uint16_t sclPin,
            GPIO_TypeDef* sdaPort, uint16_t sdaPin);
     
@@ -39,7 +39,7 @@ public:
     bool WriteMem(uint8_t devAddr, uint8_t memAddr, uint8_t data);
     uint8_t ReadMem(uint8_t devAddr, uint8_t memAddr);
 
-    // Ghi trực tiếp 1 byte (Không qua thanh ghi, dùng cho PCF8574 LCD...)
+    // Ghi trực tiếp 1 byte
     bool WriteByte(uint8_t devAddr, uint8_t data);
     uint8_t ReadByteDirect(uint8_t devAddr);
 };
