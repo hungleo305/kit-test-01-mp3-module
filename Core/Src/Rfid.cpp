@@ -149,6 +149,7 @@ uint8_t Rfid::toCard(uint8_t command, uint8_t* sendData, uint8_t sendLen, uint8_
 
 
 void Rfid::writeRegister(uint8_t addr, uint8_t val) {
+    spi_bus->SetPrescaler(SPI_BAUDRATEPRESCALER_16);
     csLow();
     spi_bus->Transfer((addr << 1) & 0x7E);
     spi_bus->Transfer(val);
@@ -156,6 +157,7 @@ void Rfid::writeRegister(uint8_t addr, uint8_t val) {
 }
 
 uint8_t Rfid::readRegister(uint8_t addr) {
+    spi_bus->SetPrescaler(SPI_BAUDRATEPRESCALER_16);
     csLow();
     spi_bus->Transfer(((addr << 1) & 0x7E) | 0x80);
     uint8_t val = spi_bus->Transfer(0x00);
