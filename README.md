@@ -247,18 +247,48 @@ Sự kết hợp giữa `SdCard` (đọc thẻ vật lý) và `Mp3` (giải mã 
 - `void process()`: **QUAN TRỌNG NHẤT**. Đặt trong `while(1)`. Hàm này sẽ kiểm tra chân `DREQ`. Chân này ở mức CAO nghĩa là IC VS1011 chưa có dữ liệu. Hàm sẽ tự lấy 32 bytes từ Buffer đẩy qua SPI. Nếu quên hàm này, âm sẽ thanh không kêu.
 - `void saveState()` và `resumeState()`: **Hot-Plug (Cắm/rút nóng thẻ)**. Giúp ghi nhớ bài hát đang hát dở để khi cắm thẻ lại, bài hát tự hát tiếp vị trí vừa đứt.
 
-**Chi tiết thư viện SdCard và cầu nối FatFs:**
-Thư viện SdCard dành riêng cho thư viện hệ thống file FatFs.
-Khi gọi các hàm cấp cao của FatFs (như `f_mount`, `f_open`, `f_read`), FatFs sẽ mượn các hàm API vật lý của thư viện SdCard để tương tác trực tiếp với thẻ nhớ qua giao thức SPI. Cụ thể cơ chế như sau:
-- `SdCard::disk_initialize()`: FatFs gọi hàm này tự động khi chạy `f_mount`. Kéo chân CS xuống, bắn các chuỗi lệnh SPI sau để kích hoạt thẻ:
-  > - **CMD0 (GO_IDLE_STATE):** Reset thẻ và ép nó chuyển sang giao thức SPI.
-  > - **CMD8 (SEND_IF_COND):** Kiểm tra điều kiện điện áp hoạt động và phiên bản thẻ (SD V1/V2).
-  > - **CMD55 (APP_CMD):** Báo cho thẻ biết lệnh tiếp theo là lệnh chuyên dụng (ACMD).
-  > - **ACMD41 (SD_SEND_OP_COND):** Yêu cầu thẻ bắt đầu khởi động nội bộ và vòng lặp chờ nó sẵn sàng.
-  > - **CMD58 (READ_OCR):** Đọc thanh ghi OCR để phân biệt thẻ là SDSC (dung lượng chuẩn) hay SDHC/SDXC (dung lượng cao), từ đó thư viện sẽ lưu biến cờ cardType để tính địa chỉ Sector cho các lệnh đọc/ghi.
-- `SdCard::disk_status()`: FatFs gọi để kiểm tra xem thẻ còn cắm hay đã bị rút ra (dựa trên cờ flag).
-- `SdCard::disk_read()` / `disk_write()`: FatFs gọi khi cần đọc/ghi Data vào từng Sector (mỗi block 512 Bytes). Hàm này xử lý các mã lệnh vật lý là **CMD17 (READ_SINGLE_BLOCK)** để đọc 1 Sector, và **CMD24 (WRITE_BLOCK)** để ghi 1 Sector. Phải chờ tín hiệu token 0xFE (chuẩn bị đọc/ghi thành công).
-- `SdCard::disk_ioctl()`: Lấy thông số thẻ (Dung lượng, Sector count, Block size) để FatFs tính toán không gian đĩa FAT32.
+**Chi tiết thư viện SdCard và Cầu nối FatFs (Kiến trúc phân tầng):**
+Thư viện `SdCard` không hoạt động độc lập mà đóng vai trò là "Cầu nối" trong một kiến trúc 3 tầng:
+1. **Tầng Ứng dụng (`main.cpp`):** Chỉ cần gọi hàm cấp cao của FatFs như `f_mount`, `f_open` để mở file âm thanh.
+2. **Tầng Hệ điều hành File (`FatFs`):** FatFs làm nhiệm vụ dịch các yêu cầu mở file thành địa chỉ logic. Nhưng FatFs lại không biết cách giao tiếp SPI với STM32.
+3. **Tầng Vật lý (`SdCard.cpp`):** Đây chính là thư viện đóng vai trò làm giao tiếp qua SPI với STM32.
+
+**1. Khai báo thư viện SdCard:**
+```cpp
+// 1. Khai báo SPI cho thẻ nhớ
+SpiBus spi1_bus(SPI1, GPIOA, GPIO_PIN_5, GPIOA, GPIO_PIN_6, GPIOA, GPIO_PIN_7); 
+
+// 2. Khai báo SdCard với các chân điều khiển phụ
+// SdCard(SpiBus* spi_bus, CS_Port, CS_Pin, CD_Port, CD_Pin, PWR_Port, PWR_Pin)
+SdCard sdCard(&spi1_bus, GPIOC, 1<<8, GPIOB, 1<<0, GPIOB, 1<<1); 
+```
+> **Giải thích các chân:**
+> - **CS (Chip Select):** Chọn thẻ nhớ để giao tiếp SPI (kéo xuống LOW khi truyền).
+> - **CD (Card Detect):** Chân phát hiện có thẻ cắm vào khe hay không (thường bị kéo xuống LOW khi có thẻ).
+> - **PWR (Power Control):** Chân điều khiển transitor để cấp nguồn 3.3V cho thẻ nhớ.
+
+**2. Giao tiếp giữa FatFs và SdCard (Quy luật Hỏi - Đáp):**
+Để FatFs hoạt động được, nó yêu cầu thư viện `SdCard.cpp` phải cung cấp các hàm giao tiếp SPI với STM32. Khi FatFs cần, nó sẽ tự động gọi 5 hàm này:
+
+- **Hàm `SdCard::disk_initialize()`:** FatFs gọi hàm này khi bạn chạy lệnh `f_mount(&fs, "", 1)`. Hàm thực hiện 4 bước khởi tạo thẻ:
+  > - **CMD0 (Reset):** Kéo chân CS xuống LOW và gửi CMD0 để ép thẻ bỏ chuẩn mặc định, chuyển sang dùng chuẩn SPI.
+  > - **CMD8 (Kiểm tra điện áp):** Kiểm tra xem có tương thích điện áp 3.3V của mạch hay không.
+  > - **ACMD41 (Khởi động bộ nhớ):** Báo thẻ khởi động con chip Flash nội bộ. Quá trình này tốn thời gian nên MCU phải gửi liên tục cho tới khi thẻ báo xong *(Lưu ý: Phải gửi CMD55 mồi trước khi gửi ACMD41)*.
+  > - **CMD58 (Phân loại dung lượng):** Hỏi xem đây là thẻ nhỏ (SDSC) hay thẻ lớn (SDHC). Thẻ nhỏ đánh địa chỉ theo từng Byte, thẻ lớn đánh địa chỉ theo từng Cục (Block).
+
+- **Hàm `SdCard::disk_status()`:** FatFs gọi định kỳ để kiểm tra thẻ có bị rút ra đột ngột hay không (thông qua chân CD).
+
+- **Hàm `SdCard::disk_read()` / `disk_write()`:** Làm việc theo từng Block (1 Block = 512 Bytes). 
+  > - **CMD17 (Đọc 1 Block):** MCU gửi CMD17 + Địa chỉ Block. Thẻ tìm xong sẽ gửi ký hiệu `0xFE` rồi gửi 512 Bytes từ block đó ra.
+  > - **CMD24 (Ghi 1 Block):** MCU gửi CMD24 + Địa chỉ Block. Sau đó tự gửi `0xFE` và đẩy 512 Bytes vào block đó. Thẻ nhận xong sẽ kéo đường dây xuống LOW (BUSY) trong lúc tự chép vào Flash nội bộ.
+
+- **Hàm `SdCard::disk_ioctl()`:** Cung cấp thông số cấu hình thẻ cho FatFs.
+  > Trong dự án này, hàm ioctl làm 2 việc: Báo cho FatFs biết kích thước 1 Block luôn là 512 Bytes, và ra lệnh bắt MCU chờ thẻ ghi xong hoàn toàn (CTRL_SYNC) thì mới cho phép đóng file.
+
+**3. Ứng dụng thực tế: Cơ chế Hot-Plug (Cắm/Rút nóng)**
+Trong `main.cpp`, nhờ hàm `disk_status()`, vi điều khiển liên tục theo dõi chân Card Detect.
+- Nếu rút thẻ ra: MCU gọi `f_mount(NULL, "", 0)` để ngắt FATFS, sau đó gọi `mp3.saveState()` để lưu lại bài hát đang phát dở.
+- Nếu cắm thẻ vào: MCU cấp lại nguồn (`PWR`), gọi `f_mount(&fs, "", 1)` để khởi tạo lại thẻ, sau đó gọi `mp3.resumeState()` để hát tiếp bài cũ một cách liền mạch!
 
 > [!WARNING]
 > **KHUYẾN CÁO VỀ SPI MỀM (BIT-BANGING)**
@@ -269,10 +299,11 @@ Khi gọi các hàm cấp cao của FatFs (như `f_mount`, `f_open`, `f_read`), 
 **Lưu ý phần cứng đặc biệt:** 
 Kit hiện tại gắn thêm mạch khuếch đại (Amply) rời MIX2018A để kéo loa công suất cao. Nguồn Amply được điều khiển Mute bằng chân `PA4`. Phải bật chân `PA4` này lên (Bằng thanh ghi: `GPIOA->BRR = (1 << 4);`) trước khi phát nhạc.
 
-**Ví dụ Code hoàn chỉnh:**
+**Ví dụ Code hoàn chỉnh có hỗ trợ Hot-Plug (Cắm rút thẻ nóng):**
 ```cpp
 #include "Mp3.h"
 #include "SdCard.h"
+#include "SystemTimer.h"
 #include "ff.h" // FatFs
 
 // 1. Khai báo các đường bus SPI chung
@@ -286,24 +317,54 @@ Mp3 mp3(&spi2_bus, GPIOC, 1<<2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1
 FATFS fs;
 
 int main(void) {
+    SystemTimer::init(); // Khởi tạo hàm delay
     sdCard.init();
     mp3.init();
     mp3.setVolume(250, 250);
     
-    // Tắt Amply ban đầu bằng Register
+    // Tắt Amply ban đầu bằng Register (Giả sử chân PA4 nối với Mute Amply)
     GPIOA->BSRR = (1 << 4);
 
-    // Dùng hàm f_mount để mount thẻ. FatFs sẽ tự gọi khởi tạo vật lý của SdCard.
+    // Lần khởi động đầu tiên
     if (f_mount(&fs, "", 1) == FR_OK) {
         GPIOA->BRR = (1 << 4); // Bật Mạch Amply
-        
         mp3.play("XINCHAO.MP3"); 
-        mp3.play("SONG.MP3"); // Tự động hát nối đuôi
+        mp3.play("SONG.MP3"); // Tự động đưa vào hàng chờ
     }
 
+    bool cardWasPresent = sdCard.checkPhysicalPresence(); // Cờ trạng thái thẻ
+
     while (1) {
-        // Nhồi dữ liệu liên tục. Nếu không, loa sẽ tắt họng.
-        mp3.process(); 
+        // 1. Theo dõi trạng thái cắm thẻ (Hot-Plug)
+        bool hasCard = sdCard.checkPhysicalPresence(); 
+        
+        if (hasCard && !cardWasPresent) {
+            // --- SỰ KIỆN: VỪA CẮM THẺ VÀO ---
+            GPIOA->BSRR = (1 << 4); // Tạm tắt Amply để triệt tiêu tiếng "xẹt" nhiễu điện
+            SystemTimer::delay_ms(100);
+            
+            sdCard.powerOn(); // Cấp lại nguồn 3.3V cho thẻ
+            if (f_mount(&fs, "", 1) == FR_OK) {
+                GPIOA->BRR = (1 << 4); // Bật lại Amply
+                mp3.resumeState(); // 🟢 PHỤC HỒI & HÁT TIẾP VỊ TRÍ ĐANG HÁT DỞ!
+            }
+            cardWasPresent = true;
+        } 
+        else if (!hasCard && cardWasPresent) {
+            // --- SỰ KIỆN: VỪA RÚT THẺ RA ---
+            GPIOA->BSRR = (1 << 4); // Tắt Mute Amply lập tức
+            
+            mp3.saveState(); // 🔴 LƯU LẠI FILE VÀ VỊ TRÍ BÀI HÁT HIỆN TẠI
+            mp3.init(); // Reset IC giải mã âm thanh
+            f_mount(NULL, "", 0); // Ngắt kết nối FatFs an toàn
+            
+            cardWasPresent = false;
+        }
+
+        // 2. Nhồi dữ liệu liên tục để loa kêu
+        if (cardWasPresent) {
+            mp3.process(); 
+        }
     }
 }
 ```
