@@ -31,7 +31,7 @@ kit-test-01-mp3-module/
 │   │   └── SystemTimer.h   # Bộ đếm Non-blocking
 │   └── Src/                # Source code C/C++ (.cpp / .c)
 │       ├── main.cpp        # Chương trình chính
-│       ├── Sensor.cpp      # Tích hợp sẵn ngắt EXTI (EXTI15_10_IRQHandler) để đọc cảm biến
+│       ├── Sensor.cpp      
 │       ├── stm32f1xx_it.c  # File chứa các ngắt hệ thống (SysTick, HardFault)
 │       └── *.cpp           # (Các file mã nguồn tương ứng cho thư viện trong thư mục Inc/)
 ├── Drivers/                # Thư viện phần cứng (HAL) chính thức của hãng ST
@@ -40,7 +40,7 @@ kit-test-01-mp3-module/
 ├── FATFS/                  # Thư viện File System (FatFs) dùng để đọc thẻ SD
 ├── Middlewares/            # Các mã nguồn phần mềm trung gian liên quan đến FatFs
 ├── Firmware.ioc            # File cấu hình đồ họa hệ thống cho STM32CubeMX
-├── kit_vna_can.dbc         # Database ánh xạ dữ liệu CAN sang tiếng Việt (Cho Cangaroo)
+├── kit_vna_can.dbc         # Database ánh xạ dữ liệu CAN cho Cangaroo
 └── README.md               # Tài liệu đang đọc
 ```
 
@@ -57,7 +57,7 @@ Phần này hướng dẫn chi tiết cách vận hành mạch từ lúc cắm �
   2. **Giờ hiện tại (Giờ:Phút):** Dấu chấm ở giữa màn hình sẽ **NHẤP NHÁY** theo từng giây.
 
 ### 3.2. Tín hiệu Còi (Buzzer) và Cảnh báo
-Hệ thống còi bíp đã được tinh chỉnh để chạy hoàn toàn đa nhiệm (có hàng chờ thông minh) nên các tiếng bíp sẽ lần lượt phát ra mượt mà, không bao giờ bị dính hoặc nuốt tiếng của nhau. 
+Hệ thống còi bíp đã được tinh chỉnh để chạy hoàn toàn đa nhiệm (có hàng chờ) nên các tiếng bíp sẽ lần lượt phát ra mượt mà, không bao giờ bị dính hoặc nuốt tiếng của nhau. 
 
 Mạch được quy định phản hồi các thao tác thông qua số lượng tiếng bíp như sau:
 
