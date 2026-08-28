@@ -480,11 +480,30 @@ int main(void) {
 
 ### 4.7. Giao thức I2C đa năng (`I2cBus`), Module Thời gian thực DS1307 (`Rtc`) & Thanh ghi Sao lưu (BKP)
 
-**Kiến trúc cốt lõi xử lý mọi giao tiếp I2C cho hệ thống (`I2cBus`):**
-Tương tự như `SpiBus`, thư viện này hỗ trợ 3 chế độ hoạt động:
-- **Chế độ 1 - Dựa dẫm CubeMX:** (Ví dụ: `I2cBus i2c1(I2C1);`) - Bạn tự cấu hình Clock, GPIO, I2C trên CubeMX.
-- **Chế độ 2 - Cấu hình Bare-metal tự động:** (Ví dụ: `I2cBus i2c1(I2C1, GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);`) - Tự cấu hình thanh ghi Clock và Open-Drain cho chuẩn I2C 100kHz.
-- **Chế độ 3 - I2C Mềm (Bit-banging):** (Ví dụ: `I2cBus i2c_soft(GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);`) - Truyền duy nhất cặp chân GPIO. Thư viện sẽ dùng CPU đóng ngắt liên tục để tạo ra xung I2C.
+**Quy trình 4 bước để làm chủ thư viện `I2cBus`:**
+
+**Bước 1: Khai báo đối tượng (Chọn 1 trong 3 chế độ)**
+Tương tự như `SpiBus`, thư viện này hỗ trợ 3 chế độ hoạt động để phù hợp với mọi project:
+- **Chế độ 1 - Dựa dẫm CubeMX:** (Ví dụ: `I2cBus i2c1(I2C1);`) - Dành cho ai đã tự cấu hình sẵn Clock, GPIO, I2C trên giao diện CubeMX.
+- **Chế độ 2 - Tự động 100% (Bare-metal):** (Ví dụ: `I2cBus i2c1(I2C1, GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);`) - Cực kỳ rảnh tay. Thư viện sẽ tự chọc thẳng vào thanh ghi để bật Clock và cấu hình chân Open-Drain chuẩn I2C 100kHz. Bạn không cần làm gì trên phần mềm CubeMX cả.
+- **Chế độ 3 - I2C Mềm (Bit-banging):** (Ví dụ: `I2cBus i2c_soft(GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);`) - Cứu cánh khi hết chân I2C cứng. Chỉ cần truyền vào 2 chân GPIO bất kỳ, thư viện sẽ tự dùng CPU nhấp nháy tạo ra xung I2C.
+
+**Bước 2: Khởi tạo phần cứng (Gọi hàm Init)**
+- Bắt buộc phải gọi hàm `i2c1.Init();` một lần duy nhất ở trong hàm `main()` (trước khi vào vòng lặp `while(1)`) để các cấu hình ở Bước 1 thực sự được ghi vào chip.
+
+**Bước 3: Chia sẻ Bus cho các thiết bị con (Dependency Injection)**
+- Kiến trúc chuẩn OOP cho phép nhiều thiết bị dùng chung 1 đường truyền I2C.
+- Thay vì cấu hình I2C lộn xộn trong từng file con, bạn chỉ cần ném con trỏ (Pointer) của đường truyền vào cho chúng:
+  Ví dụ: `Rtc rtc(&i2c1);` hoặc `Eeprom eeprom(&i2c1);`. Các hàm bên trong `Rtc` sẽ tự động mượn con trỏ này để gọi các hàm gửi/nhận ở Bước 4.
+
+**Bước 4: Sử dụng API Đọc/Ghi Dữ liệu**
+Thư viện cung cấp sẵn 2 bộ hàm giao tiếp tương ứng với 2 kiểu thiết bị I2C phổ biến trên thị trường:
+1. **Thiết bị phức tạp (Có chứa nhiều thanh ghi/ô nhớ bên trong như RTC, EEPROM, Cảm biến...):**
+   - Yêu cầu ra lệnh theo quy trình 3 bước: `Địa chỉ thiết bị` -> `Địa chỉ thanh ghi` -> `Dữ liệu`.
+   - Hàm sử dụng: `WriteMem(devAddr, memAddr, data)` và `ReadMem(devAddr, memAddr)`.
+2. **Thiết bị đơn giản (Không chứa thanh ghi như IC mở rộng chân PCF8574 cho màn hình LCD):**
+   - Yêu cầu ra lệnh theo quy trình 2 bước ngắn gọn: `Địa chỉ thiết bị` -> `Dữ liệu` (Dữ liệu sẽ ngay lập tức được xuất thẳng ra các chân tín hiệu của IC thay vì lưu vào ô nhớ).
+   - Hàm sử dụng: `WriteByte(devAddr, data)` và `ReadByteDirect(devAddr)`.
 
 **Thư viện DS1307 (`Rtc`) & BKP:**
 DS1307 là chip đồng hồ giao tiếp I2C. Trên MCU STM32F1 có cụm 42 thanh ghi 16-bit (`BKP->DR1` đến `BKP->DR42`) sử dụng chung nguồn của Pin CMOS 3V cấp cho RTC.
