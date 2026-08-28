@@ -56,8 +56,18 @@ void SpiBus::Init() {
     enable_gpio_clock(misoPort);
     enable_gpio_clock(mosiPort);
     
+    // Tự động tắt JTAG (giữ lại SWD) nếu vô tình sử dụng các chân cấu hình JTAG (PA15, PB3, PB4, PB5)
     GPIO_TypeDef* ports[] = {sckPort, misoPort, mosiPort};
     uint16_t pins[] = {sckPin, misoPin, mosiPin};
+    
+    for (int i = 0; i < 3; i++) {
+        if ((ports[i] == GPIOB && (pins[i] == (1<<3) || pins[i] == (1<<4) || pins[i] == (1<<5))) ||
+            (ports[i] == GPIOA && pins[i] == (1<<15))) {
+            RCC->APB2ENR |= RCC_APB2ENR_AFIOEN; // Bật Clock cho AFIO
+            AFIO->MAPR = (AFIO->MAPR & ~AFIO_MAPR_SWJ_CFG_Msk) | AFIO_MAPR_SWJ_CFG_JTAGDISABLE;
+            break;
+        }
+    }
     
     if (isSoftware) {
         uint8_t modes[] = {0x3, 0x4, 0x3}; // SCK: Output PP, MISO: Input Float, MOSI: Output PP
