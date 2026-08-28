@@ -339,22 +339,22 @@ int main(void) {
         bool hasCard = sdCard.checkPhysicalPresence(); 
         
         if (hasCard && !cardWasPresent) {
-            // --- SỰ KIỆN: VỪA CẮM THẺ VÀO ---
+            //Cắm thẻ
             GPIOA->BSRR = (1 << 4); // Tạm tắt Amply để triệt tiêu tiếng "xẹt" nhiễu điện
             SystemTimer::delay_ms(100);
             
             sdCard.powerOn(); // Cấp lại nguồn 3.3V cho thẻ
             if (f_mount(&fs, "", 1) == FR_OK) {
                 GPIOA->BRR = (1 << 4); // Bật lại Amply
-                mp3.resumeState(); // 🟢 PHỤC HỒI & HÁT TIẾP VỊ TRÍ ĐANG HÁT DỞ!
+                mp3.resumeState(); // PHỤC HỒI & HÁT TIẾP VỊ TRÍ ĐANG HÁT DỞ!
             }
             cardWasPresent = true;
         } 
         else if (!hasCard && cardWasPresent) {
-            // --- SỰ KIỆN: VỪA RÚT THẺ RA ---
+            //Rút thẻ
             GPIOA->BSRR = (1 << 4); // Tắt Mute Amply lập tức
             
-            mp3.saveState(); // 🔴 LƯU LẠI FILE VÀ VỊ TRÍ BÀI HÁT HIỆN TẠI
+            mp3.saveState(); // LƯU LẠI FILE VÀ VỊ TRÍ BÀI HÁT HIỆN TẠI
             mp3.init(); // Reset IC giải mã âm thanh
             f_mount(NULL, "", 0); // Ngắt kết nối FatFs an toàn
             
