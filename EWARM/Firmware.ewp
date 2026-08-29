@@ -286,7 +286,7 @@
                 <option>
                     <name>CCAllowList</name>
                     <version>1</version>
-                    <state>00000000</state>
+                    <state>11111110</state>
                 </option>
                 <option>
                     <name>CCDebugInfo</name>
@@ -373,16 +373,16 @@
                 </option>
                 <option>
                     <name>CCOptLevel</name>
-                    <state>0</state>
+                    <state>3</state>
                 </option>
                 <option>
                     <name>CCOptStrategy</name>
                     <version>0</version>
-                    <state>1</state>
+                    <state>2</state>
                 </option>
                 <option>
                     <name>CCOptLevelSlave</name>
-                    <state>0</state>
+                    <state>3</state>
                 </option>
                 <option>
                     <name>CompilerMisraRules98</name>
@@ -441,7 +441,7 @@
                 <option>
                     <name>CCOptStrategySlave</name>
                     <version>0</version>
-                    <state>1</state>
+                    <state>2</state>
                 </option>
                 <option>
                     <name>CCGuardCalls</name>
@@ -1090,6 +1090,12 @@
                     <name>$PROJ_DIR$\..\Core\Inc\CanBus.h</name>
                 </file>
                 <file>
+                    <name>$PROJ_DIR$\..\Core\Src\I2cBus.cpp</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\Core\Inc\I2cBus.h</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\..\Core\Src\Led.cpp</name>
                 </file>
                 <file>
@@ -1139,6 +1145,9 @@
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\Core\Inc\Sensor.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\Core\Src\SpiBus.cpp</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\Core\Src\stm32f1xx_hal_msp.c</name>

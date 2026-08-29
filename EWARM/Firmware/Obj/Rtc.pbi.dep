@@ -32,4 +32,5 @@ Rtc.pbi: F:\tts\ vnatech\kit-test-01-mp3-module\Core\Src\Rtc.cpp \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc\stm32f1xx_hal_flash.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_flash_ex.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc\stm32f1xx_hal_pwr.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc\stm32f1xx_hal_spi.h
+  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc\stm32f1xx_hal_spi.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc/I2cBus.h

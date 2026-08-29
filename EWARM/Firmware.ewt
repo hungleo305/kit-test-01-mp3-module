@@ -1210,6 +1210,12 @@
                     <name>$PROJ_DIR$\..\Core\Inc\CanBus.h</name>
                 </file>
                 <file>
+                    <name>$PROJ_DIR$\..\Core\Src\I2cBus.cpp</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\Core\Inc\I2cBus.h</name>
+                </file>
+                <file>
                     <name>$PROJ_DIR$\..\Core\Src\Led.cpp</name>
                 </file>
                 <file>
@@ -1259,6 +1265,9 @@
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\Core\Inc\Sensor.h</name>
+                </file>
+                <file>
+                    <name>$PROJ_DIR$\..\Core\Src\SpiBus.cpp</name>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\Core\Src\stm32f1xx_hal_msp.c</name>

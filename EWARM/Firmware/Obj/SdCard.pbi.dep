@@ -1,5 +1,6 @@
 SdCard.pbi: \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM\..\Core\Inc\SystemTimer.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM\..\Core\Inc\SpiBus.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM\..\Drivers\STM32F1xx_HAL_Driver\Inc\stm32f1xx_hal_spi.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM\..\Drivers\STM32F1xx_HAL_Driver\Inc\stm32f1xx_hal_pwr.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM\..\Drivers\STM32F1xx_HAL_Driver\Inc\stm32f1xx_hal_flash_ex.h \

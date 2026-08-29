@@ -1,7 +1,9 @@
 Mp3.pbi: \
+  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM\..\Core\Inc\SystemTimer.h \
   C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\DLib_Product_string.h \
   C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\ycheck.h \
   C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\string.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM\..\Core\Inc\SpiBus.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM\..\FATFS\Target\user_diskio.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM\..\Middlewares\Third_Party\FatFs\src\diskio.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM\..\Middlewares\Third_Party\FatFs\src\ff_gen_drv.h \
