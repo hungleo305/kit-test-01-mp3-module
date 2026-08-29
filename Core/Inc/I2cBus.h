@@ -19,6 +19,7 @@ private:
     void stopCond();
     bool sendByte(uint8_t data);
     uint8_t readByte(bool ack);
+    void resetBus();
 
 public:
     // 1a. Khởi tạo Hardware I2C (Cấu hình sẵn Clock, GPIO, I2C qua CubeMX)

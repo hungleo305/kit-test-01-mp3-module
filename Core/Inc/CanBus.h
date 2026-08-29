@@ -1,4 +1,4 @@
-﻿#ifndef CANBUS_H
+#ifndef CANBUS_H
 #define CANBUS_H
 
 #include "stm32f1xx_hal.h"
@@ -13,7 +13,7 @@ private:
 public:
     CanBus(CAN_HandleTypeDef* hcan_ptr);
     
-    void init();
+    void init(uint32_t filterId = 0x0000, uint32_t filterMask = 0x0000);
     
     bool sendFrame(uint32_t id, uint8_t* data, uint8_t length);
 

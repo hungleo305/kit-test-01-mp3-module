@@ -1,18 +1,18 @@
-﻿#include "CanBus.h"
+#include "CanBus.h"
 
 CanBus::CanBus(CAN_HandleTypeDef* hcan_ptr) {
     hcan = hcan_ptr;
 }
 
-void CanBus::init() {
+void CanBus::init(uint32_t filterId, uint32_t filterMask) {
     CAN_FilterTypeDef canFilterConfig;
     
     canFilterConfig.FilterBank = 0;
     canFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
     canFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
-    canFilterConfig.FilterIdHigh = 0x0000;
+    canFilterConfig.FilterIdHigh = (filterId << 5);
     canFilterConfig.FilterIdLow = 0x0000;
-    canFilterConfig.FilterMaskIdHigh = 0x0000;
+    canFilterConfig.FilterMaskIdHigh = (filterMask << 5);
     canFilterConfig.FilterMaskIdLow = 0x0000;
     canFilterConfig.FilterFIFOAssignment = CAN_RX_FIFO0;
     canFilterConfig.FilterActivation = ENABLE;
@@ -34,6 +34,10 @@ bool CanBus::sendFrame(uint32_t id, uint8_t* data, uint8_t length) {
     TxHeader.IDE = CAN_ID_STD;
     TxHeader.DLC = length;
     TxHeader.TransmitGlobalTime = DISABLE;
+
+    uint32_t timeout = 50000;
+    while (HAL_CAN_GetTxMailboxesFreeLevel(hcan) == 0 && --timeout);
+    if (timeout == 0) return false;
 
     if (HAL_CAN_AddTxMessage(hcan, &TxHeader, data, &TxMailbox) == HAL_OK) {
         return true;

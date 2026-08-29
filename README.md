@@ -577,7 +577,7 @@ Vì bộ thư viện này giao phó việc thiết lập phần cứng cho HAL, 
 ![Cấu hình CubeMX CAN](docs/cubemx_can.png)
 
 **2. Hàm API chi tiết:**
-- `init()`: Cài đặt tốc độ Baudrate, mở bộ lọc (chấp nhận mọi ID) và kích hoạt ngắt.
+- `init(uint32_t filterId = 0x0000, uint32_t filterMask = 0x0000)`: Kích hoạt ngắt và cài đặt bộ lọc (Filter). Mặc định là chấp nhận mọi ID. Nếu chỉ muốn nhận bản tin có ID `0x202`, hãy gọi `init(0x202, 0x7FF)`.
 - `sendFrame(uint32_t id, uint8_t* data, uint8_t len)`: Đẩy bản tin. Tối đa 8 byte.
 - `readFrame(uint32_t* id, uint8_t* data, uint8_t* len)`: Hàm lấy bản tin từ biến nội bộ. (Được gọi bên trong ngắt RxFifo0).
 
@@ -619,7 +619,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
 
 ---
 
-### 4.9. Thư viện `Led7Segment` (CD4094 Multiplexing)
+### 4.9. Thư viện `Led7Segment` (CD4094)
 Thư viện quét với IC thanh ghi dịch 3 chân (Data, Clock, Strobe/Latch).
 
 **Hàm API chi tiết:**
@@ -657,7 +657,7 @@ Thư viện quản lý bộ đếm Tick của hệ thống (dựa trên ngắt S
 - `getTick()`: Trả về giá trị đếm hiện tại (số mili-giây kể từ lúc khởi động).
 - `delay_ms(uint32_t ms)`: Hàm delay cơ bản (Blocking). Dùng trong lúc khởi tạo phần cứng.
 
-**Mẫu code Non-blocking điển hình:**
+**Ví dụ mẫu:**
 Sử dụng getTick() để kiểm tra xem đã hết thời gian chờ chưa, trong lúc chờ MCU vẫn rảnh rang chạy các tác vụ khác.
 ```cpp
 #include "SystemTimer.h"

@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <string.h>
+#include <stdio.h>
 #include "SystemTimer.h"
 #include "Led.h"
 #include "Buzzer.h"
@@ -278,7 +279,7 @@ int main(void)
     }
   
   dp.setColon(false);
-  dp.setValue(0);
+  dp.setValue(productCount);
   dp.update();
   
   
@@ -603,9 +604,14 @@ int main(void)
                                             buzzer.beep(2, 100, 100); // đã bật rồi, bỏ qua
                                             readStatus = 0x01;
                                         } else {
-                                            if (!mp3.play("BAT.MP3")) { 
-
-                                              buzzer.beep(3, 100, 100); 
+                                            char uidFilename[13];
+                                            snprintf(uidFilename, sizeof(uidFilename), "%02X%02X%02X%02X.MP3", 
+                                                     uidTheHienTai[0], uidTheHienTai[1], uidTheHienTai[2], uidTheHienTai[3]);
+                                                     
+                                            if (!mp3.play(uidFilename)) { 
+                                                if (!mp3.play("BAT.MP3")) {
+                                                    buzzer.beep(3, 100, 100); 
+                                                }
                                             }
                                             dp.turnOff();
                                             relay.on();
@@ -615,9 +621,14 @@ int main(void)
                                         }
                                     }
                                     else if (strncmp((char*)readData, "DAO_RELAY", 9) == 0) {
-                                        if (!mp3.play("DAO.MP3")) { 
-
-                                          buzzer.beep(3, 100, 100); 
+                                        char uidFilename[13];
+                                        snprintf(uidFilename, sizeof(uidFilename), "%02X%02X%02X%02X.MP3", 
+                                                 uidTheHienTai[0], uidTheHienTai[1], uidTheHienTai[2], uidTheHienTai[3]);
+                                                 
+                                        if (!mp3.play(uidFilename)) { 
+                                            if (!mp3.play("DAO.MP3")) {
+                                                buzzer.beep(3, 100, 100); 
+                                            }
                                         }
                                         dp.turnOff();
                                         relay.toggle();
@@ -674,39 +685,40 @@ int main(void)
           }
     }
     
-    //6:gui du lieu can rtc vs cam bien
-    if(currentTick - lastCanSend >= 500){
-      uint8_t frame102[6] = {0};
-      uint16_t currentCount = productCount; 
-      uint16_t currentTarget = mucTieu;
-      // Đổi sang dạng Little Endian để trùng khớp với Cangaroo (.dbc)
-        frame102[0] = currentCount & 0xFF;
-        frame102[1] = (currentCount >> 8) & 0xFF;
-        frame102[2] = currentTarget & 0xFF;
-        frame102[3] = (currentTarget >> 8) & 0xFF;
-        frame102[4] = cycleCount & 0xFF;
-        frame102[5] = (cycleCount >> 8) & 0xFF;
-        
-      myCan.sendFrame(0x102, frame102, 6);
-      
-      uint8_t h, m, s;
+    // Doc RTC moi 500ms de tranh nghe I2C (Blocking) lam cham he thong
+    static uint32_t lastRtcRead = 0;
+    static uint8_t h = 0, m = 0, s = 0, dow = 0, date = 0, month = 0, year = 0;
+    if (currentTick - lastRtcRead >= 500) {
         rtc.getTime(h, m, s);
-        uint8_t dow, date, month, year;
         rtc.getDate(dow, date, month, year);
-        
-        uint8_t frame103[7];
-        // Truyền thẳng dạng thập phân (Decimal) thay vì BCD để Cangaroo hiển thị chuẩn
-        frame103[0] = h; 
-        frame103[1] = m; 
-        frame103[2] = s; 
-        frame103[3] = date;
-        frame103[4] = month;
-        frame103[5] = year;
-        frame103[6] = dow;
-        
-        myCan.sendFrame(0x103, frame103, 7);
-      lastCanSend = currentTick;
+        lastRtcRead = currentTick;
     }
+
+    //6:gui du lieu can rtc vs cam bien LIEN TUC
+    uint8_t frame102[6] = {0};
+    uint16_t currentCount = productCount; 
+    uint16_t currentTarget = mucTieu;
+    // Đổi sang dạng Little Endian để trùng khớp với Cangaroo (.dbc)
+    frame102[0] = currentCount & 0xFF;
+    frame102[1] = (currentCount >> 8) & 0xFF;
+    frame102[2] = currentTarget & 0xFF;
+    frame102[3] = (currentTarget >> 8) & 0xFF;
+    frame102[4] = cycleCount & 0xFF;
+    frame102[5] = (cycleCount >> 8) & 0xFF;
+    
+    myCan.sendFrame(0x102, frame102, 6);
+    
+    uint8_t frame103[7];
+    // Truyền thẳng dạng thập phân (Decimal) thay vì BCD để Cangaroo hiển thị chuẩn
+    frame103[0] = h; 
+    frame103[1] = m; 
+    frame103[2] = s; 
+    frame103[3] = date;
+    frame103[4] = month;
+    frame103[5] = year;
+    frame103[6] = dow;
+    
+    myCan.sendFrame(0x103, frame103, 7);
   }
   /* USER CODE END 3 */
 }
@@ -768,8 +780,8 @@ static void MX_CAN_Init(void)
   hcan.Init.Prescaler = 9;
   hcan.Init.Mode = CAN_MODE_NORMAL;
   hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
-  hcan.Init.TimeSeg1 = CAN_BS1_13TQ;
-  hcan.Init.TimeSeg2 = CAN_BS2_2TQ;
+  hcan.Init.TimeSeg1 = CAN_BS1_6TQ; // 500kbps (36MHz / 9 / (1 + 6 + 1))
+  hcan.Init.TimeSeg2 = CAN_BS2_1TQ;
   hcan.Init.TimeTriggeredMode = DISABLE;
   hcan.Init.AutoBusOff = ENABLE;
   hcan.Init.AutoWakeUp = DISABLE;
