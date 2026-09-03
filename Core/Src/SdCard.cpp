@@ -1,5 +1,5 @@
 #include "SdCard.h"
-#include "SystemTimer.h"
+#include "stm32f1xx_hal.h"
 
 #define SD_DUMMY_BYTE 0xFF
 
@@ -60,19 +60,19 @@ bool SdCard::checkPhysicalPresence() {
     int debounce = 0;
     for (int i = 0; i < 10; i++) {
         if ((cdPort->IDR & cdPin) == 0) debounce++;
-        SystemTimer::delay_ms(1);
+        HAL_Delay(1);
     }
     return (debounce > 8);
 }
 
 void SdCard::powerOn() {
     pwrPort->BRR = pwrPin; 
-    SystemTimer::delay_ms(50);
+    HAL_Delay(50);
 }
 
 void SdCard::powerOff() {
     pwrPort->BSRR = pwrPin;
-    SystemTimer::delay_ms(50);
+    HAL_Delay(50);
 }
 
 void SdCard::csLow() {
@@ -95,10 +95,10 @@ void SdCard::setSpiSpeedFast() {
 
 uint8_t SdCard::waitReady() {
     uint8_t res;
-    uint32_t tickstart = SystemTimer::getTick();
+    uint32_t tickstart = HAL_GetTick();
     do {
         res = spi_bus->Transfer(SD_DUMMY_BYTE);
-    } while (res != 0xFF && (SystemTimer::getTick() - tickstart) < 500);
+    } while (res != 0xFF && (HAL_GetTick() - tickstart) < 500);
     return res;
 }
 
@@ -146,7 +146,7 @@ uint8_t SdCard::initialize() {
    
     setSpiSpeedSlow(); 
     csHigh();
-    SystemTimer::delay_ms(10); 
+    HAL_Delay(10); 
     
     for (int i = 0; i < 100; i++) {
         spi_bus->Transfer(SD_DUMMY_BYTE);
@@ -158,7 +158,7 @@ uint8_t SdCard::initialize() {
         cmd0_res = sendCmd(0, 0); 
         if (cmd0_res == 1) break;
         csHigh();
-        SystemTimer::delay_ms(10);
+        HAL_Delay(10);
     }
     
     cardType = 0;
@@ -168,14 +168,14 @@ uint8_t SdCard::initialize() {
             for (int i = 0; i < 4; i++) ocr[i] = spi_bus->Transfer(SD_DUMMY_BYTE); 
             
             if (ocr[2] == 0x01 && ocr[3] == 0xAA) {
-                uint32_t tickstart = SystemTimer::getTick();
+                uint32_t tickstart = HAL_GetTick();
                 do {
                     sendCmd(55, 0);
                     if (sendCmd(41, 1UL << 30) == 0) { 
                         stat &= ~0x01; 
                         break;
                     }
-                } while ((SystemTimer::getTick() - tickstart) < 2000);
+                } while ((HAL_GetTick() - tickstart) < 2000);
                 
                 if (!(stat & 0x01) && sendCmd(58, 0) == 0) {
                     for (int i = 0; i < 4; i++) ocr[i] = spi_bus->Transfer(SD_DUMMY_BYTE);
@@ -185,14 +185,14 @@ uint8_t SdCard::initialize() {
                 }
             }
         } else {
-            uint32_t tickstart = SystemTimer::getTick();
+            uint32_t tickstart = HAL_GetTick();
             do {
                 sendCmd(55, 0);
                 if (sendCmd(41, 0) == 0) { 
                     stat &= ~0x01; 
                     break;
                 }
-            } while ((SystemTimer::getTick() - tickstart) < 2000);
+            } while ((HAL_GetTick() - tickstart) < 2000);
         }
     }
     
@@ -211,9 +211,9 @@ uint8_t SdCard::read(uint8_t *buff, uint32_t sector, uint32_t count) {
     
     if (count == 1) {
         if (sendCmd(17, sector) == 0) { 
-            uint32_t tickstart = SystemTimer::getTick();
+            uint32_t tickstart = HAL_GetTick();
             while (spi_bus->Transfer(SD_DUMMY_BYTE) != 0xFE) {
-                if ((SystemTimer::getTick() - tickstart) > 500) { csHigh(); return 1; }
+                if ((HAL_GetTick() - tickstart) > 500) { csHigh(); return 1; }
             }
             spi_bus->TransferDMA(nullptr, buff, 512);
             spi_bus->Transfer(SD_DUMMY_BYTE); spi_bus->Transfer(SD_DUMMY_BYTE); 
@@ -222,11 +222,11 @@ uint8_t SdCard::read(uint8_t *buff, uint32_t sector, uint32_t count) {
     } else {
         if (sendCmd(18, sector) == 0) {
             do {
-                uint32_t tickstart = SystemTimer::getTick();
+                uint32_t tickstart = HAL_GetTick();
                 uint8_t token;
                 do {
                     token = spi_bus->Transfer(SD_DUMMY_BYTE);
-                } while (token == 0xFF && (SystemTimer::getTick() - tickstart) < 500);
+                } while (token == 0xFF && (HAL_GetTick() - tickstart) < 500);
                 
                 if (token != 0xFE) break;
                 
@@ -302,5 +302,6 @@ extern "C" {
     uint8_t sdCard_write(const uint8_t *buff, uint32_t sector, uint32_t count) { return sdCard.write(buff, sector, count); }
     uint8_t sdCard_ioctl(uint8_t cmd, void *buff) { return sdCard.ioctl(cmd, buff); }
 }
+
 
 

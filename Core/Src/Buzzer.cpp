@@ -1,5 +1,5 @@
 #include "Buzzer.h"
-#include "SystemTimer.h"
+#include "stm32f1xx_hal.h"
 
 Buzzer::Buzzer(GPIO_TypeDef* port, uint16_t pin) : port(port), pin(pin) {}
 
@@ -45,7 +45,7 @@ void Buzzer::playNext() {
         count--;
         
         isPulsing = true;
-        lastTick = SystemTimer::getTick();
+        lastTick = HAL_GetTick();
         on();
     }
 }
@@ -63,7 +63,7 @@ void Buzzer::beep(int times, int timeOn, int timeOff, bool instant) {
         tOn = timeOn;
         tOff = timeOff;
         isPulsing = true;
-        lastTick = SystemTimer::getTick();
+        lastTick = HAL_GetTick();
         on();
     } else {
         // Them vao hang doi
@@ -85,7 +85,7 @@ void Buzzer::beep(int times, int timeOn, int timeOff, bool instant) {
 void Buzzer::update() {
     if (remainingBeeps == 0) return;
 
-    uint32_t currentTick = SystemTimer::getTick();
+    uint32_t currentTick = HAL_GetTick();
 
     if (isPulsing) {
         if (currentTick - lastTick >= tOn) {
@@ -106,3 +106,4 @@ void Buzzer::update() {
         }
     }
 }
+

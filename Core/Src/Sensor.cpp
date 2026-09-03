@@ -1,5 +1,5 @@
-﻿#include "Sensor.h"
-#include "SystemTimer.h"
+#include "Sensor.h"
+#include "stm32f1xx_hal.h"
 
 Sensor::Sensor(GPIO_TypeDef* port, uint16_t pin) : port(port), pin(pin), lastInterruptTick(0), onDetectCallback(nullptr), isDetected(false) {}
 
@@ -25,7 +25,7 @@ void Sensor::init(TriggerEdge edge) {
         port->CRH &= ~(0xF << ((pinIndex - 8) * 4));
         port->CRH |= (0x8 << ((pinIndex - 8) * 4));  
     }
-    port->ODR |= pin; // Kéo trở Pull-up
+    port->ODR |= pin; // K�o tr? Pull-up
     
     uint32_t portIndex = (port == GPIOA) ? 0 : (port == GPIOB) ? 1 : (port == GPIOC) ? 2 : 3;
     AFIO->EXTICR[pinIndex / 4] &= ~(0xF << ((pinIndex % 4) * 4));
@@ -56,7 +56,7 @@ void Sensor::handleInterrupt(uint16_t extiPin) {
     if (EXTI->PR & extiPin) {
         EXTI->PR = extiPin; 
         
-        uint32_t currentTick = SystemTimer::getTick();
+        uint32_t currentTick = HAL_GetTick();
         
         if (currentTick - lastInterruptTick > 20) {
             if (onDetectCallback) onDetectCallback();
@@ -65,3 +65,4 @@ void Sensor::handleInterrupt(uint16_t extiPin) {
         }
     }
 }
+

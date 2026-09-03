@@ -1,4 +1,5 @@
 #include "SpiBus.h"
+#include "stm32f1xx_hal.h"
 
 // 1a. Khởi tạo Hardware SPI (Dùng cấu hình có sẵn từ CubeMX)
 SpiBus::SpiBus(SPI_TypeDef* spi_instance)
@@ -60,6 +61,13 @@ void SpiBus::Init() {
             dma_tx = DMA1_Channel5;
         }
 #endif
+#ifdef SPI3
+        else if (hspi == SPI3) {
+            RCC->AHBENR |= RCC_AHBENR_DMA2EN;
+            dma_rx = DMA2_Channel1;
+            dma_tx = DMA2_Channel2;
+        }
+#endif
         
         // NHƯNG HAL_SPI_Init không tự bật SPE, nên ta phải bật nó ở đây.
         hspi->CR1 |= SPI_CR1_SPE;
@@ -115,7 +123,9 @@ void SpiBus::Init() {
 #ifdef SPI3
         else if (hspi == SPI3) {
             RCC->APB1ENR |= RCC_APB1ENR_SPI3EN;
-            // SPI3 uses DMA2, ignoring for now if not needed
+            RCC->AHBENR |= RCC_AHBENR_DMA2EN;
+            dma_rx = DMA2_Channel1;
+            dma_tx = DMA2_Channel2;
         }
 #endif
         
@@ -197,9 +207,12 @@ void SpiBus::TransferDMA(const uint8_t* tx_data, uint8_t* rx_data, uint16_t size
     dma_rx->CCR &= ~DMA_CCR_EN;
     dma_tx->CCR &= ~DMA_CCR_EN;
     
-    // Xóa cờ ngắt cũ (CGIF2/3 cho SPI1, 4/5 cho SPI2)
+    // Xóa cờ ngắt cũ (CGIF2/3 cho SPI1, 4/5 cho SPI2, 1/2 cho SPI3)
     if (dma_rx == DMA1_Channel2) DMA1->IFCR = DMA_IFCR_CGIF2 | DMA_IFCR_CGIF3;
     else if (dma_rx == DMA1_Channel4) DMA1->IFCR = DMA_IFCR_CGIF4 | DMA_IFCR_CGIF5;
+#ifdef SPI3
+    else if (dma_rx == DMA2_Channel1) DMA2->IFCR = DMA_IFCR_CGIF1 | DMA_IFCR_CGIF2;
+#endif
     
     // Cấu hình DMA RX
     dma_rx->CPAR = (uint32_t)&hspi->DR;
@@ -220,14 +233,28 @@ void SpiBus::TransferDMA(const uint8_t* tx_data, uint8_t* rx_data, uint16_t size
     dma_rx->CCR |= DMA_CCR_EN;
     dma_tx->CCR |= DMA_CCR_EN;
     
-    // Chờ DMA RX xong (Cờ TC - Transfer Complete) có timeout
-    uint32_t rx_tc_flag = (dma_rx == DMA1_Channel2) ? DMA_ISR_TCIF2 : DMA_ISR_TCIF4;
-    uint32_t timeout = 2000000;
-    while (((DMA1->ISR & rx_tc_flag) == 0) && --timeout);
+    // Chờ DMA RX xong (Cờ TC - Transfer Complete) có timeout an toàn tuyệt đối
+    uint32_t rx_tc_flag = DMA_ISR_TCIF2; // Mặc định SPI1
+    if (dma_rx == DMA1_Channel4) rx_tc_flag = DMA_ISR_TCIF4;
+#ifdef SPI3
+    else if (dma_rx == DMA2_Channel1) rx_tc_flag = DMA_ISR_TCIF1;
+#endif
+
+    volatile uint32_t* isr_reg = &DMA1->ISR;
+#ifdef SPI3
+    if (dma_rx == DMA2_Channel1) isr_reg = &DMA2->ISR;
+#endif
+
+    uint32_t tickstart = HAL_GetTick();
+    while ((*isr_reg & rx_tc_flag) == 0) {
+        if ((HAL_GetTick() - tickstart) >= 200) break; // Timeout 200ms
+    }
     
     // Đảm bảo SPI đã thực sự truyền xong bit cuối cùng
-    timeout = 100000;
-    while ((hspi->SR & SPI_SR_BSY) && --timeout);
+    tickstart = HAL_GetTick();
+    while (hspi->SR & SPI_SR_BSY) {
+        if ((HAL_GetTick() - tickstart) >= 20) break; // BSY timeout 20ms
+    }
     
     // Tắt DMA
     dma_rx->CCR &= ~DMA_CCR_EN;
@@ -237,6 +264,9 @@ void SpiBus::TransferDMA(const uint8_t* tx_data, uint8_t* rx_data, uint16_t size
     // Xóa cờ ngắt DMA một lần nữa
     if (dma_rx == DMA1_Channel2) DMA1->IFCR = DMA_IFCR_CGIF2 | DMA_IFCR_CGIF3;
     else if (dma_rx == DMA1_Channel4) DMA1->IFCR = DMA_IFCR_CGIF4 | DMA_IFCR_CGIF5;
+#ifdef SPI3
+    else if (dma_rx == DMA2_Channel1) DMA2->IFCR = DMA_IFCR_CGIF1 | DMA_IFCR_CGIF2;
+#endif
 }
 
 void SpiBus::SetSpeed(uint32_t speed_hz) {

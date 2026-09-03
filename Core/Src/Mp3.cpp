@@ -1,6 +1,6 @@
 #include "Mp3.h"
 #include <string.h>
-#include "SystemTimer.h"
+#include "stm32f1xx_hal.h"
 
 #define SCI_MODE        0x00
 #define SCI_STATUS      0x01
@@ -37,9 +37,9 @@ Mp3::Mp3(SpiBus* spi_bus,
 static FIL mp3File;
 
 bool Mp3::waitReady() {
-    uint32_t timeout = SystemTimer::getTick();
+    uint32_t timeout = HAL_GetTick();
     while ((dreqPort->IDR & dreqPin) == 0) {
-        if (SystemTimer::getTick() - timeout > 500) {
+        if (HAL_GetTick() - timeout > 500) {
             return false; 
         }
     }
@@ -62,16 +62,16 @@ void Mp3::writeRegister(uint8_t address, uint16_t data) {
 
 void Mp3::reset() {
     xresetPort->BRR = xresetPin;
-    SystemTimer::delay_ms(20);
+    HAL_Delay(20);
     xresetPort->BSRR = xresetPin;
-    SystemTimer::delay_ms(20);
+    HAL_Delay(20);
     
     writeRegister(SCI_MODE, 0x0804);
-    SystemTimer::delay_ms(20);
+    HAL_Delay(20);
     waitReady();
     
     writeRegister(SCI_CLOCKF, 0x9800); 
-    SystemTimer::delay_ms(20);
+    HAL_Delay(20);
     waitReady();
     
     setVolume(50, 50); 
@@ -115,7 +115,7 @@ void Mp3::init() {
     xresetPort->BSRR = xresetPin;
     pwrPort->BRR = pwrPin; // Keo xuong LOW de mo PNP Transistor cap nguon 3V3
     
-    SystemTimer::delay_ms(100); // Cho nguon on dinh truoc khi truyen SPI
+    HAL_Delay(100); // Cho nguon on dinh truoc khi truyen SPI
     uint8_t dummy = 0xFF;
     spi_bus->Transfer(dummy);
     
@@ -230,7 +230,7 @@ void Mp3::process() {
                     }
                 }
                 
-                SystemTimer::delay_ms(50);
+                HAL_Delay(50);
                 
                 return; // Let next process iteration check queue
             }
@@ -250,7 +250,7 @@ void Mp3::process() {
 
 void Mp3::testAudio() {
     writeRegister(SCI_MODE, 0x0820); 
-    SystemTimer::delay_ms(50);
+    HAL_Delay(50);
 
     uint8_t sineCmd[] = {0x53, 0xEF, 0x6E, 0x44, 0x00, 0x00, 0x00, 0x00};
     
@@ -259,7 +259,7 @@ void Mp3::testAudio() {
     spi_bus->TransferBuffer(sineCmd, nullptr, 8); 
     xdcsPort->BSRR = xdcsPin;
 
-    SystemTimer::delay_ms(2000); 
+    HAL_Delay(2000); 
 
     uint8_t exitCmd[] = {0x45, 0x78, 0x69, 0x74, 0x00, 0x00, 0x00, 0x00};
     waitReady();
@@ -297,5 +297,6 @@ void Mp3::resumeState() {
         hasSavedState = false;
     }
 }
+
 
 

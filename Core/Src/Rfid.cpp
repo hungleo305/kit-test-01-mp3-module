@@ -1,5 +1,5 @@
 #include "Rfid.h"
-#include "SystemTimer.h"
+#include "stm32f1xx_hal.h"
 
 Rfid::Rfid(SpiBus* spi_bus, 
            GPIO_TypeDef* csPort, uint16_t csPin, 
@@ -291,3 +291,4 @@ uint8_t Rfid::selectTag(uint8_t* serial) {
         return 0; 
     }
 }
+
