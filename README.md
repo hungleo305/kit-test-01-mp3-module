@@ -28,7 +28,6 @@ kit-test-01-mp3-module/
 │   │   ├── Rtc.h           # Thời gian DS1307
 │   │   ├── SdCard.h        # Thẻ nhớ
 │   │   ├── Sensor.h        # Cảm biến đếm
-│   │   └── SystemTimer.h   # Bộ đếm Non-blocking
 │   └── Src/                # Source code C/C++ (.cpp / .c)
 │       ├── main.cpp        # Chương trình chính
 │       ├── Sensor.cpp      
@@ -51,7 +50,7 @@ kit-test-01-mp3-module/
 Phần này hướng dẫn chi tiết cách vận hành mạch từ lúc cắm điện đến lúc sử dụng các tính năng. 
 ### 3.1. Cắm điện và Khởi động
 - **Cắm điện:** Ngay khi vừa cấp nguồn, mạch sẽ khởi động hệ thống và kêu **2 tiếng Bíp** để báo hiệu đã có điện và sẵn sàng.
-- **Đèn LED Onboard :** Đèn LED nhỏ trên thân mạch sẽ chớp nháy liên tục rất nhanh (chu kỳ 0.1 giây sáng / 0.1 giây tắt - tức là chớp 5 lần/giây). Đèn này nháy đều đặn chứng tỏ  vi xử lý đang chạy cực kỳ trơn tru, vòng lặp hoạt động không bị treo .
+- **Đèn LED Onboard :** Đèn LED nhỏ trên thân mạch sẽ chớp nháy liên tục rất nhanh (chu kỳ 0.1 giây sáng / 0.1 giây tắt - tức là chớp 5 lần/giây). Đèn này nháy đều đặn chứng tỏ  vi xử lý đang chạy ổn định, vòng lặp hoạt động không bị treo .
 - **Màn hình LED 7 đoạn:** Sẽ bắt đầu tự động luân phiên hiển thị giữa 2 thông tin (mỗi thông tin hiển thị 5 giây):
   1. **Số lượng sản phẩm đã đếm được:** Dấu chấm ở giữa màn hình sẽ **TẮT**.
   2. **Giờ hiện tại (Giờ:Phút):** Dấu chấm ở giữa màn hình sẽ **NHẤP NHÁY** theo từng giây.
@@ -148,7 +147,7 @@ Cắm mạch vào máy tính qua bộ chuyển đổi CAN. Mở phần mềm **C
 
 ## 4. HƯỚNG DẪN SỬ DỤNG THƯ VIỆN CHO LẬP TRÌNH
 
-Mã nguồn được tổ chức theo cấu trúc Hướng đối tượng (OOP) C++. Tất cả các class thư viện được thiết kế theo mô hình **Non-blocking**, tuyệt đối không sử dụng hàm trễ `HAL_Delay` trong vòng lặp chính. Nhờ đó, mạch có thể thực thi đa nhiệm cực kỳ mượt mà. 
+Mã nguồn được viết theo cấu trúc Hướng đối tượng (OOP) C++. Các tác vụ liên tục trong vòng lặp chính (như kiểm tra cảm biến, nháy LED) dùng hàm `HAL_GetTick()` để không chặn chương trình (Non-blocking). Hàm `HAL_Delay()` vẫn được dùng ở các tác vụ ngắn hoặc khi khởi tạo thiết bị.
 
 **Lưu ý:** Bộ thư viện này được tối ưu trên nền tảng STM32 HAL (Chip **STM32F1**). Tất cả các thiết lập chân (Pin/Port) đều được truyền thẳng qua hàm khởi tạo (Constructor), giúp tái sử dụng với project khác.
 
@@ -223,12 +222,35 @@ Việc đặt `buzzer.update()` vào trong hàm ngắt này có ý nghĩa cực 
 ---
 
 ### 4.3. Kiến trúc cốt lõi SPI Đa năng (`SpiBus`)
-Thư viện `SpiBus` đóng vai trò là một lớp trừu tượng để quản lý toàn bộ giao tiếp SPI của hệ thống (như thẻ nhớ SD, module MP3, thẻ từ RFID). Thay vì viết code giao tiếp SPI lặp lại cho từng cảm biến, hệ thống sẽ sử dụng chung `SpiBus`.
+Thư viện `SpiBus` là nền tảng cốt lõi quản lý toàn bộ giao tiếp SPI của hệ thống. Thư viện được thiết kế độc lập, dễ dàng tái sử dụng trên bất kỳ dự án STM32F103 nào.
 
-Thư viện hỗ trợ 3 chế độ hoạt động:
-- **Chế độ 1 - Cấu hình từ CubeMX:** (Ví dụ: `SpiBus spi2_bus(SPI2);`) - Phù hợp khi bạn tự cấu hình xung nhịp và chân cắm trên CubeMX.
-- **Chế độ 2 - Cấu hình Bare-metal tự động:** (Ví dụ: `SpiBus spi1_bus(SPI1, GPIOA, GPIO_PIN_5, GPIOA, GPIO_PIN_6, GPIOA, GPIO_PIN_7);`) - Tự động thiết lập cấu hình chân (Alternate Function) và bật nguồn cho SPI. 
-- **Chế độ 3 - SPI Mềm (Bit-banging):** Truyền trực tiếp các chân vào mà không cần bộ SPI cứng. Tuy nhiên **Không nên dùng cho MP3 và SD Card** vì quá chậm.
+**A. Các chế độ khởi tạo SPI:**
+- **Chế độ 1 - Dùng cấu hình CubeMX:** Giao toàn quyền cho CubeMX cấu hình clock và chân cắm.
+  ```cpp
+  SpiBus spi1_bus(SPI1); // Quản lý SPI1
+  SpiBus spi2_bus(SPI2); // Quản lý SPI2
+  SpiBus spi3_bus(SPI3); // Quản lý SPI3
+  ```
+- **Chế độ 2 - Cấu hình Bare-metal tự động:** Thư viện sẽ tự động cấp xung nhịp (Clock) và kích hoạt chân GPIO (Alternate Function). Bạn không cần mở CubeMX.
+  ```cpp
+  // Ví dụ khởi tạo SPI1 với các chân PA5, PA6, PA7
+  SpiBus spi1_bus(SPI1, GPIOA, GPIO_PIN_5, GPIOA, GPIO_PIN_6, GPIOA, GPIO_PIN_7);
+  ```
+- **Chế độ 3 - SPI Mềm (Bit-banging):** Điều khiển trực tiếp các chân GPIO bằng CPU mà không sử dụng bộ SPI cứng bên trong chip. Phù hợp cho các dự án thiếu chân.
+  ```cpp
+  // Bỏ tham số SPI cứng đi, chỉ truyền vào GPIO
+  SpiBus spi_mem(GPIOA, GPIO_PIN_5, GPIOA, GPIO_PIN_6, GPIOA, GPIO_PIN_7);
+  ```
+
+**B. Cơ chế tăng tốc phần cứng DMA (Direct Memory Access):**
+Để giải phóng CPU khỏi việc chờ đợi đẩy từng byte qua SPI, bạn có thể bật cơ chế chuyển dữ liệu tự động DMA. 
+- **Cách bật:** `spi_bus.EnableDMA(true);`
+- **Khả năng hỗ trợ của vi điều khiển:**
+  - **SPI1**: Hỗ trợ tự động qua `DMA1` (Kênh 2 & Kênh 3).
+  - **SPI2**: Hỗ trợ tự động qua `DMA1` (Kênh 4 & Kênh 5).
+  - **SPI3**: Hỗ trợ tự động qua `DMA2` (Kênh 1 & Kênh 2).
+  - **SPI Mềm**: **Không hỗ trợ DMA.** (DMA yêu cầu tín hiệu kích hoạt phần cứng từ bộ SPI cứng).
+- **Cơ chế hoạt động:** Thư viện sử dụng cơ chế **DMA Đồng bộ (Blocking có Timeout cứng 200ms)**. CPU sẽ ra lệnh cho DMA và đứng chờ. Cơ chế này loại bỏ hoàn toàn khoảng thời gian trễ giữa các byte, giúp đẩy tốc độ SPI lên mức giới hạn vật lý (~1.93 MB/s) đồng thời giữ nguyên được cấu trúc tương thích với các thư viện cấp cao (FatFs, MP3). Nếu phần cứng kẹt, sau 200ms CPU sẽ tự thoát luồng để chống treo (Fail-safe).
 
 ---
 
@@ -292,9 +314,9 @@ Trong `main.cpp`, nhờ hàm `disk_status()`, vi điều khiển liên tục the
 
 > [!WARNING]
 > **KHUYẾN CÁO VỀ SPI MỀM (BIT-BANGING)**
-> Thư viện `SpiBus` hỗ trợ SPI Mềm, tuy nhiên **TUYỆT ĐỐI KHÔNG NÊN** dùng SPI Mềm cho `SdCard` hoặc `Mp3` trừ trường hợp bất khả kháng.
-> - **Lý do 1:** Đọc thẻ nhớ (FatFs) và giải mã âm thanh đòi hỏi băng thông cực kỳ lớn (Mỗi sector 512 bytes). SPI Cứng có thể chạy ở tốc độ 18MHz ~ 36MHz (Gửi 1 byte mất chưa tới 1 microsecond). Trong khi đó, SPI Mềm sử dụng vòng lặp CPU `for` và `GPIO BSRR` tốn ít nhất 10-20 microseconds cho mỗi byte, làm CPU bị nghẽn hoàn toàn, không thể xử lý các task khác.
-> - **Lý do 2:** Khi CPU nghẽn ở vòng lặp SPI Mềm để đọc thẻ SD, bộ đệm (buffer) của chip VS1011 (MP3) sẽ bị cạn, gây ra hiện tượng giật cục, vấp tiếng (âm thanh rè, đứt quãng).
+> Thư viện `SpiBus` hỗ trợ SPI Mềm, tuy nhiên **KHÔNG NÊN** dùng SPI Mềm cho `SdCard` hoặc `Mp3`.
+> - **Chiếm dụng tài nguyên (CPU Blocking):** SPI Cứng sử dụng phần cứng dịch bit chuyên dụng, CPU chỉ việc ghi/đọc thanh ghi (hoặc dùng DMA). Ngược lại, SPI Mềm ép CPU phải chạy vòng lặp và điều khiển GPIO liên tục cho từng bit. Việc này khóa chặt CPU, làm mất khả năng xử lý các tác vụ đa nhiệm (như đọc cảm biến, nhận CAN).
+> - **Tràn bộ đệm âm thanh (Buffer Underrun):** Đọc thẻ nhớ và nạp dữ liệu cho chip MP3 đòi hỏi băng thông liên tục. SPI Mềm có tốc độ truyền tải chậm. Nếu dùng SPI Mềm, CPU không kịp cấp đủ dữ liệu cho bộ đệm của IC MP3, dẫn đến hiện tượng hụt dữ liệu làm âm thanh bị đứt quãng hoặc giật cục.
 
 **Lưu ý phần cứng đặc biệt:** 
 Kit hiện tại gắn thêm mạch khuếch đại (Amply) rời MIX2018A để kéo loa công suất cao. Nguồn Amply được điều khiển Mute bằng chân `PA4`. Phải bật chân `PA4` này lên (Bằng thanh ghi: `GPIOA->BRR = (1 << 4);`) trước khi phát nhạc.
@@ -303,7 +325,6 @@ Kit hiện tại gắn thêm mạch khuếch đại (Amply) rời MIX2018A để
 ```cpp
 #include "Mp3.h"
 #include "SdCard.h"
-#include "SystemTimer.h"
 #include "ff.h" // FatFs
 
 // 1. Khai báo các đường bus SPI chung
@@ -317,7 +338,6 @@ Mp3 mp3(&spi2_bus, GPIOC, 1<<2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1
 FATFS fs;
 
 int main(void) {
-    SystemTimer::init(); // Khởi tạo hàm delay
     sdCard.init();
     mp3.init();
     mp3.setVolume(250, 250);
@@ -341,7 +361,7 @@ int main(void) {
         if (hasCard && !cardWasPresent) {
             //Cắm thẻ
             GPIOA->BSRR = (1 << 4); // Tạm tắt Amply để triệt tiêu tiếng "xẹt" nhiễu điện
-            SystemTimer::delay_ms(100);
+            HAL_Delay(100);
             
             sdCard.powerOn(); // Cấp lại nguồn 3.3V cho thẻ
             if (f_mount(&fs, "", 1) == FR_OK) {
@@ -507,7 +527,7 @@ Thư viện cung cấp sẵn 2 bộ hàm giao tiếp tương ứng với 2 kiể
 
 **Thư viện DS1307 (`Rtc`) & BKP:**
 DS1307 là chip đồng hồ giao tiếp I2C. Trên MCU STM32F1 có cụm 42 thanh ghi 16-bit (`BKP->DR1` đến `BKP->DR42`) sử dụng chung nguồn của Pin CMOS 3V cấp cho RTC.
-- `Rtc(I2cBus* i2c_bus)`: Nhận con trỏ `I2cBus` đã cấu hình để đẩy dữ liệu I2C.
+- `Rtc(I2cBus* i2c_bus, uint8_t devAddr = 0xD0)`: Nhận con trỏ `I2cBus` để giao tiếp vật lý, kết hợp tham số địa chỉ I2C có giá trị mặc định là `0xD0` (chuẩn DS1307). Thiết kế này giúp người dùng ở hàm `main` không cần nhớ địa chỉ I2C, nhưng vẫn giữ được khả năng thay đổi linh hoạt nếu gắn chip RTC có địa chỉ khác.
 - `bool isTimeLost()`: Trả về `true` nếu thanh ghi giờ chứa lỗi Clock Halt (Nghĩa là IC từng bị ngắt pin 3V hoàn toàn).
 - Các hàm Data: `getTime()`, `getDate()`, `setTime()`, `setDate()`. 
 
@@ -519,7 +539,8 @@ DS1307 là chip đồng hồ giao tiếp I2C. Trên MCU STM32F1 có cụm 42 tha
 
 // Khởi tạo RTC dùng I2cBus (SCL=PB6, SDA=PB7)
 I2cBus i2c1(I2C1, GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);
-Rtc rtc(&i2c1); 
+Rtc rtc(&i2c1); // Tự động nhận diện thiết bị ở địa chỉ 0xD0
+// Rtc rtc(&i2c1, 0xD2); // Trái lại, nếu bạn dùng mạch có địa chỉ 0xD2, chỉ cần truyền thêm 1 tham số ở đây!
 
 int main(void) {
     // Không cần gọi i2c1.Init() vì rtc.init() sẽ tự động mượn con trỏ để gọi
@@ -538,7 +559,7 @@ int main(void) {
         rtc.getTime(&h, &min, &s);
         
         printf("%02d:%02d:%02d - %02d/%02d/20%02d\n", h, min, s, d, m, y);
-        SystemTimer::delay_ms(1000);
+        HAL_Delay(1000);
     }
 }
 ```
@@ -560,17 +581,17 @@ BKP->DR1 = ++savedCount;
 ---
 
 ### 4.8. Thư viện `CanBus`
-Giao tiếp mạng theo chuẩn Data Frame cực kỳ chống nhiễu. Sử dụng ngắt `FIFO0` siêu nhẹ.
+Giao tiếp mạng theo chuẩn Data Frame chống nhiễu tốt. Sử dụng ngắt `FIFO0` tối ưu.
 
-**1. Hướng dẫn cấu hình CAN trên CubeMX (Tốc độ 250kbps):**
+**1. Hướng dẫn cấu hình CAN trên CubeMX (Tốc độ 500kbps):**
 Vì bộ thư viện này giao phó việc thiết lập phần cứng cho HAL, bạn phải cấu hình chuẩn xác các thông số trên CubeMX trước khi nạp code:
 - **Tại mục Connectivity -> CAN**: Tích chọn `Activated`.
-- **Tại tab Parameter Settings**: Cấu hình các thông số Bitrate. Để đạt được tốc độ **250 kbps** (Giả sử xung nhịp APB1 của bạn đang là 36MHz), hãy thiết lập như sau:
+- **Tại tab Parameter Settings**: Cấu hình các thông số Bitrate. Để đạt được tốc độ **500 kbps** (Giả sử xung nhịp APB1 của bạn đang là 36MHz), hãy thiết lập như sau:
   - Prescaler (for Time Quantum): `9`
-  - Time Quanta in Bit Segment 1: `13 Times`
-  - Time Quanta in Bit Segment 2: `2 Times`
+  - Time Quanta in Bit Segment 1: `6 Times`
+  - Time Quanta in Bit Segment 2: `1 Time`
   - ReSynchronization Jump Width: `1 Time`
-  > *(Công thức tính: `36MHz / 9 / (1 + 13 + 2) = 250,000 Hz = 250 kbps`)*
+  > *(Công thức tính: `36MHz / 9 / (1 + 6 + 1) = 500,000 Hz = 500 kbps`)*
 - **Tại tab NVIC Settings**: Bắt buộc phải tích bật ngắt **`USB low priority or CAN RX0 interrupts`** thì thư viện mới có thể tự động hứng dữ liệu chạy ngầm được.
 
 *(Ảnh minh họa cấu hình Parameter của CubeMX:)*
@@ -592,26 +613,35 @@ CanBus myCan(&hcan); // &hcan lấy từ CubeMX sinh ra
 int main() {
     myCan.init();
     
-    // GỬI BIẾN 16-BIT:
-    uint16_t mucTieu = 5000;
-    uint8_t txData[2];
-    txData[0] = mucTieu & 0xFF;         // Low byte
-    txData[1] = (mucTieu >> 8) & 0xFF;  // High byte
+    // GỬI NHIỀU BIẾN 16-BIT VÀO CÙNG MỘT FRAME (Ví dụ Frame 0x102):
+    uint16_t currentCount = 150; 
+    uint16_t currentTarget = 5000;
+    uint16_t cycleCount = 10;
     
-    myCan.sendFrame(0x202, txData, 2); 
+    uint8_t frame102[6] = {0};
     
-    while(1) {}
-}
+    // Đổi sang dạng Little Endian để trùng khớp với Cangaroo (.dbc)
+    frame102[0] = currentCount & 0xFF;         // Byte 0
+    frame102[1] = (currentCount >> 8) & 0xFF;  // Byte 1
+    
+    frame102[2] = currentTarget & 0xFF;        // Byte 2
+    frame102[3] = (currentTarget >> 8) & 0xFF; // Byte 3
+    
+    frame102[4] = cycleCount & 0xFF;           // Byte 4
+    frame102[5] = (cycleCount >> 8) & 0xFF;    // Byte 5
+    
+    myCan.sendFrame(0x102, frame102, 6); 
+    
+    while(1) {
+        // KIỂM TRA BẢN TIN CAN ĐẾN (Non-blocking):
+        uint32_t rxId;
+        uint8_t rxData[8], rxLen;
 
-// NHẬN VÀ GHÉP TRONG NGẮT:
-void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
-    uint32_t rxId;
-    uint8_t rxData[8], rxLen;
-
-    if (myCan.readFrame(&rxId, rxData, &rxLen)) {
-        if (rxId == 0x202) {
-            // Lắp ráp lại thành số 16-bit
-            uint16_t val = rxData[0] | (rxData[1] << 8);
+        if (myCan.readFrame(&rxId, rxData, &rxLen)) {
+            if (rxId == 0x202) {
+                // Lắp ráp lại thành số 16-bit
+                uint16_t val = rxData[0] | (rxData[1] << 8);
+            }
         }
     }
 }
@@ -627,7 +657,7 @@ Thư viện quét với IC thanh ghi dịch 3 chân (Data, Clock, Strobe/Latch).
 - `init()`: Chuyển 3 chân điều khiển sang GPIO Output.
 - `void display(uint16_t number)`: Cập nhật biến dữ liệu muốn xuất lên 4 bóng LED.
 - `void setColon(bool on)`: Bật tắt dấu hai chấm giữa LED.
-- `void process()`: **BẮT BUỘC ĐỂ VÀO WHILE(1)**. Hàm này sẽ thay phiên chớp tắt lần lượt 4 chữ số ở tốc độ siêu cao, tạo ảo giác cho mắt người (Lưu ảnh). Nếu thiếu, LED sẽ đứng hình và tối thui!
+- `void process()`: **Bắt buộc đặt trong vòng lặp while(1)**. Hàm này chịu trách nhiệm bật/tắt luân phiên 4 chữ số liên tục để duy trì hiển thị trên LED 7 đoạn. Nếu không gọi hàm này, màn hình LED sẽ không sáng hoặc hiển thị sai.
 
 **Ví dụ Code hoàn chỉnh:**
 ```cpp
@@ -646,43 +676,14 @@ int main(void) {
 ```
 
 
----
 
-### 4.10. Thư viện `SystemTimer` (Bộ đếm thời gian Non-blocking)
-Thư viện quản lý bộ đếm Tick của hệ thống (dựa trên ngắt SysTick của STM32). Đây là cốt lõi để tạo ra các hàm delay và kiểm tra thời gian mà không làm treo chương trình (Non-blocking).
-
-**Hàm API chi tiết:**
-- `init()`: Khởi tạo bộ đếm SysTick (thường được gọi ngầm trong HAL_Init).
-- `update()`: Tăng biến đếm Tick. Phải được đưa vào ngắt SysTick_Handler() trong stm32f1xx_it.c.
-- `getTick()`: Trả về giá trị đếm hiện tại (số mili-giây kể từ lúc khởi động).
-- `delay_ms(uint32_t ms)`: Hàm delay cơ bản (Blocking). Dùng trong lúc khởi tạo phần cứng.
-
-**Ví dụ mẫu:**
-Sử dụng getTick() để kiểm tra xem đã hết thời gian chờ chưa, trong lúc chờ MCU vẫn rảnh rang chạy các tác vụ khác.
-```cpp
-#include "SystemTimer.h"
-
-uint32_t lastTick = 0;
-
-int main() {
-    while(1) {
-        if (SystemTimer::getTick() - lastTick >= 1000) {
-            // Cứ sau 1000ms (1 giây) thì vào đây 1 lần
-            // Làm gì đó...
-            lastTick = SystemTimer::getTick();
-        }
-        
-        // Vẫn xử lý Led, MP3, CanBus thoải mái bên dưới...
-    }
-}
-```
 
 ## 5. ĐÁNH GIÁ TÀI NGUYÊN HỆ THỐNG (RESOURCE FOOTPRINT)
-Mạch Kit sử dụng vi điều khiển **STM32F103RCT6** (256 KB Flash, 48 KB RAM). Nhờ cấu trúc lập trình Non-blocking và thiết kế hướng đối tượng C++ tối ưu sâu thông qua trình biên dịch của IAR Embedded Workbench, hệ thống quản lý bộ nhớ cực kỳ hiệu quả.
+Mạch Kit sử dụng vi điều khiển **STM32F103RCT6** (256 KB Flash, 48 KB RAM). Nhờ cấu trúc lập trình Non-blocking và thiết kế hướng đối tượng C++ tối ưu sâu thông qua trình biên dịch của IAR Embedded Workbench, hệ thống quản lý bộ nhớ hiệu quả.
 
 Dựa trên file Memory Map (EWARM/Firmware/List/Firmware.map), dưới đây là mức tiêu thụ tài nguyên phần cứng của Firmware hiện tại:
 
-- **Dung lượng Flash (Read-only Code + Data):** `32.314 Bytes` (~31.56 KB) **Chỉ chiếm 12,33%**
-- **Dung lượng RAM (Read-write Data):** `7.225 Bytes` (~7.06 KB) **Chỉ chiếm 14,70%**
+- **Dung lượng Flash (Read-only Code + Data):** `40.119 Bytes` (~39.1 KB) **Chỉ chiếm khoảng 15%**
+- **Dung lượng RAM (Read-write Data):** `7.269 Bytes` (~7.1 KB) **Chỉ chiếm khoảng 15%**
 
-**Kết luận:** Dù tích hợp đồng thời nhiều module nặng (FatFs File System, giải mã MP3, giao thức CAN Bus và RFID), chương trình vẫn chạy nhẹ nhàng, chừa lại tới ~87% Flash và ~85% RAM. Lượng tài nguyên nhàn rỗi vẫn đủ sức tích hợp thêm các tính năng khác (kết nối Wifi/Bluetooth, màn hình LCD đồ họa...).
+**Kết luận:** Dù tích hợp đồng thời nhiều module nặng (FatFs File System, giải mã MP3, giao thức CAN Bus và RFID), chương trình vẫn chạy nhẹ nhàng. Lượng tài nguyên còn lại vẫn dư sức tích hợp thêm các tính năng khác (kết nối Wifi/Bluetooth, màn hình LCD đồ họa...).

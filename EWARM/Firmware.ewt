@@ -1275,12 +1275,6 @@
                 <file>
                     <name>$PROJ_DIR$\..\Core\Src\stm32f1xx_it.c</name>
                 </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Src\SystemTimer.cpp</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Inc\SystemTimer.h</name>
-                </file>
             </group>
             <group>
                 <name>FATFS</name>

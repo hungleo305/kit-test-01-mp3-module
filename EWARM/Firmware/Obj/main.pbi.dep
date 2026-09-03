@@ -11,7 +11,6 @@ main.pbi: \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM\..\Core\Inc\Sensor.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM\..\Core\Inc\Buzzer.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM\..\Core\Inc\Led.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM\..\Core\Inc\SystemTimer.h \
   C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\ycheck.h \
   C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\stdio.h \
   C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\DLib_Product_string.h \
