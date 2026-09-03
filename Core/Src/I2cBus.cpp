@@ -88,6 +88,45 @@ void I2cBus::Init() {
 
 void I2cBus::resetBus() {
     if (!isSoftware && hi2c != nullptr) {
+        if (sclPort != nullptr && sdaPort != nullptr) {
+            hi2c->CR1 &= ~I2C_CR1_PE;
+            GPIO_TypeDef* ports[] = {sclPort, sdaPort};
+            uint16_t pins[] = {sclPin, sdaPin};
+            for (int i = 0; i < 2; i++) {
+                uint32_t pinIndex = 0;
+                while (!(pins[i] & (1 << pinIndex))) pinIndex++;
+                if (pinIndex < 8) {
+                    ports[i]->CRL = (ports[i]->CRL & ~(0xF << (pinIndex * 4))) | (0x6 << (pinIndex * 4));
+                } else {
+                    ports[i]->CRH = (ports[i]->CRH & ~(0xF << ((pinIndex - 8) * 4))) | (0x6 << ((pinIndex - 8) * 4));
+                }
+            }
+            sclPort->BSRR = sclPin;
+            sdaPort->BSRR = sdaPin;
+            delay();
+            for (int i = 0; i < 9; i++) {
+                if (sdaPort->IDR & sdaPin) break;
+                sclPort->BRR = sclPin;
+                delay();
+                sclPort->BSRR = sclPin;
+                delay();
+            }
+            sdaPort->BRR = sdaPin;
+            delay();
+            sclPort->BSRR = sclPin;
+            delay();
+            sdaPort->BSRR = sdaPin;
+            delay();
+            for (int i = 0; i < 2; i++) {
+                uint32_t pinIndex = 0;
+                while (!(pins[i] & (1 << pinIndex))) pinIndex++;
+                if (pinIndex < 8) {
+                    ports[i]->CRL = (ports[i]->CRL & ~(0xF << (pinIndex * 4))) | (0xF << (pinIndex * 4));
+                } else {
+                    ports[i]->CRH = (ports[i]->CRH & ~(0xF << ((pinIndex - 8) * 4))) | (0xF << ((pinIndex - 8) * 4));
+                }
+            }
+        }
         hi2c->CR1 |= I2C_CR1_SWRST;
         hi2c->CR1 &= ~I2C_CR1_SWRST;
         hi2c->CR2 = 36;

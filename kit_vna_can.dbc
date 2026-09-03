@@ -112,6 +112,64 @@ BO_ 517 Cai_Dat_Mat_Khau_The: 7 Phan_Mem_PC
  SG_ Mat_Khau_Moi_B4 : 40|8@1+ (1,0) [0|255] "" Mach_STM32
  SG_ Mat_Khau_Moi_B5 : 48|8@1+ (1,0) [0|255] "" Mach_STM32
 
+ SG_ So_Vong_Quay : 32|16@1+ (1,0) [0|65535] "" Phan_Mem_PC
+
+BO_ 259 Thoi_Gian_Thuc_RTC: 7 Mach_STM32
+ SG_ Gio : 0|8@1+ (1,0) [0|23] "h" Phan_Mem_PC
+ SG_ Phut : 8|8@1+ (1,0) [0|59] "m" Phan_Mem_PC
+ SG_ Giay : 16|8@1+ (1,0) [0|59] "s" Phan_Mem_PC
+ SG_ Ngay : 24|8@1+ (1,0) [1|31] "d" Phan_Mem_PC
+ SG_ Thang : 32|8@1+ (1,0) [1|12] "mo" Phan_Mem_PC
+ SG_ Nam : 40|8@1+ (1,0) [0|99] "y" Phan_Mem_PC
+ SG_ Thu : 48|8@1+ (1,0) [1|7] "" Phan_Mem_PC
+
+BO_ 260 Du_Lieu_The_RFID_1: 8 Mach_STM32
+ SG_ Du_Lieu_1_B0 : 0|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Du_Lieu_1_B1 : 8|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Du_Lieu_1_B2 : 16|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Du_Lieu_1_B3 : 24|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Du_Lieu_1_B4 : 32|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Du_Lieu_1_B5 : 40|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Du_Lieu_1_B6 : 48|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Du_Lieu_1_B7 : 56|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+
+BO_ 261 Du_Lieu_The_RFID_2: 8 Mach_STM32
+ SG_ Du_Lieu_2_B0 : 0|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Du_Lieu_2_B1 : 8|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Du_Lieu_2_B2 : 16|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Du_Lieu_2_B3 : 24|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Du_Lieu_2_B4 : 32|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Du_Lieu_2_B5 : 40|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Du_Lieu_2_B6 : 48|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Du_Lieu_2_B7 : 56|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+
+BO_ 513 Cai_Dat_Muc_Tieu: 2 Phan_Mem_PC
+ SG_ Gia_Tri_Muc_Tieu : 0|16@1+ (1,0) [0|65535] "" Mach_STM32
+
+BO_ 514 Cai_Dat_Gia_Tri_Dem: 2 Phan_Mem_PC
+ SG_ Gia_Tri_Dem_Moi : 0|16@1+ (1,0) [0|65535] "" Mach_STM32
+
+BO_ 515 Cai_Dat_Thoi_Gian_RTC: 7 Phan_Mem_PC
+ SG_ Gio_Moi : 0|8@1+ (1,0) [0|23] "h" Mach_STM32
+ SG_ Phut_Moi : 8|8@1+ (1,0) [0|59] "m" Mach_STM32
+ SG_ Giay_Moi : 16|8@1+ (1,0) [0|59] "s" Mach_STM32
+ SG_ Ngay_Moi : 24|8@1+ (1,0) [1|31] "d" Mach_STM32
+ SG_ Thang_Moi : 32|8@1+ (1,0) [1|12] "mo" Mach_STM32
+ SG_ Nam_Moi : 40|8@1+ (1,0) [0|99] "y" Mach_STM32
+ SG_ Thu_Moi : 48|8@1+ (1,0) [1|7] "" Mach_STM32
+
+BO_ 516 Cai_Dat_Tinh_Nang_RFID: 1 Phan_Mem_PC
+ SG_ ID_Tinh_Nang : 0|8@1+ (1,0) [0|255] "" Mach_STM32
+
+BO_ 517 Cai_Dat_Mat_Khau_The: 7 Phan_Mem_PC
+ SG_ Lenh_Dieu_Khien : 0|8@1+ (1,0) [0|255] "" Mach_STM32
+ SG_ Mat_Khau_Moi_B0 : 8|8@1+ (1,0) [0|255] "" Mach_STM32
+ SG_ Mat_Khau_Moi_B1 : 16|8@1+ (1,0) [0|255] "" Mach_STM32
+ SG_ Mat_Khau_Moi_B2 : 24|8@1+ (1,0) [0|255] "" Mach_STM32
+ SG_ Mat_Khau_Moi_B3 : 32|8@1+ (1,0) [0|255] "" Mach_STM32
+ SG_ Mat_Khau_Moi_B4 : 40|8@1+ (1,0) [0|255] "" Mach_STM32
+ SG_ Mat_Khau_Moi_B5 : 48|8@1+ (1,0) [0|255] "" Mach_STM32
+
 BO_ 518 Mat_Khau_Tam_Thoi: 6 Phan_Mem_PC
  SG_ Mat_Khau_Tam_B0 : 0|8@1+ (1,0) [0|255] "" Mach_STM32
  SG_ Mat_Khau_Tam_B1 : 8|8@1+ (1,0) [0|255] "" Mach_STM32
@@ -119,4 +177,16 @@ BO_ 518 Mat_Khau_Tam_Thoi: 6 Phan_Mem_PC
  SG_ Mat_Khau_Tam_B3 : 24|8@1+ (1,0) [0|255] "" Mach_STM32
  SG_ Mat_Khau_Tam_B4 : 32|8@1+ (1,0) [0|255] "" Mach_STM32
  SG_ Mat_Khau_Tam_B5 : 40|8@1+ (1,0) [0|255] "" Mach_STM32
+
+BO_ 294 Ket_Qua_Benchmark_SD: 7 Mach_STM32
+ SG_ Trang_Thai : 0|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Thoi_Gian_Doc : 8|16@1+ (1,0) [0|65535] "ms" Phan_Mem_PC
+ SG_ So_Block : 24|16@1+ (1,0) [0|65535] "blocks" Phan_Mem_PC
+ SG_ Toc_Do_KBs : 40|16@1+ (1,0) [0|65535] "KB/s" Phan_Mem_PC
+ 
+BO_ 295 Ket_Qua_Ko_DMA: 7 Mach_STM32
+ SG_ Trang_Thai : 0|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Thoi_Gian_Doc : 8|16@1+ (1,0) [0|65535] "ms" Phan_Mem_PC
+ SG_ So_Block : 24|16@1+ (1,0) [0|65535] "blocks" Phan_Mem_PC
+ SG_ Toc_Do_KBs : 40|16@1+ (1,0) [0|65535] "KB/s" Phan_Mem_PC
 

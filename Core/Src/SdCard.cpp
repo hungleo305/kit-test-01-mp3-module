@@ -90,7 +90,7 @@ void SdCard::setSpiSpeedSlow() {
 }
 
 void SdCard::setSpiSpeedFast() {
-    spi_bus->SetPrescaler(SPI_BAUDRATEPRESCALER_8);
+    spi_bus->SetPrescaler(SPI_BAUDRATEPRESCALER_4); // Tăng lên 18 MHz cho SPI1
 }
 
 uint8_t SdCard::waitReady() {
@@ -208,18 +208,36 @@ uint8_t SdCard::read(uint8_t *buff, uint32_t sector, uint32_t count) {
     if (stat & 0x01) return 1; 
     if (cardType == 0) sector *= 512;
     uint8_t res = 1; 
-    csLow();
-    while (count > 0) {
+    
+    if (count == 1) {
         if (sendCmd(17, sector) == 0) { 
             uint32_t tickstart = SystemTimer::getTick();
             while (spi_bus->Transfer(SD_DUMMY_BYTE) != 0xFE) {
                 if ((SystemTimer::getTick() - tickstart) > 500) { csHigh(); return 1; }
             }
-            for (int i = 0; i < 512; i++) buff[i] = spi_bus->Transfer(SD_DUMMY_BYTE);
+            spi_bus->TransferDMA(nullptr, buff, 512);
             spi_bus->Transfer(SD_DUMMY_BYTE); spi_bus->Transfer(SD_DUMMY_BYTE); 
-            if (cardType == 0) sector += 512; else sector += 1;
-            buff += 512; count--; res = 0; 
-        } else { res = 1; break; }
+            res = 0; 
+        }
+    } else {
+        if (sendCmd(18, sector) == 0) {
+            do {
+                uint32_t tickstart = SystemTimer::getTick();
+                uint8_t token;
+                do {
+                    token = spi_bus->Transfer(SD_DUMMY_BYTE);
+                } while (token == 0xFF && (SystemTimer::getTick() - tickstart) < 500);
+                
+                if (token != 0xFE) break;
+                
+                spi_bus->TransferDMA(nullptr, buff, 512);
+                spi_bus->Transfer(SD_DUMMY_BYTE); spi_bus->Transfer(SD_DUMMY_BYTE);
+                if (buff) buff += 512;
+            } while (--count);
+            
+            sendCmd(12, 0); // STOP_TRANSMISSION
+            res = (count == 0) ? 0 : 1;
+        }
     }
     csHigh();
     return res;
@@ -229,18 +247,35 @@ uint8_t SdCard::write(const uint8_t *buff, uint32_t sector, uint32_t count) {
     if (stat & 0x01) return 1; 
     if (cardType == 0) sector *= 512;
     uint8_t res = 1; 
-    csLow();
-    while (count > 0) {
+    
+    if (count == 1) {
         if (sendCmd(24, sector) == 0) { 
+            spi_bus->Transfer(SD_DUMMY_BYTE);
             spi_bus->Transfer(0xFE);
-            for (int i = 0; i < 512; i++) spi_bus->Transfer(buff[i]);
+            spi_bus->TransferDMA(buff, nullptr, 512);
             spi_bus->Transfer(SD_DUMMY_BYTE); spi_bus->Transfer(SD_DUMMY_BYTE); 
             if ((spi_bus->Transfer(SD_DUMMY_BYTE) & 0x1F) == 0x05) {
                 waitReady();
-                if (cardType == 0) sector += 512; else sector += 1;
-                buff += 512; count--; res = 0; 
-            } else break;
-        } else { res = 1; break; }
+                res = 0; 
+            }
+        }
+    } else {
+        if (cardType == 0) sendCmd(55, 0), sendCmd(23, count);
+        if (sendCmd(25, sector) == 0) {
+            do {
+                spi_bus->Transfer(SD_DUMMY_BYTE);
+                spi_bus->Transfer(0xFC); // MULTIPLE_BLOCK_START_TOKEN
+                spi_bus->TransferDMA(buff, nullptr, 512);
+                spi_bus->Transfer(SD_DUMMY_BYTE); spi_bus->Transfer(SD_DUMMY_BYTE);
+                if ((spi_bus->Transfer(SD_DUMMY_BYTE) & 0x1F) != 0x05) break;
+                waitReady();
+                if (buff) buff += 512;
+            } while (--count);
+            
+            spi_bus->Transfer(0xFD); // STOP_TRAN_TOKEN
+            waitReady();
+            res = (count == 0) ? 0 : 1;
+        }
     }
     csHigh();
     return res;

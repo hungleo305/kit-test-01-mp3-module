@@ -199,7 +199,45 @@ static void MX_CAN_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+void test_sd_dma_vs_polling() {
+    sdCard.init();
+    sdCard.initialize();
+    uint32_t sectorCount = 200; // Đọc 100KB
+    uint8_t canData[7];
+    
+    // --- BÀI TEST 1: CÓ DMA ---
+    spi1_bus.EnableDMA(true);
+    uint32_t start1 = SystemTimer::getTick();
+    uint8_t res1 = sdCard.read(nullptr, 1000, sectorCount);
+    uint32_t diff1 = SystemTimer::getTick() - start1;
+    if (diff1 == 0) diff1 = 1;
+    uint32_t kbps1 = (sectorCount * 1000) / (2 * diff1);
+    
+    canData[0] = res1;
+    canData[1] = diff1 & 0xFF; canData[2] = (diff1 >> 8) & 0xFF;
+    canData[3] = sectorCount & 0xFF; canData[4] = (sectorCount >> 8) & 0xFF;
+    canData[5] = kbps1 & 0xFF; canData[6] = (kbps1 >> 8) & 0xFF;
+    myCan.sendFrame(0x126, canData, 7); // Gửi kết quả CÓ DMA
+    
+    SystemTimer::delay_ms(100); // Nghỉ một chút để Cangaroo hiển thị kịp
+    
+    // --- BÀI TEST 2: KHÔNG DMA (POLLING) ---
+    spi1_bus.EnableDMA(false);
+    uint32_t start2 = SystemTimer::getTick();
+    uint8_t res2 = sdCard.read(nullptr, 1000, sectorCount);
+    uint32_t diff2 = SystemTimer::getTick() - start2;
+    if (diff2 == 0) diff2 = 1;
+    uint32_t kbps2 = (sectorCount * 1000) / (2 * diff2);
+    
+    canData[0] = res2;
+    canData[1] = diff2 & 0xFF; canData[2] = (diff2 >> 8) & 0xFF;
+    canData[3] = sectorCount & 0xFF; canData[4] = (sectorCount >> 8) & 0xFF;
+    canData[5] = kbps2 & 0xFF; canData[6] = (kbps2 >> 8) & 0xFF;
+    myCan.sendFrame(0x127, canData, 7); // Gửi kết quả KHÔNG DMA
+    
+    // Khôi phục lại DMA cho các hoạt động sau này
+    spi1_bus.EnableDMA(true);
+}
 /* USER CODE END 0 */
 
 /**
@@ -234,6 +272,9 @@ int main(void)
   // Đã xóa MX_SPI2_Init();
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
+  
+  // Benchmark SD Card RAW Speed
+  test_sd_dma_vs_polling();
 
   //Kích hoạt nguồn và Clock cho Backup Register. Nạp lại biến ầm từ thanh ghi BKP->DR1
   RCC->APB1ENR |= (RCC_APB1ENR_PWREN | RCC_APB1ENR_BKPEN); // Cấp xung nhịp cho PWR và BKP
@@ -694,31 +735,35 @@ int main(void)
         lastRtcRead = currentTick;
     }
 
-    //6:gui du lieu can rtc vs cam bien LIEN TUC
-    uint8_t frame102[6] = {0};
-    uint16_t currentCount = productCount; 
-    uint16_t currentTarget = mucTieu;
-    // Đổi sang dạng Little Endian để trùng khớp với Cangaroo (.dbc)
-    frame102[0] = currentCount & 0xFF;
-    frame102[1] = (currentCount >> 8) & 0xFF;
-    frame102[2] = currentTarget & 0xFF;
-    frame102[3] = (currentTarget >> 8) & 0xFF;
-    frame102[4] = cycleCount & 0xFF;
-    frame102[5] = (cycleCount >> 8) & 0xFF;
-    
-    myCan.sendFrame(0x102, frame102, 6);
-    
-    uint8_t frame103[7];
-    // Truyền thẳng dạng thập phân (Decimal) thay vì BCD để Cangaroo hiển thị chuẩn
-    frame103[0] = h; 
-    frame103[1] = m; 
-    frame103[2] = s; 
-    frame103[3] = date;
-    frame103[4] = month;
-    frame103[5] = year;
-    frame103[6] = dow;
-    
-    myCan.sendFrame(0x103, frame103, 7);
+    //6:gui du lieu can rtc vs cam bien dinh ky 100ms
+    static uint32_t lastCanSend = 0;
+    if (currentTick - lastCanSend >= 100) {
+        lastCanSend = currentTick;
+        uint8_t frame102[6] = {0};
+        uint16_t currentCount = productCount; 
+        uint16_t currentTarget = mucTieu;
+        // Đổi sang dạng Little Endian để trùng khớp với Cangaroo (.dbc)
+        frame102[0] = currentCount & 0xFF;
+        frame102[1] = (currentCount >> 8) & 0xFF;
+        frame102[2] = currentTarget & 0xFF;
+        frame102[3] = (currentTarget >> 8) & 0xFF;
+        frame102[4] = cycleCount & 0xFF;
+        frame102[5] = (cycleCount >> 8) & 0xFF;
+        
+        myCan.sendFrame(0x102, frame102, 6);
+        
+        uint8_t frame103[7];
+        // Truyền thẳng dạng thập phân (Decimal) thay vì BCD để Cangaroo hiển thị chuẩn
+        frame103[0] = h; 
+        frame103[1] = m; 
+        frame103[2] = s; 
+        frame103[3] = date;
+        frame103[4] = month;
+        frame103[5] = year;
+        frame103[6] = dow;
+        
+        myCan.sendFrame(0x103, frame103, 7);
+    }
   }
   /* USER CODE END 3 */
 }

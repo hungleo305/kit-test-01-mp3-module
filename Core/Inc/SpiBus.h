@@ -6,6 +6,7 @@
 class SpiBus {
 private:
     bool isSoftware;
+    bool use_dma_flag = true;
     
     // Hardware SPI
     SPI_TypeDef* hspi;
@@ -15,6 +16,10 @@ private:
     GPIO_TypeDef* misoPort; uint16_t misoPin;
     GPIO_TypeDef* mosiPort; uint16_t mosiPin;
     uint32_t delay_ticks; 
+    
+    // DMA Channels
+    DMA_Channel_TypeDef* dma_rx;
+    DMA_Channel_TypeDef* dma_tx;
     
     void delay();
 
@@ -37,6 +42,9 @@ public:
 
     uint8_t Transfer(uint8_t data);
     void TransferBuffer(const uint8_t* tx_data, uint8_t* rx_data, uint16_t size);
+    void TransferDMA(const uint8_t* tx_data, uint8_t* rx_data, uint16_t size);
+    
+    void EnableDMA(bool enable) { use_dma_flag = enable; }
     
     void SetSpeed(uint32_t speed_hz);
     void SetPrescaler(uint32_t prescaler);
