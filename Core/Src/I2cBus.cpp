@@ -169,21 +169,21 @@ bool I2cBus::WriteMem(uint8_t devAddr, uint8_t memAddr, uint8_t data) {
         stopCond();
         return true;
     } else {
-        uint32_t t = 10000;
+        uint32_t t = 50000;
         while ((hi2c->SR2 & I2C_SR2_BUSY) && --t); if(!t) { resetBus(); return false; }
 
         hi2c->CR1 |= I2C_CR1_START;
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_SB) && --t); if(!t) { resetBus(); return false; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_SB) && --t); if(!t) { resetBus(); return false; }
 
         hi2c->DR = devAddr;
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_ADDR) && --t); if(!t) { resetBus(); return false; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_ADDR) && --t); if(!t) { resetBus(); return false; }
         (void)hi2c->SR2;
 
         hi2c->DR = memAddr;
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_TXE) && --t); if(!t) { resetBus(); return false; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_TXE) && --t); if(!t) { resetBus(); return false; }
 
         hi2c->DR = data;
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_BTF) && --t); if(!t) { resetBus(); return false; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_BTF) && --t); if(!t) { resetBus(); return false; }
 
         hi2c->CR1 |= I2C_CR1_STOP;
         return true;
@@ -203,31 +203,31 @@ uint8_t I2cBus::ReadMem(uint8_t devAddr, uint8_t memAddr) {
         return data;
     } else {
         uint8_t data = 0;
-        uint32_t t = 10000;
+        uint32_t t = 50000;
 
         while ((hi2c->SR2 & I2C_SR2_BUSY) && --t); if(!t) { resetBus(); return 0; }
 
         hi2c->CR1 |= I2C_CR1_START;                 
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_SB) && --t); if(!t) { resetBus(); return 0; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_SB) && --t); if(!t) { resetBus(); return 0; }
 
         hi2c->DR = devAddr;                            
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_ADDR) && --t); if(!t) { resetBus(); return 0; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_ADDR) && --t); if(!t) { resetBus(); return 0; }
         (void)hi2c->SR2;                            
 
         hi2c->DR = memAddr;                            
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_TXE) && --t); if(!t) { resetBus(); return 0; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_TXE) && --t); if(!t) { resetBus(); return 0; }
 
         hi2c->CR1 |= I2C_CR1_START;                 
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_SB) && --t); if(!t) { resetBus(); return 0; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_SB) && --t); if(!t) { resetBus(); return 0; }
 
         hi2c->DR = devAddr | 0x01;                            
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_ADDR) && --t); if(!t) { resetBus(); return 0; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_ADDR) && --t); if(!t) { resetBus(); return 0; }
 
         hi2c->CR1 &= ~I2C_CR1_ACK;                  
         (void)hi2c->SR2;                         
 
         hi2c->CR1 |= I2C_CR1_STOP;                  
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_RXNE) && --t); if(!t) { resetBus(); return 0; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_RXNE) && --t); if(!t) { resetBus(); return 0; }
 
         data = hi2c->DR;                            
         return data;
@@ -242,19 +242,19 @@ bool I2cBus::WriteByte(uint8_t devAddr, uint8_t data) {
         stopCond();
         return true;
     } else {
-        uint32_t t = 10000;
+        uint32_t t = 50000;
         while ((hi2c->SR2 & I2C_SR2_BUSY) && --t); if(!t) { resetBus(); return false; }
 
         hi2c->CR1 |= I2C_CR1_START;
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_SB) && --t); if(!t) { resetBus(); return false; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_SB) && --t); if(!t) { resetBus(); return false; }
 
         hi2c->DR = devAddr;
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_ADDR) && --t); if(!t) { resetBus(); return false; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_ADDR) && --t); if(!t) { resetBus(); return false; }
         (void)hi2c->SR2;
 
         hi2c->DR = data;
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_TXE) && --t); if(!t) { resetBus(); return false; }
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_BTF) && --t); if(!t) { resetBus(); return false; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_TXE) && --t); if(!t) { resetBus(); return false; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_BTF) && --t); if(!t) { resetBus(); return false; }
 
         hi2c->CR1 |= I2C_CR1_STOP;
         return true;
@@ -270,20 +270,20 @@ uint8_t I2cBus::ReadByteDirect(uint8_t devAddr) {
         return data;
     } else {
         uint8_t data = 0;
-        uint32_t t = 10000;
+        uint32_t t = 50000;
         while ((hi2c->SR2 & I2C_SR2_BUSY) && --t); if(!t) { resetBus(); return 0; }
 
         hi2c->CR1 |= I2C_CR1_START;
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_SB) && --t); if(!t) { resetBus(); return 0; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_SB) && --t); if(!t) { resetBus(); return 0; }
 
         hi2c->DR = devAddr | 0x01;
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_ADDR) && --t); if(!t) { resetBus(); return 0; }
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_ADDR) && --t); if(!t) { resetBus(); return 0; }
         
         hi2c->CR1 &= ~I2C_CR1_ACK;
         (void)hi2c->SR2;
         hi2c->CR1 |= I2C_CR1_STOP;
 
-        t = 10000; while (!(hi2c->SR1 & I2C_SR1_RXNE) && --t); if(t) data = hi2c->DR; else resetBus();
+        t = 50000; while (!(hi2c->SR1 & I2C_SR1_RXNE) && --t); if(t) data = hi2c->DR; else resetBus();
 
         return data;
     }
