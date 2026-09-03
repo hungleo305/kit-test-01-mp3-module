@@ -3,6 +3,7 @@
   ******************************************************************************
   * @file           : main.c
   * @brief          : Main program body
+  * @author         : Chu Manh Hung    
   ******************************************************************************
   * @attention
   *
@@ -24,7 +25,7 @@
 /* USER CODE BEGIN Includes */
 #include <string.h>
 #include <stdio.h>
-#include "SystemTimer.h"
+#include "stm32f1xx_hal.h"
 #include "Led.h"
 #include "Buzzer.h"
 #include "Sensor.h"
@@ -64,15 +65,13 @@ extern uint8_t FATFS_LinkDriver(Diskio_drvTypeDef *drv, char *path);
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan;
 
-// Đã xóa hspi2 vì sử dụng SpiBus Bare-metal
-/* USER CODE BEGIN PV */
-Led ledOb(GPIOB, 1<<2);
-Buzzer buzzer(GPIOC, 1<<15);
-Sensor cb(GPIOC, 1<<13);
-Relay relay(GPIOC, 1<<7);
+Led ledOb(GPIOB, GPIO_PIN_2);
+Buzzer buzzer(GPIOC, GPIO_PIN_15);
+Sensor cb(GPIOC, GPIO_PIN_13);
+Relay relay(GPIOC, GPIO_PIN_7);
 
 volatile bool rtcErrorFlag = false;
-Led7Segment dp(GPIOC, 1<<5, GPIOC, 1<<7, GPIOC, 1<<6);
+Led7Segment dp(GPIOC, GPIO_PIN_5, GPIOC, GPIO_PIN_7, GPIOC, GPIO_PIN_6);
 
 I2cBus i2c1(I2C1, GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);
 Rtc rtc(&i2c1);
@@ -82,8 +81,8 @@ SpiBus spi2_bus(SPI2, GPIOB, GPIO_PIN_13, GPIOB, GPIO_PIN_14, GPIOB, GPIO_PIN_15
 SpiBus spi3_bus(SPI3, GPIOB, GPIO_PIN_3, GPIOB, GPIO_PIN_4, GPIOB, GPIO_PIN_5); // Cho Rfid
 
 Rfid rfid(&spi3_bus, GPIOA, GPIO_PIN_15, GPIOC, GPIO_PIN_14); // cs,rst
-Mp3 mp3(&spi2_bus, GPIOC, 1<<2, GPIOA, 1<<0, GPIOA, 1<<1, GPIOB, 1<<12, GPIOC, 1<<3); //pwr,xrs,xdcs,xcs
-SdCard sdCard(&spi1_bus, GPIOC, 1<<8, GPIOB, 1<<0, GPIOB, 1<<1); // cs,sd_dt,pwr
+Mp3 mp3(&spi2_bus, GPIOC, GPIO_PIN_2, GPIOA, GPIO_PIN_0, GPIOA, GPIO_PIN_1, GPIOB, GPIO_PIN_12, GPIOC, GPIO_PIN_3); //pwr,xrs,xdcs,xcs
+SdCard sdCard(&spi1_bus, GPIOC, GPIO_PIN_8, GPIOB, GPIO_PIN_0, GPIOB, GPIO_PIN_1); // cs,sd_dt,pwr
 
 extern CAN_HandleTypeDef hcan;
 CanBus myCan(&hcan);
@@ -107,6 +106,10 @@ bool coMatKhauTam = false;
 uint32_t lastRelayDao = 0;
 bool choCapNhatManHinh = false;
 
+//kích hoạt test cảm biến
+#define ENABLE_SENSOR_DIAGNOSTIC
+
+#ifdef ENABLE_SENSOR_DIAGNOSTIC
 // Biến phục vụ chức năng Diagnostic cảm biến
 bool cheDoChanDoan = true; 
 uint32_t thoiDiemDoiTrangThai = 0;
@@ -117,6 +120,7 @@ uint32_t thoiGianTrong = 0;
 uint32_t thoiGianBiCheTruoc = 0;
 uint32_t thoiGianTrongTruoc = 0;
 bool coDuLieuMoi = false;
+#endif
 
 
 FATFS fs;       
@@ -137,7 +141,7 @@ extern "C" void EXTI0_IRQHandler(void) {
     if (EXTI->PR & (1 << 0)) {
         EXTI->PR = (1 << 0); // Xóa cờ ngắt
         sdCardChanged = true;
-        sdChangeTick = SystemTimer::getTick();
+        sdChangeTick = HAL_GetTick();
     }
 }
 uint32_t lastSdCheck = 0;
@@ -151,9 +155,10 @@ extern "C" void EXTI15_10_IRQHandler(void) {
 }
 
 void onSensorDetect() {
-    uint32_t currentTick = SystemTimer::getTick();
+    uint32_t currentTick = HAL_GetTick();
     bool isPinHigh = (GPIOC->IDR & (1 << 13)) != 0;
     
+#ifdef ENABLE_SENSOR_DIAGNOSTIC
     if (cheDoChanDoan) {
         static bool lastDiagState = false;
         if (currentTick - thoiDiemDoiTrangThai > 20) { 
@@ -179,6 +184,7 @@ void onSensorDetect() {
             }
         }
     }
+#endif
     
     if (isPinHigh) {
         productCount++;
@@ -192,52 +198,14 @@ void onSensorDetect() {
 }
 static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
-// Đã xóa MX_SPI2_Init(void);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-void test_sd_dma_vs_polling() {
-    sdCard.init();
-    sdCard.initialize();
-    uint32_t sectorCount = 200; // Đọc 100KB
-    uint8_t canData[7];
-    
-    // --- BÀI TEST 1: CÓ DMA ---
-    spi1_bus.EnableDMA(true);
-    uint32_t start1 = SystemTimer::getTick();
-    uint8_t res1 = sdCard.read(nullptr, 1000, sectorCount);
-    uint32_t diff1 = SystemTimer::getTick() - start1;
-    if (diff1 == 0) diff1 = 1;
-    uint32_t kbps1 = (sectorCount * 1000) / (2 * diff1);
-    
-    canData[0] = res1;
-    canData[1] = diff1 & 0xFF; canData[2] = (diff1 >> 8) & 0xFF;
-    canData[3] = sectorCount & 0xFF; canData[4] = (sectorCount >> 8) & 0xFF;
-    canData[5] = kbps1 & 0xFF; canData[6] = (kbps1 >> 8) & 0xFF;
-    myCan.sendFrame(0x126, canData, 7); // Gửi kết quả CÓ DMA
-    
-    SystemTimer::delay_ms(100); // Nghỉ một chút để Cangaroo hiển thị kịp
-    
-    // --- BÀI TEST 2: KHÔNG DMA (POLLING) ---
-    spi1_bus.EnableDMA(false);
-    uint32_t start2 = SystemTimer::getTick();
-    uint8_t res2 = sdCard.read(nullptr, 1000, sectorCount);
-    uint32_t diff2 = SystemTimer::getTick() - start2;
-    if (diff2 == 0) diff2 = 1;
-    uint32_t kbps2 = (sectorCount * 1000) / (2 * diff2);
-    
-    canData[0] = res2;
-    canData[1] = diff2 & 0xFF; canData[2] = (diff2 >> 8) & 0xFF;
-    canData[3] = sectorCount & 0xFF; canData[4] = (sectorCount >> 8) & 0xFF;
-    canData[5] = kbps2 & 0xFF; canData[6] = (kbps2 >> 8) & 0xFF;
-    myCan.sendFrame(0x127, canData, 7); // Gửi kết quả KHÔNG DMA
-    
-    // Khôi phục lại DMA cho các hoạt động sau này
-    spi1_bus.EnableDMA(true);
-}
+
 /* USER CODE END 0 */
 
 /**
@@ -269,12 +237,8 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_CAN_Init();
-  // Đã xóa MX_SPI2_Init();
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
-  
-  // Benchmark SD Card RAW Speed
-  test_sd_dma_vs_polling();
 
   //Kích hoạt nguồn và Clock cho Backup Register. Nạp lại biến ầm từ thanh ghi BKP->DR1
   RCC->APB1ENR |= (RCC_APB1ENR_PWREN | RCC_APB1ENR_BKPEN); // Cấp xung nhịp cho PWR và BKP
@@ -284,8 +248,11 @@ int main(void)
   cycleCount = BKP->DR2;
 
   ledOb.init();
-  cb.init(Sensor::BOTH_EDGES);
-    EXTI->RTSR |= (1 << 13); // Bật luôn ngắt cạnh lên cho chức năng Diagnostic
+#ifdef ENABLE_SENSOR_DIAGNOSTIC
+  cb.init(Sensor::BOTH_EDGES); 
+#else
+  cb.init(Sensor::RISING_EDGE); 
+#endif
 
   cb.setCallback(onSensorDetect);
   dp.init();
@@ -296,6 +263,9 @@ int main(void)
   mp3.init();
   myCan.init();
   sdCard.init();
+  
+  // Kích hoạt DMA cho spi1
+  spi1_bus.EnableDMA(true);
   
   // Cấu hình ngắt EXTI0 cho chân PB0 (SD_DETECT)
   AFIO->EXTICR[0] &= ~(0xF << 0);
@@ -308,7 +278,7 @@ int main(void)
 
   //còi khởi động
   buzzer.beep(2, 50, 100, true);
-    SystemTimer::delay_ms(300); // Chờ tiếng bíp khởi động hơn tắt
+    HAL_Delay(300); // Chờ tiếng bíp khởi động hơn tắt
 
   fres = f_mount(&fs, "", 1);
   if (fres != FR_OK) {
@@ -355,6 +325,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     
+#ifdef ENABLE_SENSOR_DIAGNOSTIC
     //ĐỌC LOG CẢM BIẾN (DIAGNOSTIC)
     uint16_t currBlock = 0, currGap = 0, prevBlock = 0, prevGap = 0;
     if (coDuLieuMoi) {
@@ -381,9 +352,10 @@ int main(void)
         canData[7] = (prevGap >> 8) & 0xFF;
         myCan.sendFrame(0x124, canData, 8);
     }
+#endif
     
     //chong nhay led
-    uint32_t currentTick = SystemTimer::getTick();
+    uint32_t currentTick = HAL_GetTick();
     
     if (choCapNhatManHinh) {
         if (currentTick - lastRelayDao >= 100) {
@@ -409,7 +381,7 @@ int main(void)
                     mp3.init();
                     f_mount(NULL, "", 0); 
                     buzzer.beep(1, 100, 0, true); // Kêu 1 tiếng bíp hiệu rút thẻ
-                    SystemTimer::delay_ms(100);
+                    HAL_Delay(100);
                     GPIOA->BRR = (1 << 4); // Bật lại Amply
                 }
             } else {
@@ -417,7 +389,7 @@ int main(void)
                 if (!sdCardInSlot) {
                     GPIOA->BSRR = (1 << 4); // Tắt Amply (Mute) để chống nhiễu điện khi cắm nóng
                     sdCardInSlot = true; // đánh dấu là đã cắm vào
-                    uint32_t startMount = SystemTimer::getTick();
+                    uint32_t startMount = HAL_GetTick();
                 
                     sdCard.init();
                 
@@ -425,14 +397,14 @@ int main(void)
                     FATFS_LinkDriver(&USER_Driver, USERPath);
                 
                     // Chờ chút ổn định điện áp sau khi cắm nóng
-                    SystemTimer::delay_ms(300); // Tăng lên 300ms cho các thẻ dung lượng cao
+                    HAL_Delay(300); // Tăng lên 300ms cho các thẻ dung lượng cao
                 
                     uint8_t stat = sdCard.initialize();
                 
                     if (stat == 0x00) { // Khởi tạo SD thành công
                         if (f_mount(&fs, USERPath, 1) == FR_OK) {
                             daNhanTheSD = true;
-                              uint32_t mountTime = SystemTimer::getTick() - startMount;
+                              uint32_t mountTime = HAL_GetTick() - startMount;
                           
                               // Kêu 2 tiếng ngắn báo thành công
                           buzzer.beep(2, 50, 100, true); 
@@ -442,7 +414,7 @@ int main(void)
                           dp.setValue(mountTime);
                           dp.update(false);
                           lastDisplayValue = mountTime;
-                          showMountTimeUntil = SystemTimer::getTick() + 3000;
+                          showMountTimeUntil = HAL_GetTick() + 3000;
                           
                           // Gửi thời gian kết nối (ms) qua mạng CAN (ID 0x125)
                           // Định dạng Little-Endian 32-bit Integer để Cangaroo DBC giải mã chuẩn
@@ -465,7 +437,7 @@ int main(void)
                         buzzer.beep(5, 50, 50);
                     }
                     
-                    SystemTimer::delay_ms(100);
+                    HAL_Delay(100);
                     GPIOA->BRR = (1 << 4); // Bật lại Amply sau khi nạp thẻ xong
                 } // Kết thúc if (!sdCardInSlot)
             }
@@ -1006,6 +978,7 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+
 
 
 
