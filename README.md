@@ -1,6 +1,6 @@
-# TÀI LIỆU HƯỚNG DẪN SỬ DỤNG VÀ PHÁT TRIỂN FIRMWARE - KIT VNA
+﻿# TÀI LIỆU HƯỚNG DẪN SỬ DỤNG VÀ PHÁT TRIỂN FIRMWARE - KIT VNA
 
-Dự án mạch Kit STM32F103RCT6 điều khiển đa năng giao tiếp CAN Bus, tích hợp đọc thẻ RFID, thẻ nhớ SD (phát nhạc MP3), cảm biến đếm sản phẩm, và LED 7 đoạn.
+Dự án mạch Kit STM32F103RCT6 điều khiển đa năng giao tiếp CAN Bus, tích hợp đọc thẻ RFID, thẻ nhớ SD (phát nhạc MP3), cảm biến hồng ngoại, và LED 7 đoạn.
 
 ---
 
@@ -9,7 +9,7 @@ Dự án mạch Kit STM32F103RCT6 điều khiển đa năng giao tiếp CAN Bus,
 
 - **STM32CubeMX (Phiên bản 6.17.0):** Công cụ sinh code tự động (C code) và cấu hình phần cứng (Clock, GPIO, SPI, I2C, CAN...). File cấu hình dự án là `Firmware.ioc`. Khi muốn thay đổi sơ đồ chân mạch, hãy dùng CubeMX để Generate Code ban đầu.
 - **IAR Embedded Workbench (Phiên bản 8.40.1.21539):** Trình biên dịch (Compiler) và Môi trường phát triển (IDE) chính để viết code C++ và nạp chương trình. Sử dụng Workspace `Project.eww` nằm trong thư mục `EWARM/`. Mã nguồn của dự án được tối ưu rất sâu trên IAR, tận dụng trình biên dịch DLib và kiến trúc tối ưu bộ nhớ.
-- **Cangaroo (Phiên bản 0.6.3):** Phần mềm giả lập màn hình HMI/PC mã nguồn mở. Dùng để gửi và nhận tín hiệu mạng CAN Bus giữa máy tính và mạch. Hỗ trợ import Database trực tiếp qua file `.dbc` để hiển thị tiếng Việt thay cho các mã Hexa khó đọc.
+- **Cangaroo (Phiên bản 0.6.3):** Phần mềm giả lập màn hình HMI/PC mã nguồn mở. Dùng để gửi và nhận tín hiệu mạng CAN Bus giữa máy tính và mạch. Hỗ trợ import Database trực tiếp qua file `.dbc` để hiển thị tiếng Việt.
 
 ---
 
@@ -56,7 +56,7 @@ Phần này hướng dẫn chi tiết cách vận hành mạch từ lúc cắm �
   2. **Giờ hiện tại (Giờ:Phút):** Dấu chấm ở giữa màn hình sẽ **NHẤP NHÁY** theo từng giây.
 
 ### 3.2. Tín hiệu Còi (Buzzer) và Cảnh báo
-Hệ thống còi bíp đã được tinh chỉnh để chạy hoàn toàn đa nhiệm (có hàng chờ) nên các tiếng bíp sẽ lần lượt phát ra mượt mà, không bao giờ bị dính hoặc nuốt tiếng của nhau. 
+Hệ thống còi bíp đã được tinh chỉnh để chạy hoàn toàn đa nhiệm (có hàng chờ) nên các tiếng bíp sẽ lần lượt phát ra mượt, không bị dính hoặc nuốt tiếng của nhau. 
 
 Mạch được quy định phản hồi các thao tác thông qua số lượng tiếng bíp như sau:
 
@@ -65,10 +65,9 @@ Mạch được quy định phản hồi các thao tác thông qua số lượng
 | **1 Bíp ngắn** | **Thành công** | - Có sản phẩm chạy qua mắt cảm biến.<br>- Nhận diện thành công có thẻ RFID quẹt qua.<br>- Cập nhật thành công cài đặt mới từ phần mềm máy tính (CAN Bus: Mục tiêu, Bộ đếm, Xem giờ). |
 | **2 Bíp ngắn** | **Lỗi Dữ liệu / Cảnh báo nhẹ** | - **Khởi động:** Báo hiệu mạch vừa khởi động/cấp điện thành công.<br>- **Thẻ SD (Hot-plug):** Cắm thẻ SD thành công khi mạch đang chạy.<br>- **CAN Bus:** Gửi cài đặt Mục tiêu / Số đếm lớn hơn `9999` (Vượt quá giới hạn màn hình LED).<br>- **Quẹt Thẻ (RFID):** Sai mật khẩu thẻ.<br>- **Quẹt Thẻ (RFID):** Lỗi giao tiếp với chip nhớ trong thẻ (không đọc được Block).<br>- **Quẹt Thẻ (RFID):** Dữ liệu trong thẻ bị sai lệch (VD: Không chứa các lệnh hợp lệ như `RESET_DEM`, `BAT_RELAY`...).<br>- **Quẹt Thẻ (RFID) Thao tác thừa:** Ví dụ thẻ mang lệnh bắt "Bật Relay" nhưng Relay đang bật sẵn, hoặc thẻ mang lệnh "Reset bộ đếm" nhưng số đếm đang là 0 sẵn rồi. |
 | **3 Bíp ngắn** | **Lỗi Phần cứng / Module MP3** | - **Lỗi Thẻ Nhớ SD:** Thẻ nhớ bị lỗi định dạng (yêu cầu FAT32), chưa cắm thẻ nhớ, hoặc khe cắm hỏng tiếp xúc phần cứng.<br>- **Lỗi Module MP3:** Module âm thanh MP3 bị treo không phản hồi, hoặc thẻ nhớ không có tệp `.MP3` tương ứng với hành động. |
-| **1 Bíp Dài**<br>*(Nửa giây)* | **Lỗi Mất Mạng CAN** | - Mạch cảnh báo phần cứng phát hiện đường truyền mạng CAN Bus đang bị đứt cáp hoặc lỗi bộ chuyển đổi máy tính. |
-
+| **1 Bíp Dài**<br>*(Nửa giây)* | **Lỗi Mất Mạng CAN** | - Không gửi được dữ liệu qua đường truyền CANBUS
 **Tín hiệu Cảnh báo trên Màn hình LED:**
-- **Lỗi đứt cáp mạng CAN:** Nếu mạch phát hiện mạng CAN bị đứt, ở chế độ đếm số, **dấu chấm ở giữa màn hình sẽ nhấp nháy liên tục rất nhanh (5 lần/giây)** để cảnh báo dữ liệu không gửi được lên máy tính. Ngay khi khôi phục lại kết nối canbus, phần cứng sẽ tự khôi phục và dấu chấm tự động ngừng nhấp nháy (hệ thống về trạng thái bình thường).
+- **Lỗi đứt cáp mạng CAN:** Nếu mạch phát hiện dữ liệu gửi qua mạng CAN bị lỗi, ở chế độ đếm số, **dấu chấm ở giữa màn hình sẽ nhấp nháy liên tục rất nhanh (5 lần/giây)** để cảnh báo dữ liệu không gửi được lên máy tính. Ngay khi khôi phục lại kết nối canbus, phần cứng sẽ tự khôi phục và dấu chấm tự động ngừng nhấp nháy (hệ thống về trạng thái bình thường).
 - **Lỗi mất thời gian thực (Hết pin RTC):** Nếu mạch bị mất thời gian thực. Khi hiển thị chế độ Xem giờ, thay vì hiện `Giờ:Phút`, màn hình sẽ hiện chữ `----` nhấp nháy mãi mãi để báo lỗi. Lúc này cần nạp lại thời gian qua CAN Bus (Cangaroo).
 
 ### 3.3. Hướng dẫn đếm sản phẩm bằng Cảm biến
@@ -154,11 +153,10 @@ Mã nguồn được viết theo cấu trúc Hướng đối tượng (OOP) C++.
 ---
 
 
-### 4.1. Bắt Đầu Nhanh (Mở Code và Nạp vào mạch dành cho người mới)
-
+### 4.1. Bắt Đầu Nhanh
 **Bước 1: Mở phần mềm lập trình**
 - Cài đặt phần mềm **IAR Embedded Workbench**.
-- Vào thư mục EWARM, click đúp chuột vào file **Project.eww** để mở dự án.
+-Vào thư mục EWARM, click đúp chuột vào file **Project.eww** để mở dự án.
 - Phía bên trái phần mềm, mở nhánh thư mục Application/User/Core và click đúp vào file main.cpp để bắt đầu viết code.
 
 **Bước 2: Biên dịch (Kiểm tra lỗi)**
@@ -167,7 +165,7 @@ Mã nguồn được viết theo cấu trúc Hướng đối tượng (OOP) C++.
 
 **Bước 3: Nạp code xuống mạch**
 - Cắm mạch vào máy tính qua cổng nạp ST-Link (Chân SWDIO, SWCLK).
-- Bấm nút **Download and Debug** (hoặc Ctrl + D). Code sẽ bay thẳng vào chip.
+- Bấm nút **Download and Debug** (hoặc Ctrl + D). Code sẽ được nạp vào chip.
 - Bấm nút hình "Dấu X" đỏ để thoát chế độ Debug, sau đó mạch sẽ tự động chạy code mới.
 
 ---
@@ -241,8 +239,7 @@ Việc đặt `buzzer.update()` vào trong hàm ngắt này có ý nghĩa cực 
 ---
 
 ### 4.4. Kiến trúc cốt lõi SPI Đa năng (`SpiBus`)
-Thư viện `SpiBus` là nền tảng cốt lõi quản lý toàn bộ giao tiếp SPI của hệ thống. Thư viện được thiết kế độc lập, dễ dàng tái sử dụng trên bất kỳ dự án STM32F103 nào.
-
+Thư viện `SpiBus` là nền tảng cốt lõi quản lý toàn bộ giao tiếp SPI của hệ thống.
 **A. Các chế độ khởi tạo SPI:**
 - **Chế độ 1 - Dùng cấu hình CubeMX:** Giao toàn quyền cho CubeMX cấu hình clock và chân cắm.
   ```cpp
@@ -261,16 +258,12 @@ Thư viện `SpiBus` là nền tảng cốt lõi quản lý toàn bộ giao ti�
   SpiBus spi_mem(GPIOA, GPIO_PIN_5, GPIOA, GPIO_PIN_6, GPIOA, GPIO_PIN_7);
   ```
 
-**B. Cơ chế tăng tốc phần cứng DMA (Direct Memory Access):**
-Để giải phóng CPU khỏi việc chờ đợi đẩy từng byte qua SPI, bạn có thể bật cơ chế chuyển dữ liệu tự động DMA. 
-- **Cách bật:** `spi_bus.EnableDMA(true);`
-- **Khả năng hỗ trợ của vi điều khiển:**
-  - **SPI1**: Hỗ trợ tự động qua `DMA1` (Kênh 2 & Kênh 3).
-  - **SPI2**: Hỗ trợ tự động qua `DMA1` (Kênh 4 & Kênh 5).
-  - **SPI3**: Hỗ trợ tự động qua `DMA2` (Kênh 1 & Kênh 2).
-  - **SPI Mềm**: **Không hỗ trợ DMA.** (DMA yêu cầu tín hiệu kích hoạt phần cứng từ bộ SPI cứng).
-- **Cơ chế hoạt động:** Thư viện sử dụng cơ chế **DMA Đồng bộ (Blocking có Timeout cứng 200ms)**. CPU sẽ ra lệnh cho DMA và đứng chờ. Cơ chế này loại bỏ hoàn toàn khoảng thời gian trễ giữa các byte, giúp đẩy tốc độ SPI lên mức giới hạn vật lý (~1.93 MB/s) đồng thời giữ nguyên được cấu trúc tương thích với các thư viện cấp cao (FatFs, MP3). Nếu phần cứng kẹt, sau 200ms CPU sẽ tự thoát luồng để chống treo (Fail-safe).
-
+**B. Cơ chế tăng tốc bằng DMA (Tối đa hóa băng thông):**
+Thư viện SpiBus hỗ trợ truyền dữ liệu tốc độ cao bằng DMA. Lưu ý: DMA ở dự án này không dùng để chạy ngầm đa nhiệm (vì hàm đọc thẻ nhớ FatFs bắt buộc phải có dữ liệu mới chạy tiếp được), mà dùng để **tối đa hóa tốc độ truyền SPI**.
+- **Lý do:** Nếu dùng CPU đẩy từng byte, giữa các byte luôn có độ trễ do CPU phải xử lý vòng lặp. Khi bật DMA, luồng dữ liệu được phần cứng bơm liên tục không có khoảng nghỉ. Nhờ vậy tốc độ đọc thẻ SD tăng lên cao (rất cần thiết để đọc nhạc MP3 mượt mà). CPU chỉ cần đứng chờ DMA làm xong (với timeout 200ms chống treo).
+- **Cách dùng để tái sử dụng:** Thư viện đã tự động mapping kênh DMA chuẩn cho từng bộ SPI cứng (VD: SPI1 nối DMA1 CH2/3). Bạn **không cần** bật DMA trong CubeMX. Chỉ cần:
+  1. spi_bus.EnableDMA(true); (Bật tính năng DMA)
+  2. Dùng hàm spi_bus.TransferDMA(tx_buf, rx_buf, size); thay cho TransferBuffer() để truyền mảng dữ liệu lớn.
 ---
 
 ### 4.5. Thư viện `Mp3` (IC Giải mã VS1011e) & Thẻ nhớ (`SdCard`)
@@ -340,7 +333,7 @@ Trong `main.cpp`, nhờ hàm `disk_status()`, vi điều khiển liên tục the
 **Lưu ý phần cứng đặc biệt:** 
 Kit hiện tại gắn thêm mạch khuếch đại (Amply) rời MIX2018A để kéo loa công suất cao. Nguồn Amply được điều khiển Mute bằng chân `PA4`. Phải bật chân `PA4` này lên (Bằng thanh ghi: `GPIOA->BRR = (1 << 4);`) trước khi phát nhạc.
 
-**Ví dụ Code hoàn chỉnh có hỗ trợ Hot-Plug (Cắm rút thẻ nóng):**
+**Ví dụ Code hoàn chỉnh:**
 ```cpp
 #include "Mp3.h"
 #include "SdCard.h"
@@ -460,7 +453,7 @@ int main(void) {
                     rfid.MIFARE_Read(1, data, &size);
                 }
                 
-                // NGỦ ĐÔNG THẺ! Tránh bị đọc liên hồi
+                // NGỦ THẺ! Tránh bị đọc liên hồi
                 rfid.PICC_HaltA(); 
             }
         }
@@ -483,7 +476,7 @@ Giúp đọc tín hiệu từ cảm biến nhanh chóng mặt nhờ hệ thống
   - `Sensor::FALLING_EDGE`: Phản xạ khi mức điện áp rơi từ Cao -> Thấp.
   - `Sensor::RISING_EDGE`: Phản xạ khi mức Thấp -> Cao.
   - `Sensor::BOTH_EDGES` (Diagnostic Mode): Chế độ đo đạc nhiễu.
-- **Diagnostic Mode:** Gọi `Sensor::enableDiagnosticMode(true)` và dùng ngắt `BOTH_EDGES`. Lúc này, hàm ngắt sẽ tính toán thời gian cảm biến Bị Che là bao nhiêu mili-giây, và Bị Trống là bao nhiêu mili-giây. Các thông số này được đẩy qua CAN Bus để thợ bảo trì phân tích và cắt nhiễu rung lắc của băng tải.
+- **Diagnostic Mode:** Gọi `Sensor::enableDiagnosticMode(true)` và dùng ngắt `BOTH_EDGES`. Lúc này, hàm ngắt sẽ tính toán thời gian cảm biến Bị Che là bao nhiêu mili-giây, và Bị Trống là bao nhiêu mili-giây.
 
 **Ví dụ Code hoàn chỉnh:**
 ```cpp
@@ -517,7 +510,7 @@ int main(void) {
 
 ---
 
-### 4.8. Giao thức I2C đa năng (`I2cBus`), Module Thời gian thực DS1307 (`Rtc`) & Thanh ghi Sao lưu (BKP)
+### 4.8. Giao thức I2C (`I2cBus`), Module Thời gian thực DS1307 (`Rtc`) & Thanh ghi Sao lưu (BKP)
 
 **Quy trình 4 bước để làm chủ thư viện `I2cBus`:**
 
