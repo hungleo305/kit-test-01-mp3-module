@@ -53,6 +53,7 @@ void Buzzer::playNext() {
 void Buzzer::beep(int times, int timeOn, int timeOff, bool instant) {
     if (times <= 0) return;
     
+    __disable_irq();
     if (instant) {
         // Xoa hang doi va phat ngay lap tuc
         head = 0;
@@ -80,6 +81,7 @@ void Buzzer::beep(int times, int timeOn, int timeOff, bool instant) {
             }
         }
     }
+    __enable_irq();
 }
 
 void Buzzer::update() {

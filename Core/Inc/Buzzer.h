@@ -3,7 +3,7 @@
 
 #include "stm32f1xx.h"
 
-#define MAX_BEEP_QUEUE 5
+#define MAX_BEEP_QUEUE 20
 
 struct BeepReq {
     uint8_t times;

@@ -190,3 +190,19 @@ BO_ 295 Ket_Qua_GHI_SD: 7 Mach_STM32
  SG_ So_Block : 24|16@1+ (1,0) [0|65535] "blocks" Phan_Mem_PC
  SG_ Toc_Do_KBs : 40|16@1+ (1,0) [0|65535] "KB/s" Phan_Mem_PC
 
+BO_ 296 Thong_Ke_CAN: 8 Mach_STM32
+ SG_ So_Goi_Thanh_Cong : 0|32@1+ (1,0) [0|4294967295] "goi" Phan_Mem_PC
+ SG_ Thoi_Gian_Hoat_Dong : 32|32@1+ (1,0) [0|4294967295] "s" Phan_Mem_PC
+
+
+BO_ 297 Ket_Qua_GHI_RAW: 7 Mach_STM32
+ SG_ Trang_Thai : 0|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Thoi_Gian_Ghi : 8|16@1+ (1,0) [0|65535] "ms" Phan_Mem_PC
+ SG_ So_Block : 24|16@1+ (1,0) [0|65535] "blocks" Phan_Mem_PC
+ SG_ Toc_Do_KBs : 40|16@1+ (1,0) [0|65535] "KB/s" Phan_Mem_PC
+
+BO_ 298 Ket_Qua_DOC_RAW: 7 Mach_STM32
+ SG_ Trang_Thai : 0|8@1+ (1,0) [0|255] "" Phan_Mem_PC
+ SG_ Thoi_Gian_Doc : 8|16@1+ (1,0) [0|65535] "ms" Phan_Mem_PC
+ SG_ So_Block : 24|16@1+ (1,0) [0|65535] "blocks" Phan_Mem_PC
+ SG_ Toc_Do_KBs : 40|16@1+ (1,0) [0|65535] "KB/s" Phan_Mem_PC

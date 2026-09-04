@@ -11,6 +11,7 @@ private:
     uint32_t TxMailbox;
 
 public:
+    uint32_t txSuccessCount;
     CanBus(CAN_HandleTypeDef* hcan_ptr);
     
     void init(uint32_t filterId = 0x0000, uint32_t filterMask = 0x0000);

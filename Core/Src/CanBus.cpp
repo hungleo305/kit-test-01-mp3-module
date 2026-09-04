@@ -2,6 +2,7 @@
 
 CanBus::CanBus(CAN_HandleTypeDef* hcan_ptr) {
     hcan = hcan_ptr;
+    txSuccessCount = 0;
 }
 
 void CanBus::init(uint32_t filterId, uint32_t filterMask) {
@@ -35,13 +36,15 @@ bool CanBus::sendFrame(uint32_t id, uint8_t* data, uint8_t length) {
     TxHeader.DLC = length;
     TxHeader.TransmitGlobalTime = DISABLE;
 
-    uint32_t timeout = 50000;
-    while (HAL_CAN_GetTxMailboxesFreeLevel(hcan) == 0 && --timeout);
-    if (timeout == 0) return false;
+    if (HAL_CAN_GetTxMailboxesFreeLevel(hcan) == 0) {
+        return false;
+    }
 
     if (HAL_CAN_AddTxMessage(hcan, &TxHeader, data, &TxMailbox) == HAL_OK) {
+        txSuccessCount++;
         return true;
     }
+    
     return false;
 }
 

@@ -186,7 +186,7 @@ void Mp3::process() {
     }
 
     int chunksSent = 0;
-    while (((dreqPort->IDR & dreqPin) ? 1 : 0) == 1 && chunksSent < 16) {
+    while (((dreqPort->IDR & dreqPin) ? 1 : 0) == 1 && chunksSent < 64) {
         
         if (bufferIndex >= dataInBuf) {
             UINT bytesRead;

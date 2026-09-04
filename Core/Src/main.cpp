@@ -205,7 +205,103 @@ static void MX_CAN_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void testSdCardSpeedAndSendCan() {
+    static uint8_t buffer[4096]; // Dung static de tranh tran Stack, 4KB buffer (8 block) de ep DMA chay max cong suat
+    for (int i = 0; i < 4096; i++) buffer[i] = 0xAA;
+    
+    uint32_t totalBlocks = 128; // 128 blocks = 64KB
+    uint32_t loopCount = totalBlocks / 8; // 16 loops (mỗi loop 8 block = 4KB)
+    
+    uint32_t start, timeMs, speedKBs;
+    uint8_t frame[7] = {0};
+    uint32_t timeout;
+    
+    FIL testFile;
+    UINT bw, br;
+    
+    // 1. TEST GHI FATFS (Tốc độ thực tế) -> 0x127
+    if (f_open(&testFile, "speed.tst", FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+        start = HAL_GetTick();
+        for (uint32_t i = 0; i < loopCount; i++) {
+            f_write(&testFile, buffer, 4096, &bw);
+        }
+        f_close(&testFile);
+        timeMs = HAL_GetTick() - start;
+        if (timeMs == 0) timeMs = 1;
+        speedKBs = (totalBlocks * 512 * 1000) / 1024 / timeMs;
+        
+        frame[0] = 1; // Trang_Thai = 1 (Thực tế)
+        frame[1] = timeMs & 0xFF; frame[2] = (timeMs >> 8) & 0xFF;
+        frame[3] = totalBlocks & 0xFF; frame[4] = (totalBlocks >> 8) & 0xFF;
+        frame[5] = speedKBs & 0xFF; frame[6] = (speedKBs >> 8) & 0xFF;
+    } else {
+        frame[0] = 0; // Error
+    }
+    timeout = HAL_GetTick();
+    while(!myCan.sendFrame(0x127, frame, 7)) { if (HAL_GetTick() - timeout > 1000) break; }
 
+    // 2. TEST ĐỌC FATFS (Tốc độ thực tế) -> 0x126
+    if (f_open(&testFile, "speed.tst", FA_READ) == FR_OK) {
+        start = HAL_GetTick();
+        for (uint32_t i = 0; i < loopCount; i++) {
+            f_read(&testFile, buffer, 4096, &br);
+        }
+        f_close(&testFile);
+        timeMs = HAL_GetTick() - start;
+        if (timeMs == 0) timeMs = 1;
+        speedKBs = (totalBlocks * 512 * 1000) / 1024 / timeMs;
+        
+        frame[0] = 1; // Trang_Thai = 1 (Thực tế)
+        frame[1] = timeMs & 0xFF; frame[2] = (timeMs >> 8) & 0xFF;
+        frame[3] = totalBlocks & 0xFF; frame[4] = (totalBlocks >> 8) & 0xFF;
+        frame[5] = speedKBs & 0xFF; frame[6] = (speedKBs >> 8) & 0xFF;
+    } else {
+        frame[0] = 0; // Error
+    }
+    timeout = HAL_GetTick();
+    while(!myCan.sendFrame(0x126, frame, 7)) { if (HAL_GetTick() - timeout > 1000) break; }
+    
+    f_unlink("speed.tst");
+
+    // 3. TEST GHI RAW (Tốc độ phần cứng MAX) -> 0x129
+
+    start = HAL_GetTick();
+    uint8_t stat = 0;
+    if (sdCard.write(nullptr, 200000, totalBlocks) != 0) stat = 1; // Loi
+    timeMs = HAL_GetTick() - start;
+    if (timeMs == 0) timeMs = 1;
+    speedKBs = (totalBlocks * 512 * 1000) / 1024 / timeMs;
+    
+    if (stat == 0) {
+        frame[0] = 2; // Trang_Thai = 2 (Raw)
+        frame[1] = timeMs & 0xFF; frame[2] = (timeMs >> 8) & 0xFF;
+        frame[3] = totalBlocks & 0xFF; frame[4] = (totalBlocks >> 8) & 0xFF;
+        frame[5] = speedKBs & 0xFF; frame[6] = (speedKBs >> 8) & 0xFF;
+    } else {
+        frame[0] = 0; // Error
+    }
+    timeout = HAL_GetTick();
+    while(!myCan.sendFrame(0x129, frame, 7)) { if (HAL_GetTick() - timeout > 1000) break; }
+
+    // 4. TEST ĐỌC RAW (Tốc độ phần cứng MAX) -> 0x12A
+    start = HAL_GetTick();
+    stat = 0;
+    if (sdCard.read(nullptr, 200000, totalBlocks) != 0) stat = 1; // Loi
+    timeMs = HAL_GetTick() - start;
+    if (timeMs == 0) timeMs = 1;
+    speedKBs = (totalBlocks * 512 * 1000) / 1024 / timeMs;
+    
+    if (stat == 0) {
+        frame[0] = 2; // Trang_Thai = 2 (Raw)
+        frame[1] = timeMs & 0xFF; frame[2] = (timeMs >> 8) & 0xFF;
+        frame[3] = totalBlocks & 0xFF; frame[4] = (totalBlocks >> 8) & 0xFF;
+        frame[5] = speedKBs & 0xFF; frame[6] = (speedKBs >> 8) & 0xFF;
+    } else {
+        frame[0] = 0; // Error
+    }
+    timeout = HAL_GetTick();
+    while(!myCan.sendFrame(0x12A, frame, 7)) { if (HAL_GetTick() - timeout > 1000) break; }
+}
 /* USER CODE END 0 */
 
 /**
@@ -283,6 +379,9 @@ int main(void)
   fres = f_mount(&fs, "", 1);
   if (fres != FR_OK) {
         buzzer.beep(3, 100, 100);
+    } else {
+        daNhanTheSD = true;
+        testSdCardSpeedAndSendCan(); //test the sd
     }
 
   if (rtc.isTimeLost()) {
@@ -404,6 +503,7 @@ int main(void)
                     if (stat == 0x00) { // Khởi tạo SD thành công
                         if (f_mount(&fs, USERPath, 1) == FR_OK) {
                             daNhanTheSD = true;
+                            testSdCardSpeedAndSendCan(); //test the sd
                               uint32_t mountTime = HAL_GetTick() - startMount;
                           
                               // Kêu 2 tiếng ngắn báo thành công
@@ -452,7 +552,7 @@ int main(void)
     if (cb.isDetected) {
       cb.isDetected = false;
       if ((GPIOC->IDR & (1 << 13)) != 0) { // Cảm biến tích cực mức CAO (HIGH) khi có vật cản
-        buzzer.beep(1, 50, 0, true);
+        buzzer.beep(1, 30, 30, false);
       // Chuyển màn hình về đếm số ngay lập tức
       isShowingTime = false;
       lastDisplayToggle = currentTick;
@@ -707,10 +807,8 @@ int main(void)
         lastRtcRead = currentTick;
     }
 
-    //6:gui du lieu can rtc vs cam bien dinh ky 100ms
-    static uint32_t lastCanSend = 0;
-    if (currentTick - lastCanSend >= 100) {
-        lastCanSend = currentTick;
+    //6:gui du lieu can rtc vs cam bien (Stress test: Gui lien tuc khong gioi han)
+    {
         uint8_t frame102[6] = {0};
         uint16_t currentCount = productCount; 
         uint16_t currentTarget = mucTieu;
@@ -735,6 +833,29 @@ int main(void)
         frame103[6] = dow;
         
         myCan.sendFrame(0x103, frame103, 7);
+    }
+    
+    //7: gui thong ke CAN moi 1 giay
+    static uint32_t lastCanStatsSend = 0;
+    if (currentTick - lastCanStatsSend >= 1000) {
+        uint8_t frame128[8] = {0};
+        
+        // 4 byte: So goi thanh cong
+        frame128[0] = myCan.txSuccessCount & 0xFF;
+        frame128[1] = (myCan.txSuccessCount >> 8) & 0xFF;
+        frame128[2] = (myCan.txSuccessCount >> 16) & 0xFF;
+        frame128[3] = (myCan.txSuccessCount >> 24) & 0xFF;
+        
+        // 4 byte: Thoi gian hoat dong (giay)
+        uint32_t uptimeSec = currentTick / 1000;
+        frame128[4] = uptimeSec & 0xFF;
+        frame128[5] = (uptimeSec >> 8) & 0xFF;
+        frame128[6] = (uptimeSec >> 16) & 0xFF;
+        frame128[7] = (uptimeSec >> 24) & 0xFF;
+        
+        if (myCan.sendFrame(0x128, frame128, 8)) {
+            lastCanStatsSend = currentTick;
+        }
     }
   }
   /* USER CODE END 3 */
