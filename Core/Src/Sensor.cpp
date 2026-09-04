@@ -25,7 +25,7 @@ void Sensor::init(TriggerEdge edge) {
         port->CRH &= ~(0xF << ((pinIndex - 8) * 4));
         port->CRH |= (0x8 << ((pinIndex - 8) * 4));  
     }
-    port->ODR |= pin; // Kéo tr? Pull-up
+    port->ODR |= pin; 
     
     uint32_t portIndex = (port == GPIOA) ? 0 : (port == GPIOB) ? 1 : (port == GPIOC) ? 2 : 3;
     AFIO->EXTICR[pinIndex / 4] &= ~(0xF << ((pinIndex % 4) * 4));
