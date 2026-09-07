@@ -71,8 +71,9 @@ Sensor cb(GPIOC, GPIO_PIN_13);
 Relay relay(GPIOC, GPIO_PIN_7);
 
 volatile bool rtcErrorFlag = false;
-Led7Segment dp(GPIOC, GPIO_PIN_5, GPIOC, GPIO_PIN_7, GPIOC, GPIO_PIN_6);
-
+volatile bool sensorCountTriggered = false;
+Led7Segment dp(GPIOC, GPIO_PIN_5, GPIOC, GPIO_PIN_7, GPIOC, GPIO_PIN_6, 9);
+Led7Segment dp2(GPIOA, GPIO_PIN_8, GPIOC,GPIO_PIN_10,GPIOC,GPIO_PIN_11,4);
 I2cBus i2c1(I2C1, GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);
 Rtc rtc(&i2c1);
 
@@ -194,6 +195,7 @@ void onSensorDetect() {
             BKP->DR2 = cycleCount;
         }
         BKP->DR1 = productCount;
+        sensorCountTriggered = true;
     }
 }
 static void MX_GPIO_Init(void);
@@ -238,7 +240,7 @@ void testSdCardSpeedAndSendCan() {
         frame[0] = 0; // Error
     }
     timeout = HAL_GetTick();
-    while(!myCan.sendFrame(0x127, frame, 7)) { if (HAL_GetTick() - timeout > 1000) break; }
+    while(!myCan.sendFrame(0x127, frame, 7)) { if (HAL_GetTick() - timeout > 5) break; }
 
     // 2. TEST ĐỌC FATFS (Tốc độ thực tế) -> 0x126
     if (f_open(&testFile, "speed.tst", FA_READ) == FR_OK) {
@@ -259,7 +261,7 @@ void testSdCardSpeedAndSendCan() {
         frame[0] = 0; // Error
     }
     timeout = HAL_GetTick();
-    while(!myCan.sendFrame(0x126, frame, 7)) { if (HAL_GetTick() - timeout > 1000) break; }
+    while(!myCan.sendFrame(0x126, frame, 7)) { if (HAL_GetTick() - timeout > 5) break; }
     
     f_unlink("speed.tst");
 
@@ -281,7 +283,7 @@ void testSdCardSpeedAndSendCan() {
         frame[0] = 0; // Error
     }
     timeout = HAL_GetTick();
-    while(!myCan.sendFrame(0x129, frame, 7)) { if (HAL_GetTick() - timeout > 1000) break; }
+    while(!myCan.sendFrame(0x129, frame, 7)) { if (HAL_GetTick() - timeout > 5) break; }
 
     // 4. TEST ĐỌC RAW (Tốc độ phần cứng MAX) -> 0x12A
     start = HAL_GetTick();
@@ -300,7 +302,7 @@ void testSdCardSpeedAndSendCan() {
         frame[0] = 0; // Error
     }
     timeout = HAL_GetTick();
-    while(!myCan.sendFrame(0x12A, frame, 7)) { if (HAL_GetTick() - timeout > 1000) break; }
+    while(!myCan.sendFrame(0x12A, frame, 7)) { if (HAL_GetTick() - timeout > 5) break; }
 }
 /* USER CODE END 0 */
 
@@ -351,7 +353,15 @@ int main(void)
 #endif
 
   cb.setCallback(onSensorDetect);
+  dp.setSegmentMap(5, 4, 0, 1, 2, 6, 7, 3);
+  dp.setReverseMask(1 << 1); // Đảo chiều digit ở vị trí index 1 (hàng chục của cụm 4 led)
+  dp.setStrobeOE(true);
+  dp2.setSegmentMap(5,4,0,1,2,7,3,6); 
+  dp2.setInverted(true);
+  dp2.setReverseMask(1<<1);
+
   dp.init();
+  dp2.init();  
   rtc.init();
   buzzer.init();
   rfid.init();
@@ -362,6 +372,7 @@ int main(void)
   
   // Kích hoạt DMA cho spi1
   spi1_bus.EnableDMA(true);
+  spi2_bus.EnableDMA(true); // Fix MP3 stuttering
   
   // Cấu hình ngắt EXTI0 cho chân PB0 (SD_DETECT)
   AFIO->EXTICR[0] &= ~(0xF << 0);
@@ -388,10 +399,7 @@ int main(void)
         rtcErrorFlag = true;
     }
   
-  dp.setColon(false);
-  dp.setValue(productCount);
-  dp.update();
-  
+  //dp.updateSplit(productCount, 4, false, cycleCount, 5, false, 0);
   
   uint32_t lastDisplayToggle = 0;
   bool isShowingTime = false;
@@ -400,7 +408,6 @@ int main(void)
   
   
   uint32_t lastCardRead = 0;
-  uint16_t timeValue = 0;
   
   /* USER CODE END 2 */
 
@@ -423,6 +430,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
     
 #ifdef ENABLE_SENSOR_DIAGNOSTIC
     //ĐỌC LOG CẢM BIẾN (DIAGNOSTIC)
@@ -458,7 +466,10 @@ int main(void)
     
     if (choCapNhatManHinh) {
         if (currentTick - lastRelayDao >= 100) {
-            dp.update(isShowingTime);
+            uint32_t dotMask = (isShowingTime && lastBlinkState) ? ((1<<1)|(1<<2)) : 0;
+            uint8_t curH = 0, curM = 0, curS = 0;
+            if (isShowingTime) rtc.getTime(curH, curM, curS);
+            dp.updateSplit(lastDisplayValue, 4, false, isShowingTime ? curS : cycleCount, 5, false, dotMask);
             choCapNhatManHinh = false;
         }
     }
@@ -510,9 +521,9 @@ int main(void)
                           buzzer.beep(2, 50, 100, true); 
                           
                           // Hiển thị thời gian kết nối (ms) lên màn hình LED trong 3 giây
-                          dp.setColon(false);
-                          dp.setValue(mountTime);
-                          dp.update(false);
+                          dp2.clearBuffer();
+                            dp2.setNumber(mountTime, 0, 4, false);
+                            dp2.refresh();
                           lastDisplayValue = mountTime;
                           showMountTimeUntil = HAL_GetTick() + 3000;
                           
@@ -551,16 +562,15 @@ int main(void)
     //1:kiem tra cam bien
     if (cb.isDetected) {
       cb.isDetected = false;
-      if ((GPIOC->IDR & (1 << 13)) != 0) { // Cảm biến tích cực mức CAO (HIGH) khi có vật cản
-        buzzer.beep(1, 30, 30, false);
+    }
+    
+    if (sensorCountTriggered) {
+      sensorCountTriggered = false;
+      buzzer.beep(1, 50, 50, true); // instant = true để reset beep nếu quẹt liên tục, tạo cảm giác liền mạch
       // Chuyển màn hình về đếm số ngay lập tức
       isShowingTime = false;
       lastDisplayToggle = currentTick;
       lastDisplayValue = productCount;
-      dp.setColon(false);
-      dp.setValue(productCount);
-      dp.update(false); // Cập nhật lại số đếm
-      }
     }
       if(productCount >= mucTieu && !datMucTieu){
         datMucTieu = true;
@@ -576,57 +586,121 @@ int main(void)
       lastDisplayValue = 0xFFFF;        
     }
     //3:hien thi led
-    if (currentTick < showMountTimeUntil) {
-        // đang hiển thị thời gian kết nối thẻ, tạm thời giữ nguyên màn hình LED
-    }
-    else if (isShowingTime)
-    {
-      bool currentBlinkState = (currentTick / 500) % 2 == 0;
+    // if (currentTick < showMountTimeUntil) {
+    //     // đang hiển thị thời gian kết nối thẻ, tạm thời giữ nguyên màn hình LED
+    // }
+    // else if (isShowingTime)
+    // {
+    //   bool currentBlinkState = (currentTick / 500) % 2 == 0;
       
-      if (rtcErrorFlag) {
-          if (currentBlinkState != lastBlinkState) {
-              if (currentBlinkState) {
-                  dp.showDashes();
-              } else {
-                  dp.blank();
-              }
-              lastBlinkState = currentBlinkState;
-              lastDisplayValue = 0xFFFE;
-          }
-      }
-      else {
-          static uint32_t lastRtcReadTime = 0;
-          if (currentTick - lastRtcReadTime >= 1000 || lastRtcReadTime == 0) {
-              uint8_t curH = 0, curM = 0, curS = 0;
-              rtc.getTime(curH, curM, curS);
-              timeValue = (curH * 100) + curM;
-              lastRtcReadTime = currentTick;
-          }
+    //   if (rtcErrorFlag) {
+    //       if (currentBlinkState != lastBlinkState) {
+    //           if (currentBlinkState) {
+    //               dp.showDashes();
+    //           } else {
+    //               dp.blank();
+    //           }
+    //           lastBlinkState = currentBlinkState;
+    //           lastDisplayValue = 0xFFFE;
+    //       }
+    //   }
+    //   else {
+    //       static uint32_t lastRtcReadTime = 0;
+    //       static uint8_t currentSeconds = 0;
+    //       if (currentTick - lastRtcReadTime >= 1000 || lastRtcReadTime == 0) {
+    //           uint8_t curH = 0, curM = 0;
+    //           rtc.getTime(curH, curM, currentSeconds);
+
+    //           timeValue = (curH * 100) + curM;
+    //           lastRtcReadTime = currentTick;
+    //       }
           
-          if ((timeValue != lastDisplayValue) || (currentBlinkState != lastBlinkState)) {
-              dp.setColon(currentBlinkState);     
-              dp.setValue(timeValue);    
-              dp.update(true);    
-              lastDisplayValue = timeValue;
-              lastBlinkState = currentBlinkState;
-          }
-      }
-    }
-    else
-    {
-      bool currentBlinkState = false;
-      if (CAN1->ESR & (CAN_ESR_BOFF | CAN_ESR_EPVF)) {
-          currentBlinkState = (currentTick / 100) % 2 == 0; //chớp dấu : mode đếm cảnh báo mất canbus
-      }
+    //       if ((timeValue != lastDisplayValue) || (currentBlinkState != lastBlinkState)) {
+    //           dp.updateSplit(timeValue, 4, false, currentSeconds, 5, false, currentBlinkState ? ((1<<1)|(1<<2)) : 0);    
+    //           lastDisplayValue = timeValue;
+    //           lastBlinkState = currentBlinkState;
+    //       }
+    //   }
+    // }
+    // else
+    // {
+    //   bool currentBlinkState = false;
+    //   if (CAN1->ESR & (CAN_ESR_BOFF | CAN_ESR_EPVF)) {
+    //       currentBlinkState = (currentTick / 100) % 2 == 0; //chớp dấu : mode đếm cảnh báo mất canbus
+    //   }
       
-      if (productCount != lastDisplayValue || currentBlinkState != lastBlinkState) 
-      {
-          dp.setColon(currentBlinkState);   
-          dp.setValue(productCount);    
-          dp.update(false);
-          lastDisplayValue = productCount;
-          lastBlinkState = currentBlinkState;
-      }
+    //   if (productCount != lastDisplayValue || currentBlinkState != lastBlinkState) 
+    //   {
+    //       dp.updateSplit(productCount, 4, false, cycleCount, 5, false, currentBlinkState ? ((1<<1)|(1<<2)) : 0);
+    //       lastDisplayValue = productCount;
+    //       lastBlinkState = currentBlinkState;
+    //   }
+    // }
+    // =================================================================
+    // 1. HIỂN THỊ BỘ ĐẾM TRÊN MODULE 4 LED (dp2)
+    // =================================================================
+    static bool wasShowingMountTime = false;
+    static uint16_t lastProductCount = 0xFFFF;
+    if (currentTick < showMountTimeUntil) {
+        // Đang trong 3 giây hiển thị thời gian kết nối thẻ, giữ nguyên dp2
+        wasShowingMountTime = true;
+    } else {
+        // Nếu vừa hết 3 giây, ép reset lại biến đếm để màn hình cập nhật số sản phẩm ngay lập tức
+        if (wasShowingMountTime) {
+            wasShowingMountTime = false;
+            lastProductCount = 0xFFFF; 
+        }
+        
+        if (productCount != lastProductCount) {
+            dp2.clearBuffer(); 
+            dp2.setNumber(productCount, 0, 4, false); 
+            dp2.refresh();
+            lastProductCount = productCount;
+        }
+    }
+
+    // =================================================================
+    // 2. HIỂN THỊ THỜI GIAN TRÊN MODULE 9 LED (dp)
+    // =================================================================
+    static uint32_t lastDpTimeTick = 0;
+    // Cập nhật mỗi 500ms để tạo hiệu ứng nhấp nháy dấu 2 chấm
+    if (currentTick - lastDpTimeTick >= 500 || lastDpTimeTick == 0) {
+        lastDpTimeTick = currentTick;
+        
+        uint8_t curH = 0, curM = 0, curS = 0;
+        if (!rtcErrorFlag) {
+            rtc.getTime(curH, curM, curS); // Kéo dữ liệu từ RTC DS1307
+        }
+        
+        dp.clearBuffer(); // Tắt toàn bộ 9 LED trước khi vẽ lại
+        
+        if (rtcErrorFlag) {
+            dp.showDashes(); // Nếu lỗi RTC thì hiện gạch ngang
+        } else {
+            // A. Bắn Giờ và Phút vào vị trí 3-2-1-0 
+            // (padZeroes = true để luôn hiện đủ số 0, ví dụ 08:05)
+            uint16_t timeHM = (curH * 100) + curM;
+            dp.setNumber(timeHM, 0, 4, true); 
+            
+            // Tạo hiệu ứng nhấp nháy dấu chấm ở vị trí 1 và 2
+            if ((currentTick / 500) % 2 == 0) {
+                dp.setDigit(1, (timeHM / 10) % 10, true); // Đè lại số cũ nhưng bật Dot
+                dp.setDigit(2, (timeHM / 100) % 10, true);
+            }
+            
+            // B. Bắn Giây vào vị trí 8-7
+            // Bắt đầu từ index 7, chiều dài 2 chữ số
+            dp.setNumber(curS, 7, 2, true); 
+            
+            // C. Vị trí 6, 5, 4 tự động tối đen vì đã gọi clearBuffer()
+            // (Mẹo nhỏ: Nếu ông muốn thêm 2 dấu gạch ngang phân cách Giờ và Giây cho ngầu 
+            // thì bỏ comment 2 dòng dưới đây)
+            // dp.setDigit(5, 0xFE, false); 
+            // dp.setDigit(4, 0xFE, false);
+            
+            // D. Bơm toàn bộ dữ liệu ra màn hình
+            dp.refresh();
+        }
     }
     // 4: doc du lieu the
     if (currentTick - lastCardRead >= 100) {
@@ -726,10 +800,14 @@ int main(void)
                                                     buzzer.beep(3, 100, 100); 
                                                 }
                                             }
-                                            dp.turnOff();
+
+                                            dp.hide();
                                             relay.on();
+                                            HAL_Delay(30);
+                                            dp.refresh();  // Bơm số cũ ra
+                                            dp2.refresh();
                                             lastRelayDao = currentTick;
-                                            choCapNhatManHinh = true;
+                                            
                                             readStatus = 0x00;
                                         }
                                     }
@@ -743,10 +821,14 @@ int main(void)
                                                 buzzer.beep(3, 100, 100); 
                                             }
                                         }
-                                        dp.turnOff();
+                                       
+                                        dp.hide();
                                         relay.toggle();
+                                        HAL_Delay(30);
+                                        dp.refresh();  // Bơm số cũ ra
+                                        dp2.refresh();
                                         lastRelayDao = currentTick;
-                                        choCapNhatManHinh = true;
+                                        
                                         readStatus = 0x00;
                                     }
                                     else if (strncmp((char*)readData, "PHAT_NHAC", 9) == 0) {

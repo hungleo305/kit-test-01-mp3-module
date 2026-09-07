@@ -211,7 +211,7 @@ void Mp3::process() {
                 
                 for (int i = 0; i < 65; i++) { if (!waitReady()) break;
                     xdcsPort->BRR = xdcsPin;               
-                    spi_bus->TransferBuffer(endFill, nullptr, 32); 
+                    spi_bus->TransferDMA(endFill, nullptr, 32); 
                     xdcsPort->BSRR = xdcsPin;
                 }
                 
@@ -221,7 +221,7 @@ void Mp3::process() {
                 
                 for (int i = 0; i < 64; i++) { if (!waitReady()) break;
                     xdcsPort->BRR = xdcsPin;               
-                    spi_bus->TransferBuffer(endFill, nullptr, 32); 
+                    spi_bus->TransferDMA(endFill, nullptr, 32); 
                     xdcsPort->BSRR = xdcsPin;
                     
                     mode = readRegister(SCI_MODE);
@@ -240,7 +240,7 @@ void Mp3::process() {
         if (chunk > 32) chunk = 32;
 
         xdcsPort->BRR = xdcsPin;               
-        spi_bus->TransferBuffer(&audioBuffer[bufferIndex], nullptr, chunk); 
+        spi_bus->TransferDMA(&audioBuffer[bufferIndex], nullptr, chunk); 
         xdcsPort->BSRR = xdcsPin;
         
         bufferIndex += chunk;
