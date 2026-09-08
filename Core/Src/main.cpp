@@ -362,6 +362,7 @@ int main(void)
 
   dp.init();
   dp2.init();  
+  
   rtc.init();
   buzzer.init();
   rfid.init();
@@ -415,6 +416,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    //dp2.autoScan(1000);
     static bool lastCanError = false;
     bool currentCanError = (CAN1->ESR & (CAN_ESR_BOFF | CAN_ESR_EPVF)) != 0;
     if (currentCanError && !lastCanError) {
@@ -463,16 +465,6 @@ int main(void)
     
     //chong nhay led
     uint32_t currentTick = HAL_GetTick();
-    
-    if (choCapNhatManHinh) {
-        if (currentTick - lastRelayDao >= 100) {
-            uint32_t dotMask = (isShowingTime && lastBlinkState) ? ((1<<1)|(1<<2)) : 0;
-            uint8_t curH = 0, curM = 0, curS = 0;
-            if (isShowingTime) rtc.getTime(curH, curM, curS);
-            dp.updateSplit(lastDisplayValue, 4, false, isShowingTime ? curS : cycleCount, 5, false, dotMask);
-            choCapNhatManHinh = false;
-        }
-    }
     //kiem tra the nho
     if (sdCardChanged) { 
         // Lọc nhiễu chống rung 100ms cho tiếp điểm thẻ nhớ
@@ -521,10 +513,9 @@ int main(void)
                           buzzer.beep(2, 50, 100, true); 
                           
                           // Hiển thị thời gian kết nối (ms) lên màn hình LED trong 3 giây
-                          dp2.clearBuffer();
-                            dp2.setNumber(mountTime, 0, 4, false);
-                            dp2.refresh();
-                          lastDisplayValue = mountTime;
+                          dp.clearBuffer();
+                          dp.setNumber(mountTime, 0, 4, false);
+                          dp.refresh();
                           showMountTimeUntil = HAL_GetTick() + 3000;
                           
                           // Gửi thời gian kết nối (ms) qua mạng CAN (ID 0x125)
@@ -585,120 +576,90 @@ int main(void)
       lastDisplayToggle = currentTick;  
       lastDisplayValue = 0xFFFF;        
     }
-    //3:hien thi led
-    // if (currentTick < showMountTimeUntil) {
-    //     // đang hiển thị thời gian kết nối thẻ, tạm thời giữ nguyên màn hình LED
-    // }
-    // else if (isShowingTime)
-    // {
-    //   bool currentBlinkState = (currentTick / 500) % 2 == 0;
-      
-    //   if (rtcErrorFlag) {
-    //       if (currentBlinkState != lastBlinkState) {
-    //           if (currentBlinkState) {
-    //               dp.showDashes();
-    //           } else {
-    //               dp.blank();
-    //           }
-    //           lastBlinkState = currentBlinkState;
-    //           lastDisplayValue = 0xFFFE;
-    //       }
-    //   }
-    //   else {
-    //       static uint32_t lastRtcReadTime = 0;
-    //       static uint8_t currentSeconds = 0;
-    //       if (currentTick - lastRtcReadTime >= 1000 || lastRtcReadTime == 0) {
-    //           uint8_t curH = 0, curM = 0;
-    //           rtc.getTime(curH, curM, currentSeconds);
-
-    //           timeValue = (curH * 100) + curM;
-    //           lastRtcReadTime = currentTick;
-    //       }
-          
-    //       if ((timeValue != lastDisplayValue) || (currentBlinkState != lastBlinkState)) {
-    //           dp.updateSplit(timeValue, 4, false, currentSeconds, 5, false, currentBlinkState ? ((1<<1)|(1<<2)) : 0);    
-    //           lastDisplayValue = timeValue;
-    //           lastBlinkState = currentBlinkState;
-    //       }
-    //   }
-    // }
-    // else
-    // {
-    //   bool currentBlinkState = false;
-    //   if (CAN1->ESR & (CAN_ESR_BOFF | CAN_ESR_EPVF)) {
-    //       currentBlinkState = (currentTick / 100) % 2 == 0; //chớp dấu : mode đếm cảnh báo mất canbus
-    //   }
-      
-    //   if (productCount != lastDisplayValue || currentBlinkState != lastBlinkState) 
-    //   {
-    //       dp.updateSplit(productCount, 4, false, cycleCount, 5, false, currentBlinkState ? ((1<<1)|(1<<2)) : 0);
-    //       lastDisplayValue = productCount;
-    //       lastBlinkState = currentBlinkState;
-    //   }
-    // }
     // =================================================================
     // 1. HIỂN THỊ BỘ ĐẾM TRÊN MODULE 4 LED (dp2)
     // =================================================================
-    static bool wasShowingMountTime = false;
     static uint16_t lastProductCount = 0xFFFF;
-    if (currentTick < showMountTimeUntil) {
-        // Đang trong 3 giây hiển thị thời gian kết nối thẻ, giữ nguyên dp2
-        wasShowingMountTime = true;
-    } else {
-        // Nếu vừa hết 3 giây, ép reset lại biến đếm để màn hình cập nhật số sản phẩm ngay lập tức
-        if (wasShowingMountTime) {
-            wasShowingMountTime = false;
-            lastProductCount = 0xFFFF; 
-        }
-        
-        if (productCount != lastProductCount) {
-            dp2.clearBuffer(); 
-            dp2.setNumber(productCount, 0, 4, false); 
-            dp2.refresh();
-            lastProductCount = productCount;
-        }
+    if (productCount != lastProductCount) {
+        dp2.clearBuffer(); 
+        dp2.setNumber(productCount, 0, 4, false); 
+        dp2.refresh();
+        lastProductCount = productCount;
     }
 
     // =================================================================
-    // 2. HIỂN THỊ THỜI GIAN TRÊN MODULE 9 LED (dp)
+    // ĐỌC THỜI GIAN TỪ RTC (Mỗi 500ms)
+    // =================================================================
+    static uint32_t lastRtcRead = 0;
+    static uint8_t h = 0, m = 0, s = 0, dow = 0, date = 0, month = 0, year = 0;
+    if (currentTick - lastRtcRead >= 500) {
+        if (!rtcErrorFlag) {
+            rtc.getTime(h, m, s);
+            rtc.getDate(dow, date, month, year);
+        }
+        lastRtcRead = currentTick;
+    }
+
+    // =================================================================
+    // 2. HIỂN THỊ LUÂN PHIÊN TRÊN MODULE 9 LED (dp)
     // =================================================================
     static uint32_t lastDpTimeTick = 0;
-    // Cập nhật mỗi 500ms để tạo hiệu ứng nhấp nháy dấu 2 chấm
-    if (currentTick - lastDpTimeTick >= 500 || lastDpTimeTick == 0) {
-        lastDpTimeTick = currentTick;
-        
-        uint8_t curH = 0, curM = 0, curS = 0;
-        if (!rtcErrorFlag) {
-            rtc.getTime(curH, curM, curS); // Kéo dữ liệu từ RTC DS1307
+    static bool wasShowingMountTime = false;
+    
+    if (currentTick < showMountTimeUntil) {
+        wasShowingMountTime = true;
+    } else {
+        if (wasShowingMountTime) {
+            wasShowingMountTime = false;
+            lastDpTimeTick = 0; // Ép vẽ lại ngay lập tức
         }
         
-        dp.clearBuffer(); // Tắt toàn bộ 9 LED trước khi vẽ lại
+        static uint16_t lastDpProductCount = 0xFFFF;
+        bool forceUpdate = (!isShowingTime && productCount != lastDpProductCount);
         
-        if (rtcErrorFlag) {
-            dp.showDashes(); // Nếu lỗi RTC thì hiện gạch ngang
-        } else {
-            // A. Bắn Giờ và Phút vào vị trí 3-2-1-0 
-            // (padZeroes = true để luôn hiện đủ số 0, ví dụ 08:05)
-            uint16_t timeHM = (curH * 100) + curM;
-            dp.setNumber(timeHM, 0, 4, true); 
+        // Cập nhật mỗi 500ms hoặc khi có biến thiên số đếm
+        if (currentTick - lastDpTimeTick >= 500 || lastDpTimeTick == 0 || forceUpdate) {
+            lastDpTimeTick = currentTick;
+            lastDpProductCount = productCount;
             
-            // Tạo hiệu ứng nhấp nháy dấu chấm ở vị trí 1 và 2
-            if ((currentTick / 500) % 2 == 0) {
-                dp.setDigit(1, (timeHM / 10) % 10, true); // Đè lại số cũ nhưng bật Dot
-                dp.setDigit(2, (timeHM / 100) % 10, true);
+            dp.clearBuffer(); // Tắt toàn bộ 9 LED trước khi vẽ lại
+            
+            if (isShowingTime) {
+                if (rtcErrorFlag) {
+                    // Nếu lỗi RTC thì hiện gạch ngang ở 4 digit đầu
+                    for (int i = 0; i < 4; i++) {
+                        dp.setDigit(i, 0xFE, false);
+                    }
+                } else {
+                    // A. Bắn Giờ và Phút vào 4 digit đầu (vị trí 3-2-1-0)
+                    uint16_t timeHM = (h * 100) + m;
+                    dp.setNumber(timeHM, 0, 4, true); 
+                    
+                    // Tạo hiệu ứng nhấp nháy dấu chấm ở vị trí 1 và 2
+                    if ((currentTick / 500) % 2 == 0) {
+                        dp.setDigit(1, (timeHM / 10) % 10, true);
+                        dp.setDigit(2, (timeHM / 100) % 10, true);
+                    }
+                }
+            } else {
+                // Hiển thị bộ đếm ở 4 digit đầu
+                dp.setNumber(productCount, 0, 4, false);
+                
+                // Chớp dấu chấm nếu mất canbus
+                if (CAN1->ESR & (CAN_ESR_BOFF | CAN_ESR_EPVF)) {
+                    if ((currentTick / 100) % 2 == 0) {
+                        dp.setDigit(1, (productCount / 10) % 10, true);
+                        dp.setDigit(2, (productCount / 100) % 10, true);
+                    }
+                }
             }
             
-            // B. Bắn Giây vào vị trí 8-7
-            // Bắt đầu từ index 7, chiều dài 2 chữ số
-            dp.setNumber(curS, 7, 2, true); 
+            // B. Luôn bắn Giây vào 2 digit (ví dụ vị trí 7 và 8) bất kể đang ở mode nào
+            if (!rtcErrorFlag) {
+                dp.setNumber(s, 7, 2, true);
+            }
             
-            // C. Vị trí 6, 5, 4 tự động tối đen vì đã gọi clearBuffer()
-            // (Mẹo nhỏ: Nếu ông muốn thêm 2 dấu gạch ngang phân cách Giờ và Giây cho ngầu 
-            // thì bỏ comment 2 dòng dưới đây)
-            // dp.setDigit(5, 0xFE, false); 
-            // dp.setDigit(4, 0xFE, false);
-            
-            // D. Bơm toàn bộ dữ liệu ra màn hình
+            // Bơm toàn bộ dữ liệu ra màn hình
             dp.refresh();
         }
     }
@@ -880,14 +841,6 @@ int main(void)
           }
     }
     
-    // Doc RTC moi 500ms de tranh nghe I2C (Blocking) lam cham he thong
-    static uint32_t lastRtcRead = 0;
-    static uint8_t h = 0, m = 0, s = 0, dow = 0, date = 0, month = 0, year = 0;
-    if (currentTick - lastRtcRead >= 500) {
-        rtc.getTime(h, m, s);
-        rtc.getDate(dow, date, month, year);
-        lastRtcRead = currentTick;
-    }
 
     //6:gui du lieu can rtc vs cam bien (Stress test: Gui lien tuc khong gioi han)
     {

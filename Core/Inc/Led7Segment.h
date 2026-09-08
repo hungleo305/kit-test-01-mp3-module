@@ -23,6 +23,8 @@ private:
     uint8_t segMap[8];
     uint8_t displayBuffer[16]; 
     uint32_t dotBuffer; 
+    uint32_t lastScanTick;
+    uint8_t currentScanBit; 
 
     void clockPulse();
     void sendBit(uint8_t bit);
@@ -41,6 +43,8 @@ public:
     void setSegmentMap(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t e, uint8_t f, uint8_t g, uint8_t dp);
     void setReverseMask(uint32_t mask);
     void setInverted(bool state);
+    // --- HÀM HỖ TRỢ TEST MẠCH ---
+    void autoScan(uint32_t delayMs = 1000);
     
     // --- 2. HAI HÀM CẤU HÌNH OE CẦN THÊM VÀO ĐÂY ---
     void setStrobeOE(bool state);

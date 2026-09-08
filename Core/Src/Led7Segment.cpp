@@ -1,13 +1,15 @@
 #include "Led7Segment.h"
 
-#define SEG_A  (1U << 0)
-#define SEG_B  (1U << 1)
-#define SEG_C  (1U << 2)
-#define SEG_D  (1U << 3)
-#define SEG_E  (1U << 4)
-#define SEG_F  (1U << 5)
-#define SEG_G  (1U << 6)
-#define SEG_DP (1U << 7)
+// Quy ước 8 bit tương ứng với 8 thanh sáng của 1 con LED (từ A đến DP)
+// Mỗi bit '1' đại diện cho việc bật 1 thanh sáng tương ứng
+#define SEG_A  0b00000001 // Thanh A (Nét trên cùng)      - Bit số 0
+#define SEG_B  0b00000010 // Thanh B (Nét trên bên phải) - Bit số 1
+#define SEG_C  0b00000100 // Thanh C (Nét dưới bên phải) - Bit số 2
+#define SEG_D  0b00001000 // Thanh D (Nét dưới cùng)     - Bit số 3
+#define SEG_E  0b00010000 // Thanh E (Nét dưới bên trái) - Bit số 4
+#define SEG_F  0b00100000 // Thanh F (Nét trên bên trái) - Bit số 5
+#define SEG_G  0b01000000 // Thanh G (Nét gạch ngang)    - Bit số 6
+#define SEG_DP 0b10000000 // Thanh DP (Dấu chấm)         - Bit số 7
 
 // 1. CẬP NHẬT HÀM KHỞI TẠO (Thêm isOE(false))
 Led7Segment::Led7Segment(GPIO_TypeDef* dPort, uint16_t dPin, 
@@ -17,7 +19,8 @@ Led7Segment::Led7Segment(GPIO_TypeDef* dPort, uint16_t dPin,
     : dataPort(dPort), dataPin(dPin), 
       clockPort(clkPort), clockPin(clkPin), 
       strobePort(strPort), strobePin(strPin),
-      numDigits(digits), revMask(0), isInverted(false), isOE(false) 
+      numDigits(digits), revMask(0), isInverted(false), isOE(false),
+      lastScanTick(0), currentScanBit(0) 
 {
     for (uint8_t i = 0; i < 8; i++) segMap[i] = i;
 }
@@ -227,4 +230,34 @@ void Led7Segment::showDashes() {
     
     dataPort->BRR = dataPin;
     __enable_irq();
+}
+void Led7Segment::autoScan(uint32_t delayMs) {
+    uint32_t now = HAL_GetTick();
+    if (now - lastScanTick < delayMs && lastScanTick != 0) {
+        return; // Chưa đến chu kỳ kế tiếp, thoát ngay lập tức để các tác vụ khác chạy bình thường
+    }
+    lastScanTick = now;
+
+    __disable_irq(); 
+    
+    // Khóa màn hình theo chuẩn mạch
+    if (isOE) strobePort->BSRR = strobePin; 
+    else      strobePort->BRR = strobePin;  
+    
+    // Bơm thẳng bit vật lý vào toàn bộ các chữ số (bỏ qua map chân)
+    uint8_t physByte = (1 << currentScanBit); 
+    if (isInverted) physByte = ~physByte;
+    for (int d = numDigits - 1; d >= 0; d--) {
+        sendByte(physByte);
+    }
+    
+    // Mở màn hình chốt dữ liệu
+    if (isOE) strobePort->BRR = strobePin;  
+    else      latch();                      
+    
+    dataPort->BRR = dataPin;
+    __enable_irq();
+    
+    // Tự động chuyển sang bit kế tiếp (0 -> 7 -> 0)
+    currentScanBit = (currentScanBit + 1) % 8;
 }
