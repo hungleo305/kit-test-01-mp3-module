@@ -269,6 +269,9 @@ Thư viện SpiBus hỗ trợ truyền dữ liệu tốc độ cao bằng DMA. L
 ---
 
 ### 4.5. Thư viện `Mp3` (IC Giải mã VS1011e) & Thẻ nhớ (`SdCard`)
+
+> **[📝 Xem tài liệu Hướng Dẫn Sử Dụng Thư viện SdCard và FatFs đầy đủ tại đây](README_SdCard.md)**
+
 Sự kết hợp giữa `SdCard` (đọc thẻ vật lý) và `Mp3` (giải mã tín hiệu số). Quá trình diễn ra như sau: Vi điều khiển (MCU) đọc luồng Byte từ thẻ nhớ (SPI) vào bộ đệm (Buffer) trong RAM, sau đó MCU bơm liên tục dữ liệu từ bộ đệm này sang chip giải mã VS1011 (SPI)."
 
 **Hàm API chi tiết thư viện `Mp3`:**
@@ -664,6 +667,9 @@ int main() {
 ---
 
 ### 4.10. Thư viện `Led7Segment` (CD4094)
+
+> **[📝 Xem tài liệu Hướng Dẫn Sử Dụng Thư viện Led7Segment đầy đủ tại đây](README_Led7Segment.md)**
+
 Thư viện quét với IC thanh ghi dịch 3 chân (Data, Clock, Strobe/Latch).
 
 **Hàm API chi tiết:**
@@ -701,3 +707,4 @@ Dựa trên file Memory Map (EWARM/Firmware/List/Firmware.map), dưới đây l�
 - **Dung lượng RAM (Read-write Data):** `7.269 Bytes` (~7.1 KB) **Chỉ chiếm khoảng 15%**
 
 **Kết luận:** Dù tích hợp đồng thời nhiều module nặng (FatFs File System, giải mã MP3, giao thức CAN Bus và RFID), chương trình vẫn chạy nhẹ nhàng. Lượng tài nguyên còn lại vẫn dư sức tích hợp thêm các tính năng khác (kết nối Wifi/Bluetooth, màn hình LCD đồ họa...).
+
