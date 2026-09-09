@@ -34,17 +34,12 @@
 #include "Rfid.h"
 #include "Relay.h"
 #include "Mp3.h"
-#include "ff.h"
+
 #include "CanBus.h"
 #include "SpiBus.h"
 #include "I2cBus.h"
-#include "user_diskio.h"
 #include "SdCard.h"
 
-extern char USERPath[4];
-extern Diskio_drvTypeDef USER_Driver;
-extern uint8_t FATFS_UnLinkDriver(char *path);
-extern uint8_t FATFS_LinkDriver(Diskio_drvTypeDef *drv, char *path);
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -269,7 +264,16 @@ void testSdCardSpeedAndSendCan() {
 
     start = HAL_GetTick();
     uint8_t stat = 0;
-    if (sdCard.write(nullptr, 200000, totalBlocks) != 0) stat = 1; // Loi
+    
+    // Chia nhỏ 128 blocks thành các vòng lặp, mỗi vòng lặp ghi 8 blocks (4096 bytes) để vừa với buffer
+    for (uint32_t i = 0; i < loopCount; i++) {
+        // Tịnh tiến địa chỉ sector lên 8 sau mỗi lần ghi: 200000, 200008, 200016...
+        if (sdCard.write(buffer, 200000 + (i * 8), 8) != 0) { 
+            stat = 1; // Lỗi
+            break; 
+        }
+    }
+    
     timeMs = HAL_GetTick() - start;
     if (timeMs == 0) timeMs = 1;
     speedKBs = (totalBlocks * 512 * 1000) / 1024 / timeMs;
@@ -286,9 +290,17 @@ void testSdCardSpeedAndSendCan() {
     while(!myCan.sendFrame(0x129, frame, 7)) { if (HAL_GetTick() - timeout > 5) break; }
 
     // 4. TEST ĐỌC RAW (Tốc độ phần cứng MAX) -> 0x12A
-    start = HAL_GetTick();
+start = HAL_GetTick();
     stat = 0;
-    if (sdCard.read(nullptr, 200000, totalBlocks) != 0) stat = 1; // Loi
+    
+    // Tương tự, đọc từng cụm 8 blocks vào buffer
+    for (uint32_t i = 0; i < loopCount; i++) {
+        if (sdCard.read(buffer, 200000 + (i * 8), 8) != 0) { 
+            stat = 1; // Lỗi
+            break; 
+        }
+    }
+    
     timeMs = HAL_GetTick() - start;
     if (timeMs == 0) timeMs = 1;
     speedKBs = (totalBlocks * 512 * 1000) / 1024 / timeMs;
@@ -398,15 +410,12 @@ int main(void)
 
   if (rtc.isTimeLost()) {
         rtcErrorFlag = true;
-    }
-  
-  //dp.updateSplit(productCount, 4, false, cycleCount, 5, false, 0);
+    } 
   
   uint32_t lastDisplayToggle = 0;
   bool isShowingTime = false;
-  uint16_t lastDisplayValue = 0xFFFF;
-  bool lastBlinkState = false;
   
+
   
   uint32_t lastCardRead = 0;
   
@@ -561,7 +570,6 @@ int main(void)
       // Chuyển màn hình về đếm số ngay lập tức
       isShowingTime = false;
       lastDisplayToggle = currentTick;
-      lastDisplayValue = productCount;
     }
       if(productCount >= mucTieu && !datMucTieu){
         datMucTieu = true;
@@ -574,7 +582,6 @@ int main(void)
     {
       isShowingTime = !isShowingTime;   
       lastDisplayToggle = currentTick;  
-      lastDisplayValue = 0xFFFF;        
     }
     // =================================================================
     // 1. HIỂN THỊ BỘ ĐẾM TRÊN MODULE 4 LED (dp2)
@@ -588,11 +595,11 @@ int main(void)
     }
 
     // =================================================================
-    // ĐỌC THỜI GIAN TỪ RTC (Mỗi 500ms)
+    // ĐỌC THỜI GIAN TỪ RTC (Mỗi 100ms)
     // =================================================================
     static uint32_t lastRtcRead = 0;
     static uint8_t h = 0, m = 0, s = 0, dow = 0, date = 0, month = 0, year = 0;
-    if (currentTick - lastRtcRead >= 500) {
+    if (currentTick - lastRtcRead >= 100) {
         if (!rtcErrorFlag) {
             rtc.getTime(h, m, s);
             rtc.getDate(dow, date, month, year);
@@ -617,8 +624,8 @@ int main(void)
         static uint16_t lastDpProductCount = 0xFFFF;
         bool forceUpdate = (!isShowingTime && productCount != lastDpProductCount);
         
-        // Cập nhật mỗi 500ms hoặc khi có biến thiên số đếm
-        if (currentTick - lastDpTimeTick >= 500 || lastDpTimeTick == 0 || forceUpdate) {
+        // Cập nhật mỗi 100ms hoặc khi có biến thiên số đếm
+        if (currentTick - lastDpTimeTick >= 100 || lastDpTimeTick == 0 || forceUpdate) {
             lastDpTimeTick = currentTick;
             lastDpProductCount = productCount;
             
@@ -637,8 +644,8 @@ int main(void)
                     
                     // Tạo hiệu ứng nhấp nháy dấu chấm ở vị trí 1 và 2
                     if ((currentTick / 500) % 2 == 0) {
-                        dp.setDigit(1, (timeHM / 10) % 10, true);
-                        dp.setDigit(2, (timeHM / 100) % 10, true);
+                        dp.setDot(1, true);
+                        dp.setDot(2, true);
                     }
                 }
             } else {
@@ -648,8 +655,8 @@ int main(void)
                 // Chớp dấu chấm nếu mất canbus
                 if (CAN1->ESR & (CAN_ESR_BOFF | CAN_ESR_EPVF)) {
                     if ((currentTick / 100) % 2 == 0) {
-                        dp.setDigit(1, (productCount / 10) % 10, true);
-                        dp.setDigit(2, (productCount / 100) % 10, true);
+                        dp.setDot(1, true);
+                        dp.setDot(2, true);
                     }
                 }
             }
@@ -742,7 +749,6 @@ int main(void)
                                             cycleCount = 0;
                                             BKP->DR1 = productCount;
                                             BKP->DR2 = cycleCount;
-                                            lastDisplayValue = 0xFFFF;
                                             readStatus = 0x00;
                                             datMucTieu = false;
                                         }
@@ -888,9 +894,9 @@ int main(void)
         frame128[6] = (uptimeSec >> 16) & 0xFF;
         frame128[7] = (uptimeSec >> 24) & 0xFF;
         
-        if (myCan.sendFrame(0x128, frame128, 8)) {
-            lastCanStatsSend = currentTick;
-        }
+        // Luôn cập nhật thời gian để không bị kẹt spam khi CAN bị ngắt
+        lastCanStatsSend = currentTick;
+        myCan.sendFrame(0x128, frame128, 8);
     }
   }
   /* USER CODE END 3 */

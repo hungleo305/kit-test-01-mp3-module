@@ -52,12 +52,11 @@ public:
     
     void init();
 
-    void update(uint32_t value, bool padZeroes = false, uint32_t dotMask = 0);
-    void updateSplit(uint32_t rightVal, uint8_t rightDigits, bool rightPad, uint32_t leftVal, uint8_t leftDigits, bool leftPad, uint32_t dotMask = 0);
+
 
     void clearBuffer();
     void setDigit(uint8_t index, uint8_t value, bool showDot = false);
-    void setRaw(uint8_t index, uint8_t rawHex);
+    void setDot(uint8_t index, bool showDot);
     void setNumber(uint32_t number, uint8_t startIndex, uint8_t length, bool padZeroes = false);
     
     void refresh();

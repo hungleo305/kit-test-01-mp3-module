@@ -120,30 +120,7 @@ void Led7Segment::latch() {
     strobePort->BRR = strobePin;
 }
 
-void Led7Segment::update(uint32_t value, bool padZeroes, uint32_t dotMask) {
-    clearBuffer();
-    setNumber(value, 0, numDigits, padZeroes);
-    for (int i = 0; i < numDigits; i++) {
-        if (dotMask & (1 << i)) {
-            displayBuffer[i] |= SEG_DP;
-            dotBuffer |= (1 << i);
-        }
-    }
-    refresh();
-}
 
-void Led7Segment::updateSplit(uint32_t rightVal, uint8_t rightDigits, bool rightPad, uint32_t leftVal, uint8_t leftDigits, bool leftPad, uint32_t dotMask) {
-    clearBuffer();
-    if (rightDigits > 0) setNumber(rightVal, 0, rightDigits, rightPad);
-    if (leftDigits > 0) setNumber(leftVal, rightDigits, leftDigits, leftPad);
-    for (int i = 0; i < numDigits; i++) {
-        if (dotMask & (1 << i)) {
-            displayBuffer[i] |= SEG_DP;
-            dotBuffer |= (1 << i);
-        }
-    }
-    refresh();
-}
 
 void Led7Segment::clearBuffer() {
     for (int i = 0; i < 16; i++) displayBuffer[i] = 0x00;
@@ -162,10 +139,12 @@ void Led7Segment::setDigit(uint8_t index, uint8_t value, bool showDot) {
     else dotBuffer &= ~(1 << index);
 }
 
-void Led7Segment::setRaw(uint8_t index, uint8_t rawHex) {
+void Led7Segment::setDot(uint8_t index, bool showDot) {
     if (index >= 16) return;
-    displayBuffer[index] = rawHex;
+    if (showDot) dotBuffer |= (1 << index);
+    else dotBuffer &= ~(1 << index);
 }
+
 
 void Led7Segment::setNumber(uint32_t number, uint8_t startIndex, uint8_t length, bool padZeroes) {
     uint32_t tempVal = number;
