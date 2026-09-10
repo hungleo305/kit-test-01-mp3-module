@@ -63,10 +63,11 @@ CAN_HandleTypeDef hcan;
 Led ledOb(GPIOB, GPIO_PIN_2);
 Buzzer buzzer(GPIOC, GPIO_PIN_15);
 Sensor cb(GPIOC, GPIO_PIN_13);
+Sensor cb2(GPIOB, GPIO_PIN_8);
 Relay relay(GPIOC, GPIO_PIN_7);
 
 volatile bool rtcErrorFlag = false;
-volatile bool sensorCountTriggered = false;
+
 Led7Segment dp(GPIOC, GPIO_PIN_5, GPIOC, GPIO_PIN_7, GPIOC, GPIO_PIN_6, 9);
 Led7Segment dp2(GPIOA, GPIO_PIN_8, GPIOC,GPIO_PIN_10,GPIOC,GPIO_PIN_11,4);
 I2cBus i2c1(I2C1, GPIOB, GPIO_PIN_6, GPIOB, GPIO_PIN_7);
@@ -84,6 +85,7 @@ extern CAN_HandleTypeDef hcan;
 CanBus myCan(&hcan);
 
 volatile uint16_t productCount = 0;
+volatile uint16_t productCount2 = 0;
 volatile uint16_t cycleCount = 0;
 uint16_t mucTieu = 10;
 bool datMucTieu = false;
@@ -102,21 +104,7 @@ bool coMatKhauTam = false;
 uint32_t lastRelayDao = 0;
 bool choCapNhatManHinh = false;
 
-//kích hoạt test cảm biến
-#define ENABLE_SENSOR_DIAGNOSTIC
 
-#ifdef ENABLE_SENSOR_DIAGNOSTIC
-// Biến phục vụ chức năng Diagnostic cảm biến
-bool cheDoChanDoan = true; 
-uint32_t thoiDiemDoiTrangThai = 0;
-uint32_t thoiDiemVao = 0;
-uint32_t thoiDiemRa = 0;
-uint32_t thoiGianBiChe = 0;
-uint32_t thoiGianTrong = 0;
-uint32_t thoiGianBiCheTruoc = 0;
-uint32_t thoiGianTrongTruoc = 0;
-bool coDuLieuMoi = false;
-#endif
 
 
 FATFS fs;       
@@ -148,51 +136,13 @@ void SystemClock_Config(void);
 
 extern "C" void EXTI15_10_IRQHandler(void) {
     cb.handleInterrupt(1 << 13);
+    
+}
+extern "C" void EXTI9_5_IRQHandler(void) {
+    cb2.handleInterrupt(1 << 8);
+    
 }
 
-void onSensorDetect() {
-    uint32_t currentTick = HAL_GetTick();
-    bool isPinHigh = (GPIOC->IDR & (1 << 13)) != 0;
-    
-#ifdef ENABLE_SENSOR_DIAGNOSTIC
-    if (cheDoChanDoan) {
-        static bool lastDiagState = false;
-        if (currentTick - thoiDiemDoiTrangThai > 20) { 
-            if (isPinHigh != lastDiagState) {
-                if (isPinHigh) {
-                  // Cảm biến bị che (HIGH)
-                  if (thoiDiemRa > 0) {
-                      thoiGianTrongTruoc = thoiGianTrong;
-                      thoiGianTrong = currentTick - thoiDiemRa;
-                  }
-                  thoiDiemVao = currentTick;
-              } else {
-                  // Cảm biến hết bị che (LOW)
-                  if (thoiDiemVao > 0) {
-                      thoiGianBiCheTruoc = thoiGianBiChe;
-                      thoiGianBiChe = currentTick - thoiDiemVao;
-                      coDuLieuMoi = true;
-                  }
-                  thoiDiemRa = currentTick;
-              }
-                lastDiagState = isPinHigh;
-                thoiDiemDoiTrangThai = currentTick;
-            }
-        }
-    }
-#endif
-    
-    if (isPinHigh) {
-        productCount++;
-        if (productCount > 9999) {
-            productCount = 0;
-            cycleCount++;
-            BKP->DR2 = cycleCount;
-        }
-        BKP->DR1 = productCount;
-        sensorCountTriggered = true;
-    }
-}
 static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
 
@@ -353,18 +303,14 @@ int main(void)
   //Kích hoạt nguồn và Clock cho Backup Register. Nạp lại biến ầm từ thanh ghi BKP->DR1
   RCC->APB1ENR |= (RCC_APB1ENR_PWREN | RCC_APB1ENR_BKPEN); // Cấp xung nhịp cho PWR và BKP
   PWR->CR |= PWR_CR_DBP; // Mở khóa cho phép ghi vào phần vùng Backup (Disable Backup Domain write protection)
-  
-  productCount = BKP->DR1;
-  cycleCount = BKP->DR2;
+    productCount = BKP->DR1;
+    cycleCount = BKP->DR2;
+    productCount2 = BKP->DR3;
 
   ledOb.init();
-#ifdef ENABLE_SENSOR_DIAGNOSTIC
-  cb.init(Sensor::BOTH_EDGES); 
-#else
-  cb.init(Sensor::RISING_EDGE); 
-#endif
+  cb.init(Sensor::RISING_EDGE);
+  cb2.init(Sensor::RISING_EDGE); 
 
-  cb.setCallback(onSensorDetect);
   dp.setSegmentMap(5, 4, 0, 1, 2, 6, 7, 3);
   dp.setReverseMask(1 << 1); // Đảo chiều digit ở vị trí index 1 (hàng chục của cụm 4 led)
   dp.setStrobeOE(true);
@@ -414,11 +360,11 @@ int main(void)
   
   uint32_t lastDisplayToggle = 0;
   bool isShowingTime = false;
+  uint32_t lastUiTick = 0;
   
 
   
   uint32_t lastCardRead = 0;
-  
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -426,6 +372,8 @@ int main(void)
   while (1)
   {
     //dp2.autoScan(1000);
+    
+    //Báo lỗi kết nối canbus
     static bool lastCanError = false;
     bool currentCanError = (CAN1->ESR & (CAN_ESR_BOFF | CAN_ESR_EPVF)) != 0;
     if (currentCanError && !lastCanError) {
@@ -441,38 +389,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-    
-#ifdef ENABLE_SENSOR_DIAGNOSTIC
-    //ĐỌC LOG CẢM BIẾN (DIAGNOSTIC)
-    uint16_t currBlock = 0, currGap = 0, prevBlock = 0, prevGap = 0;
-    if (coDuLieuMoi) {
-        currBlock = (thoiGianBiChe > 9999) ? 9999 : thoiGianBiChe;
-        currGap = (thoiGianTrong > 9999) ? 9999 : thoiGianTrong;
-        prevBlock = (thoiGianBiCheTruoc > 9999) ? 9999 : thoiGianBiCheTruoc;
-        prevGap = (thoiGianTrongTruoc > 9999) ? 9999 : thoiGianTrongTruoc;
-        coDuLieuMoi = false;
-        // Gửi qua CAN ID: 0x124 
-        // Byte 0-1: Current Block, Byte 2-3: Current Gap
-        // Byte 4-5: Previous Block, Byte 6-7: Previous Gap
-        uint8_t canData[8] = {0};
-        
-        canData[0] = currBlock & 0xFF;
-        canData[1] = (currBlock >> 8) & 0xFF;
-        
-        canData[2] = currGap & 0xFF;
-        canData[3] = (currGap >> 8) & 0xFF;
-        
-        canData[4] = prevBlock & 0xFF;
-        canData[5] = (prevBlock >> 8) & 0xFF;
-        
-        canData[6] = prevGap & 0xFF;
-        canData[7] = (prevGap >> 8) & 0xFF;
-        myCan.sendFrame(0x124, canData, 8);
-    }
-#endif
-    
-    //chong nhay led
     uint32_t currentTick = HAL_GetTick();
     //kiem tra the nho
     if (sdCardChanged) { 
@@ -492,7 +408,7 @@ int main(void)
                     mp3.init();
                     f_mount(NULL, "", 0); 
                     buzzer.beep(1, 100, 0, true); // Kêu 1 tiếng bíp hiệu rút thẻ
-                    HAL_Delay(100);
+                    
                     GPIOA->BRR = (1 << 4); // Bật lại Amply
                 }
             } else {
@@ -506,9 +422,6 @@ int main(void)
                 
                     FATFS_UnLinkDriver(USERPath);
                     FATFS_LinkDriver(&USER_Driver, USERPath);
-                
-                    // Chờ chút ổn định điện áp sau khi cắm nóng
-                    HAL_Delay(300); // Tăng lên 300ms cho các thẻ dung lượng cao
                 
                     uint8_t stat = sdCard.initialize();
                 
@@ -548,7 +461,6 @@ int main(void)
                         buzzer.beep(5, 50, 50);
                     }
                     
-                    HAL_Delay(100);
                     GPIOA->BRR = (1 << 4); // Bật lại Amply sau khi nạp thẻ xong
                 } // Kết thúc if (!sdCardInSlot)
             }
@@ -559,17 +471,34 @@ int main(void)
         mp3.process();
     }
 
-    //1:kiem tra cam bien
+    // 1: Kiểm tra cảm biến
+    if (cb2.isDetected){
+        cb2.isDetected = false;
+        
+        productCount2++;
+        if (productCount2 > 9999) {
+            productCount2 = 0;
+        }
+        BKP->DR3 = productCount2;
+        
+        buzzer.beep(1, 50, 50, true);
+        lastUiTick = 0; // Ép vẽ lại màn hình ngay lập tức
+    }
     if (cb.isDetected) {
       cb.isDetected = false;
-    }
-    
-    if (sensorCountTriggered) {
-      sensorCountTriggered = false;
-      buzzer.beep(1, 50, 50, true); // instant = true để reset beep nếu quẹt liên tục, tạo cảm giác liền mạch
-      // Chuyển màn hình về đếm số ngay lập tức
+      
+      productCount++;
+      if (productCount > 9999) {
+          productCount = 0;
+          cycleCount++;
+          BKP->DR2 = cycleCount;
+      }
+      BKP->DR1 = productCount;
+      
+      buzzer.beep(1, 50, 50, true); 
       isShowingTime = false;
       lastDisplayToggle = currentTick;
+      lastUiTick = 0; // Ép vẽ lại màn hình ngay lập tức
     }
       if(productCount >= mucTieu && !datMucTieu){
         datMucTieu = true;
@@ -577,96 +506,53 @@ int main(void)
           buzzer.beep(3, 100, 100); 
         }
       }
-    //2:doi mode led
-    if (currentTick - lastDisplayToggle >= 5000)
-    {
-      isShowingTime = !isShowingTime;   
-      lastDisplayToggle = currentTick;  
-    }
-    // =================================================================
-    // 1. HIỂN THỊ BỘ ĐẾM TRÊN MODULE 4 LED (dp2)
-    // =================================================================
-    static uint16_t lastProductCount = 0xFFFF;
-    if (productCount != lastProductCount) {
-        dp2.clearBuffer(); 
-        dp2.setNumber(productCount, 0, 4, false); 
-        dp2.refresh();
-        lastProductCount = productCount;
-    }
-
-    // =================================================================
-    // ĐỌC THỜI GIAN TỪ RTC (Mỗi 100ms)
-    // =================================================================
-    static uint32_t lastRtcRead = 0;
+    // 2. CẬP NHẬT GIAO DIỆN MÀN HÌNH (10 lần/giây)
     static uint8_t h = 0, m = 0, s = 0, dow = 0, date = 0, month = 0, year = 0;
-    if (currentTick - lastRtcRead >= 100) {
+    if (currentTick - lastUiTick >= 100) {
+        lastUiTick = currentTick;
+
+        // A. Đọc thời gian RTC
         if (!rtcErrorFlag) {
             rtc.getTime(h, m, s);
             rtc.getDate(dow, date, month, year);
         }
-        lastRtcRead = currentTick;
-    }
 
-    // =================================================================
-    // 2. HIỂN THỊ LUÂN PHIÊN TRÊN MODULE 9 LED (dp)
-    // =================================================================
-    static uint32_t lastDpTimeTick = 0;
-    static bool wasShowingMountTime = false;
-    
-    if (currentTick < showMountTimeUntil) {
-        wasShowingMountTime = true;
-    } else {
-        if (wasShowingMountTime) {
-            wasShowingMountTime = false;
-            lastDpTimeTick = 0; // Ép vẽ lại ngay lập tức
-        }
-        
-        static uint16_t lastDpProductCount = 0xFFFF;
-        bool forceUpdate = (!isShowingTime && productCount != lastDpProductCount);
-        
-        // Cập nhật mỗi 100ms hoặc khi có biến thiên số đếm
-        if (currentTick - lastDpTimeTick >= 100 || lastDpTimeTick == 0 || forceUpdate) {
-            lastDpTimeTick = currentTick;
-            lastDpProductCount = productCount;
-            
-            dp.clearBuffer(); // Tắt toàn bộ 9 LED trước khi vẽ lại
+        // B. Cập nhật Màn hình đếm phụ (dp2)
+        dp2.clearBuffer(); 
+        dp2.setNumber(productCount2, 0, 4, false); 
+        dp2.refresh();
+
+        // C. Cập nhật Màn hình chính (dp)
+        if (currentTick >= showMountTimeUntil) {
+            // Chuyển đổi mode luân phiên sau mỗi 5s
+            if (currentTick - lastDisplayToggle >= 5000) {
+                isShowingTime = !isShowingTime;   
+                lastDisplayToggle = currentTick;  
+            }
+
+            dp.clearBuffer();
             
             if (isShowingTime) {
                 if (rtcErrorFlag) {
-                    // Nếu lỗi RTC thì hiện gạch ngang ở 4 digit đầu
-                    for (int i = 0; i < 4; i++) {
-                        dp.setDigit(i, 0xFE, false);
-                    }
+                    for (int i = 0; i < 4; i++) dp.setDigit(i, 0xFE, false);
                 } else {
-                    // A. Bắn Giờ và Phút vào 4 digit đầu (vị trí 3-2-1-0)
-                    uint16_t timeHM = (h * 100) + m;
-                    dp.setNumber(timeHM, 0, 4, true); 
-                    
-                    // Tạo hiệu ứng nhấp nháy dấu chấm ở vị trí 1 và 2
+                    dp.setNumber((h * 100) + m, 0, 4, true); 
                     if ((currentTick / 500) % 2 == 0) {
                         dp.setDot(1, true);
                         dp.setDot(2, true);
                     }
                 }
             } else {
-                // Hiển thị bộ đếm ở 4 digit đầu
                 dp.setNumber(productCount, 0, 4, false);
-                
-                // Chớp dấu chấm nếu mất canbus
                 if (CAN1->ESR & (CAN_ESR_BOFF | CAN_ESR_EPVF)) {
-                    if ((currentTick / 100) % 2 == 0) {
                         dp.setDot(1, true);
-                        dp.setDot(2, true);
-                    }
+                    
                 }
             }
             
-            // B. Luôn bắn Giây vào 2 digit (ví dụ vị trí 7 và 8) bất kể đang ở mode nào
             if (!rtcErrorFlag) {
-                dp.setNumber(s, 7, 2, true);
+            dp.setNumber(s, 7, 2, true);
             }
-            
-            // Bơm toàn bộ dữ liệu ra màn hình
             dp.refresh();
         }
     }
@@ -746,9 +632,11 @@ int main(void)
                                             }
                                             //Cập nhật lại thanh ghi BKP khi Reset đểm
                                             productCount = 0;
+                                            productCount2 = 0;
                                             cycleCount = 0;
                                             BKP->DR1 = productCount;
                                             BKP->DR2 = cycleCount;
+                                            BKP->DR3 = productCount2;
                                             readStatus = 0x00;
                                             datMucTieu = false;
                                         }
@@ -770,9 +658,9 @@ int main(void)
 
                                             dp.hide();
                                             relay.on();
-                                            HAL_Delay(30);
-                                            dp.refresh();  // Bơm số cũ ra
-                                            dp2.refresh();
+                                            // HAL_Delay(30);
+                                            // dp.refresh();  // Bơm số cũ ra
+                                            // dp2.refresh();
                                             lastRelayDao = currentTick;
                                             
                                             readStatus = 0x00;
@@ -791,9 +679,9 @@ int main(void)
                                        
                                         dp.hide();
                                         relay.toggle();
-                                        HAL_Delay(30);
-                                        dp.refresh();  // Bơm số cũ ra
-                                        dp2.refresh();
+                                        // HAL_Delay(30);
+                                        // dp.refresh();  // Bơm số cũ ra
+                                        // dp2.refresh();
                                         lastRelayDao = currentTick;
                                         
                                         readStatus = 0x00;

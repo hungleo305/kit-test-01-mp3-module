@@ -14,15 +14,30 @@ public:
         GPIO_TypeDef* xdcsPort, uint16_t xdcsPin,
         GPIO_TypeDef* xcsPort, uint16_t xcsPin);
 
+    // Khởi tạo module VS1053 (cấp nguồn, reset cứng, reset mềm, cấu hình volume mặc định)
     void init();
+    
+    // Yêu cầu phát một file MP3 từ thẻ nhớ.
+    // Trả về true nếu mở file thành công, false nếu file không tồn tại hoặc lỗi thẻ.
     bool play(const char* filename);
+    
+    // Điều chỉnh âm lượng (Volume). Giá trị từ 0 (to nhất) đến 254 (nhỏ nhất / tắt tiếng).
     void setVolume(uint8_t left, uint8_t right);
+    
+    // Hàm test nhanh bằng cách xuất ra một âm thanh bíp phần cứng (không cần thẻ nhớ).
     void testAudio();
+    
+    // Hàm cốt lõi: Bơm dữ liệu âm thanh từ thẻ nhớ vào chip VS1053.
+    // Bắt buộc phải được gọi liên tục trong vòng lặp while(1) để duy trì bài nhạc không bị đứt quãng.
     void process(); 
     
+    // Lưu lại trạng thái bài hát đang phát dở (Tên file và Vị trí byte đang đọc) trước khi bị ngắt quãng.
     void saveState();
+    
+    // Khôi phục và phát tiếp bài hát từ đúng vị trí đã lưu trước đó.
     void resumeState();
     
+    // Cờ trạng thái: Bằng true nếu đang có bài hát được phát, false nếu đã phát xong hoặc đang dừng.
     bool isPlaying; 
 
 private:

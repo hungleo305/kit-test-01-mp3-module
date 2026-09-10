@@ -38,15 +38,25 @@ public:
            GPIO_TypeDef* misoPort, uint16_t misoPin,
            GPIO_TypeDef* mosiPort, uint16_t mosiPin);
                 
-    void Init(); // Dùng chung cho cả SPI Cứng và SPI Mềm
+    // Khởi tạo SPI (Tự động cấu hình GPIO nếu dùng Bare-metal, hoặc chỉ reset nếu dùng cấu hình CubeMX)
+    void Init(); 
 
+    // Gửi đi 1 byte từ Master sang Slave, đồng thời đọc về 1 byte từ Slave (Full-duplex)
     uint8_t Transfer(uint8_t data);
+    
+    // Gửi và nhận một chuỗi byte (mảng) sử dụng cơ chế Polling (CPU đứng chờ cho đến khi gửi xong)
     void TransferBuffer(const uint8_t* tx_data, uint8_t* rx_data, uint16_t size);
+    
+    // Gửi và nhận chuỗi byte sử dụng DMA (truy cập bộ nhớ trực tiếp, giải phóng CPU làm việc khác)
     void TransferDMA(const uint8_t* tx_data, uint8_t* rx_data, uint16_t size);
     
+    // Cho phép (true) hoặc vô hiệu hóa (false) chức năng truyền DMA của thư viện
     void EnableDMA(bool enable) { use_dma_flag = enable; }
     
+    // Cài đặt tốc độ truyền (tần số Clock) cho SPI (Tính theo đơn vị Hertz, VD: 400000 = 400kHz)
     void SetSpeed(uint32_t speed_hz);
+    
+    // Cài đặt bộ chia tần số cứng (Prescaler) cho khối SPI (VD: SPI_CR1_BR_1 để chia 8)
     void SetPrescaler(uint32_t prescaler);
 };
 

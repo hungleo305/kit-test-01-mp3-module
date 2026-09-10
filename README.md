@@ -261,11 +261,17 @@ Thư viện `SpiBus` là nền tảng cốt lõi quản lý toàn bộ giao ti�
   ```
 
 **B. Cơ chế tăng tốc bằng DMA (Tối đa hóa băng thông):**
-Thư viện SpiBus hỗ trợ truyền dữ liệu tốc độ cao bằng DMA. Lưu ý: DMA ở dự án này không dùng để chạy ngầm đa nhiệm (vì hàm đọc thẻ nhớ FatFs bắt buộc phải có dữ liệu mới chạy tiếp được), mà dùng để **tối đa hóa tốc độ truyền SPI**.
-- **Lý do:** Nếu dùng CPU đẩy từng byte, giữa các byte luôn có độ trễ do CPU phải xử lý vòng lặp. Khi bật DMA, luồng dữ liệu được phần cứng bơm liên tục không có khoảng nghỉ. Nhờ vậy tốc độ đọc thẻ SD tăng lên cao (rất cần thiết để đọc nhạc MP3 mượt mà). CPU chỉ cần đứng chờ DMA làm xong (với timeout 200ms chống treo).
-- **Cách dùng để tái sử dụng:** Thư viện đã tự động mapping kênh DMA chuẩn cho từng bộ SPI cứng (VD: SPI1 nối DMA1 CH2/3). Bạn **không cần** bật DMA trong CubeMX. Chỉ cần:
-  1. spi_bus.EnableDMA(true); (Bật tính năng DMA)
-  2. Dùng hàm spi_bus.TransferDMA(tx_buf, rx_buf, size); thay cho TransferBuffer() để truyền mảng dữ liệu lớn.
+Thư viện SpiBus hỗ trợ truyền dữ liệu tốc độ cao bằng DMA (hiện tại hoạt động theo cơ chế Polling - Vòng lặp chờ cờ phần cứng).
+- **Lưu ý quan trọng:** Tính năng DMA **chỉ hoạt động với SPI cứng** (Chế độ 1 và 2). Bạn không thể bật DMA nếu đang khởi tạo đối tượng ở Chế độ 3 (SPI Mềm/Bit-banging).
+- **Tại sao chưa dùng ngắt DMA chuẩn (Interrupt-driven)?**
+  - Trong dự án này, hệ thống chạy dạng vòng lặp đơn (Super-loop), và thư viện thẻ nhớ FatFs hoạt động theo cơ chế **đồng bộ** (gọi hàm đọc thẻ thì phải chờ có đủ dữ liệu trên tay mới chạy tiếp code bên dưới). 
+  - Do đó, dù có bật Ngắt DMA, vi điều khiển vẫn bắt buộc phải tạo một vòng lặp `while(!dma_done)` để đứng chờ cờ báo hoàn thành. Cách này không giải phóng được vi điều khiển mà còn làm hệ thống ngắt phức tạp thêm.
+  - Mục đích chính của DMA ở đây không phải là đa nhiệm, mà là để **loại bỏ độ trễ do vòng lặp phần mềm khi gửi từng Byte**. Bộ DMA cứng tự động bơm chuỗi Byte liên tục ra chân SPI không có khoảng nghỉ, giúp thẻ SD đạt tốc độ cực cao, giải quyết triệt để lỗi giật cục (stuttering) khi phát MP3.
+- **Nếu muốn dùng ngắt DMA thì cần gì?**
+  - Dự án cần phải nâng cấp lên dùng Hệ điều hành thời gian thực (**RTOS** như FreeRTOS).
+- **Cách dùng DMA hiện tại để tái sử dụng:** Thư viện đã tự động mapping kênh DMA chuẩn cho từng bộ SPI cứng (VD: SPI1 nối DMA1 CH2/3). Bạn **không cần** cấu hình DMA hay bật ngắt trong CubeMX. Chỉ cần:
+  1. `spi_bus.EnableDMA(true);` (Bật tính năng DMA)
+  2. Dùng hàm `spi_bus.TransferDMA(tx_buf, rx_buf, size);` thay cho `TransferBuffer()` để truyền mảng dữ liệu lớn.
 ---
 
 ### 4.5. Thư viện `Mp3` (IC Giải mã VS1011e) & Thẻ nhớ (`SdCard`)
@@ -671,13 +677,6 @@ int main() {
 > **[📝 Xem tài liệu Hướng Dẫn Sử Dụng Thư viện Led7Segment đầy đủ tại đây](README_Led7Segment.md)**
 
 Thư viện quét với IC thanh ghi dịch 3 chân (Data, Clock, Strobe/Latch).
-
-**Hàm API chi tiết:**
-- Cấu hình 3 chân điều khiển trong Constructor.
-- `init()`: Chuyển 3 chân điều khiển sang GPIO Output.
-- `void display(uint16_t number)`: Cập nhật biến dữ liệu muốn xuất lên 4 bóng LED.
-- `void setColon(bool on)`: Bật tắt dấu hai chấm giữa LED.
-- `void process()`: **Bắt buộc đặt trong vòng lặp while(1)**. Hàm này chịu trách nhiệm bật/tắt luân phiên 4 chữ số liên tục để duy trì hiển thị trên LED 7 đoạn. Nếu không gọi hàm này, màn hình LED sẽ không sáng hoặc hiển thị sai.
 
 **Ví dụ Code hoàn chỉnh:**
 ```cpp

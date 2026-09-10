@@ -31,11 +31,9 @@ void Led7Segment::setSegmentMap(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint
 }
 void Led7Segment::setInverted(bool state) { isInverted = state; }
 void Led7Segment::setReverseMask(uint32_t mask) { revMask = mask; }
-
-// 2. THÊM 2 HÀM CẤU HÌNH OE
 void Led7Segment::setStrobeOE(bool state) { isOE = state; }
 void Led7Segment::hide() {
-    if (isOE) strobePort->BSRR = strobePin; // OE mức CAO là tắt màn hình
+    if (isOE) strobePort->BSRR = strobePin;
 }
 
 void Led7Segment::init() {

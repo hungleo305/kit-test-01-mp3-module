@@ -72,14 +72,31 @@ public:
          GPIO_TypeDef* csPort, uint16_t csPin, 
          GPIO_TypeDef* rstPort, uint16_t rstPin);
 
+    // Khởi tạo, cấu hình chân GPIO và reset module RC522
     void init();
+    
+    // Phát sóng kiểm tra xem có thẻ RFID trong vùng phủ sóng không (trả về true nếu có)
     bool checkCard();
+    
+    // Đọc mã định danh UID của thẻ (yêu cầu mảng serial tối thiểu 5 byte để chứa 4 byte UID + 1 byte CRC)
     bool readCardSerial(uint8_t* serial);
+    
+    // Chọn thẻ để giao tiếp (truyền vào UID vừa đọc), bắt buộc gọi trước khi xác thực mật khẩu
     uint8_t selectTag(uint8_t* serial);
+    
+    // Xác thực mật khẩu để mở khóa 1 Block (VD: PICC_CMD_MF_AUTH_KEY_A, truyền mảng key 6 byte mặc định 0xFF)
     uint8_t PCD_Authenticate(uint8_t command, uint8_t blockAddr, uint8_t *key, uint8_t *uid);
+    
+    // Đọc 16 byte dữ liệu từ blockAddr (yêu cầu mảng buffer phải đủ 18 byte do RC522 trả về 2 byte CRC)
     uint8_t MIFARE_Read(uint8_t blockAddr, uint8_t *buffer, uint8_t *bufferSize);
+    
+    // Ghi 16 byte dữ liệu đè lên blockAddr (yêu cầu mảng buffer phải có đúng 16 byte)
     uint8_t MIFARE_Write(uint8_t blockAddr, uint8_t *buffer, uint8_t bufferSize);
+    
+    // Đưa thẻ vào trạng thái "Ngủ" (Halt) để thẻ không bị kích hoạt đọc lại liên tục khi vẫn đặt trên đầu đọc
     void PICC_HaltA();
+    
+    // Tắt chế độ mã hóa Crypto, giải phóng chip RC522. Bắt buộc gọi sau khi Đọc/Ghi xong để chống treo
     void PCD_StopCrypto1();
 };
 
