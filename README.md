@@ -289,6 +289,7 @@ Sự kết hợp giữa `SdCard` (đọc thẻ vật lý) và `Mp3` (giải mã 
   > - Sau khi set GPIO, hàm sẽ kéo PWR_EN xuống LOW để bật nguồn cho mạch MP3, delay 100ms cho điện áp ổn định rồi mới nạp thanh ghi qua SPI.
 - `void play(const char* filename)`: Tìm và mở file MP3. Hỗ trợ hàng chờ (Playlist). Nếu đang hát mà gọi tiếp `play()`, file mới sẽ đợi file cũ hát xong.
 - `void setVolume(uint8_t left, uint8_t right)`: Chỉnh âm lượng (0 = Max, 254 = Min/Tắt, 255 = Power down).
+- `void setPlaySpeed(float speedMultiplier)`: Điều chỉnh tốc độ âm thanh (Sample Rate Override). Bóc tách Header MP3 (`SCI_HDAT0/1`) để vô hiệu hóa sai số của mạch Auto-Upsampler trong VS1011e. Vì giới hạn phần cứng của DAC là 48kHz, nếu dùng file gốc 16kHz thì chỉ ép xung được tối đa 3.0x. Khuyến cáo format toàn bộ file âm thanh về chuẩn 16.000 Hz.
 - `void process()`: **QUAN TRỌNG NHẤT**. Đặt trong `while(1)`. Hàm này sẽ kiểm tra chân `DREQ`. Chân này ở mức CAO nghĩa là IC VS1011 chưa có dữ liệu. Hàm sẽ tự lấy 32 bytes từ Buffer đẩy qua SPI. Nếu quên hàm này, âm sẽ thanh không kêu.
 - `void saveState()` và `resumeState()`: **Hot-Plug (Cắm/rút nóng thẻ)**. Giúp ghi nhớ bài hát đang hát dở để khi cắm thẻ lại, bài hát tự hát tiếp vị trí vừa đứt.
 
@@ -312,7 +313,7 @@ SdCard sdCard(&spi1_bus, GPIOC, 1<<8, GPIOB, 1<<0, GPIOB, 1<<1);
 > - **CD (Card Detect):** Chân phát hiện có thẻ cắm vào khe hay không (thường bị kéo xuống LOW khi có thẻ).
 > - **PWR (Power Control):** Chân điều khiển transitor để cấp nguồn 3.3V cho thẻ nhớ.
 
-**2. Giao tiếp giữa FatFs và SdCard (Quy luật Hỏi - Đáp):**
+**2. Giao tiếp giữa FatFs và SdCard :**
 Để FatFs hoạt động được, nó yêu cầu thư viện `SdCard.cpp` phải cung cấp các hàm giao tiếp SPI với STM32. Khi FatFs cần, nó sẽ tự động gọi 5 hàm này:
 
 - **Hàm `SdCard::disk_initialize()`:** FatFs gọi hàm này khi bạn chạy lệnh `f_mount(&fs, "", 1)`. Hàm thực hiện 4 bước khởi tạo thẻ:
