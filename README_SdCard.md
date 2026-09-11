@@ -200,13 +200,13 @@ if (f_open(&myFile, "LOG.TXT", FA_WRITE | FA_OPEN_APPEND) == FR_OK) {
 
 ## PHẦN 3: BÍ QUYẾT TỐI ƯU TỐC ĐỘ THẺ NHỚ
 
-Ở chế độ SPI 18MHz, tốc độ lý thuyết là 2.25 MB/s (truyền liên tục 100%). Khi chạy thực tế trong dự án này (đã sử dụng phần cứng DMA đồng bộ), tốc độ đọc đo được đạt khoảng **~1.5 MB/s** (tương đương 68% lý thuyết). Sự hao hụt này là do vi điều khiển luôn phải tiêu tốn thêm thời gian trễ giữa các khối (block) để xử lý ngắt và truyền thêm các gói tín hiệu cấu trúc (như lệnh giao tiếp, cờ hiệu, CRC). Tốc độ này đã rất dư dả để phát nhạc MP3.
+Ở chế độ SPI 18MHz, tốc độ lý thuyết là 2.25 MB/s (truyền liên tục 100%). Khi chạy thực tế trong dự án này (đã sử dụng phần cứng DMA đồng bộ), tốc độ đọc đo được đạt khoảng **~1.5 MB/s** (tương đương ~68% lý thuyết). Sự hao hụt này là do vi điều khiển luôn phải tiêu tốn thêm thời gian trễ giữa các khối (block) để xử lý ngắt và truyền thêm các gói tín hiệu cấu trúc (như lệnh giao tiếp, cờ hiệu, CRC). Tốc độ này đủ để để phát nhạc MP3 trong dự án mà không bị giật, đơ.
 Với tác vụ ghi, tốc độ chỉ đạt khoảng **~0.4 MB/s** vì bị rào cản vật lý: mỗi khi truyền xong 1 khối dữ liệu, chip nhớ Flash bên trong thẻ cần thời gian để lưu mảng dữ liệu đó vào ô nhớ. Trong lúc chờ Flash ghi xong này, vi điều khiển bắt buộc phải đợi đường dây rảnh mới được gửi tiếp khối khác.
 
 Nếu làm các dự án cần đọc dữ liệu lớn hoặc ghi Log tốc độ cao, bắt buộc phải nhớ các quy tắc sau:
 
 1. **Luôn dùng mảng đệm (Buffer) lớn:** 
-   Thẻ nhớ (Flash NAND) có cấu trúc vật lý xử lý theo từng khối **512 bytes**. Đừng bao giờ gọi lệnh `f_write` hay `f_read` lắt nhắt 1 byte hoặc 2 byte một lần, nó sẽ khiến tốc độ chậm đi hàng chục lần vì Overhead tạo lệnh SPI. Hãy tạo mảng buffer lớn (ví dụ `uint8_t buffer[4096];` - tương đương 8 khối) và đọc/ghi hẳn 4KB một lần.
+   Thẻ nhớ (Flash NAND) có cấu trúc vật lý xử lý theo từng khối **512 bytes**. Đừng gọi lệnh `f_write` hay `f_read` lắt nhắt 1 byte hoặc 2 byte một lần, nó sẽ khiến tốc độ chậm đi nhiều lần vì Overhead tạo lệnh SPI. Hãy tạo mảng buffer lớn (ví dụ `uint8_t buffer[4096];` - tương đương 8 khối) và đọc/ghi hẳn 4KB một lần.
 
 2. **Hạn chế Open/Close liên tục:** 
    Lệnh `f_open` và `f_close` rất nặng nề vì nó phải ra lệnh cho vi điều khiển sửa đổi bảng định vị FAT của ổ đĩa (FAT Table). 
