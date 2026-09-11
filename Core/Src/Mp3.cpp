@@ -32,7 +32,7 @@ Mp3::Mp3(SpiBus* spi_bus,
         dreqPort(dreqPort), dreqPin(dreqPin),
         xdcsPort(xdcsPort), xdcsPin(xdcsPin),
         xcsPort(xcsPort), xcsPin(xcsPin),
-        hasSavedState(false) {}
+        hasSavedState(false), playSpeed(1.0f), baseSampleRate(0), targetAudata(0) {}
 
 static FIL mp3File;
 
@@ -72,9 +72,16 @@ void Mp3::reset() {
     
     writeRegister(SCI_CLOCKF, 0x9800); 
     HAL_Delay(20);
-    waitReady();
     
-    setVolume(50, 50); 
+    setVolume(40, 40);
+    
+    isPlaying = false;
+    bufferIndex = 0;
+    dataInBuf = 0;
+    
+    playSpeed = 1.0f;
+    baseSampleRate = 0;
+    targetAudata = 0;
 }
 
 void Mp3::init() {
@@ -128,6 +135,22 @@ void Mp3::setVolume(uint8_t left, uint8_t right) {
     writeRegister(SCI_VOL, v);
 }
 
+void Mp3::setPlaySpeed(float speedMultiplier) {
+    if (speedMultiplier <= 0.0f) speedMultiplier = 1.0f;
+    playSpeed = speedMultiplier;
+    baseSampleRate = 0; // Đặt lại để process() tự nhận diện khi bắt đầu bài hát mới
+    targetAudata = 0;
+    
+    // Đảm bảo phần cứng ở trạng thái chuẩn nhất (không ép xung SCI_CLOCKF)
+    // CLOCKF = 0x9800 (Doubler ON, SC_FREQ = 0 -> XTALI = 12.288MHz mặc định)
+    writeRegister(SCI_CLOCKF, 0x9800);
+    
+    uint16_t currentMode = readRegister(SCI_MODE);
+    writeRegister(SCI_MODE, currentMode | 0x0004); // SM_RESET
+    HAL_Delay(20);
+    waitReady();
+}
+
 void Mp3::sendDataBlock(uint8_t* data, uint16_t length) {
     if (!waitReady()) return; 
     xdcsPort->BRR = xdcsPin;               
@@ -176,6 +199,8 @@ void Mp3::process() {
                 currentFilename[31] = '\0';
                 bufferIndex = 0; 
                 dataInBuf = 0;
+                baseSampleRate = 0; 
+                targetAudata = 0;
                 isPlaying = true; 
             }
             
@@ -245,6 +270,61 @@ void Mp3::process() {
         
         bufferIndex += chunk;
         chunksSent++;
+        
+        // Kỹ thuật Sample Rate Override
+        if (playSpeed > 1.01f || playSpeed < 0.99f) {
+            uint16_t currentAudata = readRegister(SCI_AUDATA);
+            uint16_t sampleRate = currentAudata & ~1;
+            
+            if (baseSampleRate == 0) {
+                // Đang bắt đầu file mới. Ta CHỜ cho đến khi Decoder phân tích xong Header
+                uint16_t hdat1 = readRegister(SCI_HDAT1);
+                if (hdat1 > 0) {
+                    uint16_t hdat0 = readRegister(SCI_HDAT0);
+                    
+                    // Bóc tách MP3 Header để lấy tần số gốc THẬT SỰ của file, 
+                    // tránh việc đọc SCI_AUDATA bị dính bộ tự động Upsample của VS1011e (ví dụ file 16k chip tự báo 24k)
+                    uint8_t mpegVersion = (hdat1 >> 3) & 0x03;
+                    uint8_t srIndex = (hdat0 >> 10) & 0x03;
+                    uint16_t nativeRate = 0;
+                    
+                    if (mpegVersion == 3) { // MPEG 1
+                        if (srIndex == 0) nativeRate = 44100;
+                        else if (srIndex == 1) nativeRate = 48000;
+                        else if (srIndex == 2) nativeRate = 32000;
+                    } else if (mpegVersion == 2) { // MPEG 2
+                        if (srIndex == 0) nativeRate = 22050;
+                        else if (srIndex == 1) nativeRate = 24000;
+                        else if (srIndex == 2) nativeRate = 16000;
+                    } else if (mpegVersion == 0) { // MPEG 2.5
+                        if (srIndex == 0) nativeRate = 11025;
+                        else if (srIndex == 1) nativeRate = 12000;
+                        else if (srIndex == 2) nativeRate = 8000;
+                    }
+                    
+                    if (nativeRate > 0) {
+                        baseSampleRate = nativeRate; // Lấy làm chuẩn
+                        
+                        uint32_t calcAudata = (uint32_t)(baseSampleRate * playSpeed);
+                        if (calcAudata > 48000) calcAudata = 48000;
+                        if (calcAudata < 8000) calcAudata = 8000;
+                        targetAudata = (uint16_t)calcAudata;
+                        
+                        // Bắt đầu ép xung
+                        writeRegister(SCI_AUDATA, targetAudata | (currentAudata & 1));
+                    }
+                }
+            } else {
+                // Đã chốt được rate gốc và đang trong quá trình ép xung.
+                // Nếu sụt áp / nhiễu EMI từ Relay làm thanh ghi AUDATA bị thay đổi sai lệch:
+                if (sampleRate != (targetAudata & ~1)) {
+                    // Cứ tự động GHI ĐÈ LẠI để giữ vững tốc độ mục tiêu, bất chấp nhiễu!
+                    if (targetAudata >= 8000) {
+                        writeRegister(SCI_AUDATA, targetAudata | (currentAudata & 1));
+                    }
+                }
+            }
+        }
     }
 }
 
