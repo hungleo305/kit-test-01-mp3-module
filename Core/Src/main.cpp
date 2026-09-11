@@ -326,6 +326,8 @@ int main(void)
   rfid.init();
   relay.init();
   mp3.init();
+  mp3.setPlaySpeed(2.0f);
+  mp3.setVolume(70,70);
   myCan.init();
   sdCard.init();
   
