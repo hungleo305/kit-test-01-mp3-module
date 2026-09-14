@@ -3,6 +3,18 @@
 
 #include "stm32f1xx.h"
 
+// Định nghĩa sẵn các hằng số Prescaler để không phụ thuộc vào HAL
+#ifndef SPI_BAUDRATEPRESCALER_2
+#define SPI_BAUDRATEPRESCALER_2   (0x00000000U)
+#define SPI_BAUDRATEPRESCALER_4   (0x00000008U)
+#define SPI_BAUDRATEPRESCALER_8   (0x00000010U)
+#define SPI_BAUDRATEPRESCALER_16  (0x00000018U)
+#define SPI_BAUDRATEPRESCALER_32  (0x00000020U)
+#define SPI_BAUDRATEPRESCALER_64  (0x00000028U)
+#define SPI_BAUDRATEPRESCALER_128 (0x00000030U)
+#define SPI_BAUDRATEPRESCALER_256 (0x00000038U)
+#endif
+
 class SpiBus {
 private:
     bool isSoftware;

@@ -279,7 +279,9 @@ void SpiBus::SetSpeed(uint32_t speed_hz) {
 
 void SpiBus::SetPrescaler(uint32_t prescaler) {
     if (isSoftware) {
-        switch (prescaler) {
+        // Chuẩn hóa prescaler (0x00 đến 0x38) về index từ 0 đến 7
+        uint32_t br_index = (prescaler & 0x38) >> 3;
+        switch (br_index) {
             case 0: delay_ticks = 2; break; 
             case 1: delay_ticks = 4; break; 
             case 2: delay_ticks = 8; break; 
@@ -297,8 +299,8 @@ void SpiBus::SetPrescaler(uint32_t prescaler) {
         hspi->CR1 &= ~SPI_CR1_SPE;
         
         uint32_t cr1 = hspi->CR1;
-        cr1 &= ~(7U << 3); 
-        cr1 |= (prescaler & (7U << 3));
+        cr1 &= ~(7U << 3); // Xóa 3 bit BR (0x38)
+        cr1 |= (prescaler & (7U << 3)); // Ghi đè 3 bit BR
         hspi->CR1 = cr1;
         
         hspi->CR1 |= SPI_CR1_SPE;
