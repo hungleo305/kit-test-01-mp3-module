@@ -16,13 +16,14 @@ Led7Segment::Led7Segment(GPIO_TypeDef* dPort, uint16_t dPin,
                          GPIO_TypeDef* clkPort, uint16_t clkPin, 
                          GPIO_TypeDef* strPort, uint16_t strPin,
                          uint8_t digits) 
-    : dataPort(dPort), dataPin(dPin), 
-      clockPort(clkPort), clockPin(clkPin), 
-      strobePort(strPort), strobePin(strPin),
-      numDigits(digits), revMask(0), isInverted(false), isOE(false),
-      lastScanTick(0), currentScanBit(0) 
+: dataPort(dPort), dataPin(dPin),
+  clockPort(clkPort), clockPin(clkPin),
+  strobePort(strPort), strobePin(strPin),
+  numDigits(digits), revMask(0), isInverted(false),
+  dotBuffer(0), lastScanTick(0), currentScanBit(0)
 {
-    for (uint8_t i = 0; i < 8; i++) segMap[i] = i;
+    for (uint8_t i = 0; i < 8; i++)  segMap[i] = i;
+    for (uint8_t i = 0; i < 16; i++) displayBuffer[i] = 0x00;
 }
 
 void Led7Segment::setSegmentMap(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t e, uint8_t f, uint8_t g, uint8_t dp) {
@@ -31,9 +32,8 @@ void Led7Segment::setSegmentMap(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint
 }
 void Led7Segment::setInverted(bool state) { isInverted = state; }
 void Led7Segment::setReverseMask(uint32_t mask) { revMask = mask; }
-void Led7Segment::setStrobeOE(bool state) { isOE = state; }
 void Led7Segment::hide() {
-    if (isOE) strobePort->BSRR = strobePin;
+    blank();
 }
 
 void Led7Segment::init() {
@@ -58,6 +58,7 @@ void Led7Segment::init() {
         }
         ports[i]->BRR = pins[i]; 
     }
+    strobePort->BSRR = strobePin; // Khởi tạo Strobe ở mức HIGH
     blank(); 
 }
 
@@ -113,9 +114,10 @@ void Led7Segment::sendByte(uint8_t data) {
 }
 
 void Led7Segment::latch() {
-    strobePort->BSRR = strobePin;
-    __NOP(); __NOP(); __NOP();
     strobePort->BRR = strobePin;
+    for (volatile int d = 0; d < 50; d++);   // ~2µs: đủ cho output propagation
+    strobePort->BSRR = strobePin;
+    for (volatile int d = 0; d < 50; d++);   // ~2µs: setup time trước refresh sau
 }
 
 
@@ -157,8 +159,7 @@ void Led7Segment::setNumber(uint32_t number, uint8_t startIndex, uint8_t length,
 // 3. SỬA CHUẨN CÁC HÀM REFRESH/BLANK ĐỂ HỖ TRỢ CHUẨN OE
 void Led7Segment::refresh() {
     __disable_irq(); 
-    if (isOE) strobePort->BSRR = strobePin; // Mạch VNATECH -> Tắt màn hình
-    else      strobePort->BRR = strobePin;  // Mạch dp2 -> Khóa chốt
+    strobePort->BSRR = strobePin; // HIGH khi dịch: Hold/không cạnh
     
     for (int i = numDigits - 1; i >= 0; i--) {
         uint8_t logicalSeg = displayBuffer[i];
@@ -169,8 +170,7 @@ void Led7Segment::refresh() {
         sendByte(physByte);
     }
     
-    if (isOE) strobePort->BRR = strobePin;  // Mạch VNATECH -> Bật lại màn hình
-    else      latch();                      // Mạch dp2 -> Mở chốt xả data
+    latch(); // Chốt bằng xung HIGH -> LOW -> HIGH
     
     dataPort->BRR = dataPin;
     __enable_irq();
@@ -178,13 +178,11 @@ void Led7Segment::refresh() {
 
 void Led7Segment::blank() {
     __disable_irq();
-    if (isOE) strobePort->BSRR = strobePin; 
-    else      strobePort->BRR = strobePin; 
+    strobePort->BSRR = strobePin;
     
     for(int i = 0; i < numDigits; i++) sendByte(isInverted ? 0xFF : 0x00);
     
-    if (isOE) strobePort->BRR = strobePin; 
-    else      latch(); 
+    latch(); 
     
     dataPort->BRR = dataPin;
     __enable_irq();
@@ -192,8 +190,7 @@ void Led7Segment::blank() {
 
 void Led7Segment::showDashes() {
     __disable_irq();
-    if (isOE) strobePort->BSRR = strobePin; 
-    else      strobePort->BRR = strobePin; 
+    strobePort->BSRR = strobePin;
     
     for(int i = numDigits - 1; i >= 0; i--) {
         bool isRev = (revMask & (1 << i)) != 0;
@@ -202,8 +199,7 @@ void Led7Segment::showDashes() {
         sendByte(physByte);
     }
     
-    if (isOE) strobePort->BRR = strobePin; 
-    else      latch(); 
+    latch(); 
     
     dataPort->BRR = dataPin;
     __enable_irq();
@@ -217,9 +213,7 @@ void Led7Segment::autoScan(uint32_t delayMs) {
 
     __disable_irq(); 
     
-    // Khóa màn hình theo chuẩn mạch
-    if (isOE) strobePort->BSRR = strobePin; 
-    else      strobePort->BRR = strobePin;  
+    strobePort->BSRR = strobePin;
     
     // Bơm thẳng bit vật lý vào toàn bộ các chữ số (bỏ qua map chân)
     uint8_t physByte = (1 << currentScanBit); 
@@ -228,9 +222,7 @@ void Led7Segment::autoScan(uint32_t delayMs) {
         sendByte(physByte);
     }
     
-    // Mở màn hình chốt dữ liệu
-    if (isOE) strobePort->BRR = strobePin;  
-    else      latch();                      
+    latch();
     
     dataPort->BRR = dataPin;
     __enable_irq();

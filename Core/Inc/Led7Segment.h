@@ -17,9 +17,6 @@ private:
     uint32_t revMask;  
     bool isInverted;
     
-    // --- 1. BIẾN IS_OE CẦN THÊM VÀO ĐÂY ---
-    bool isOE; 
-    
     uint8_t segMap[8];
     uint8_t displayBuffer[16]; 
     uint32_t dotBuffer; 
@@ -40,28 +37,48 @@ public:
                 GPIO_TypeDef* strPort, uint16_t strPin,
                 uint8_t digits);
                 
+    // Ánh xạ lại chân segment (khi module đấu lệch thứ tự A..DP).
     void setSegmentMap(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t e, uint8_t f, uint8_t g, uint8_t dp);
-    void setReverseMask(uint32_t mask);
-    void setInverted(bool state);
-    // --- HÀM HỖ TRỢ TEST MẠCH ---
-    void autoScan(uint32_t delayMs = 1000);
     
-    // --- 2. HAI HÀM CẤU HÌNH OE CẦN THÊM VÀO ĐÂY ---
-    void setStrobeOE(bool state);
+    // Đảo vị trí các digit (bit i = digit i bị đảo ngược vật lý).
+    void setReverseMask(uint32_t mask);
+    
+    // Đảo cực byte hiển thị (module LED âm cực).
+    void setInverted(bool state);
+    
+    // Tắt hoàn toàn màn hình (đồng nghĩa với blank())
     void hide();
     
+    // Khởi tạo chân GPIO. STROBE được đưa lên mức HIGH (mức nghỉ).
     void init();
 
-
-
+    // Xoá buffer hiển thị
     void clearBuffer();
+    
+    // Đặt giá trị cho 1 chữ số
     void setDigit(uint8_t index, uint8_t value, bool showDot = false);
+    
+    // Điều khiển dấu chấm
     void setDot(uint8_t index, bool showDot);
+    
+    // In số ra màn hình
     void setNumber(uint32_t number, uint8_t startIndex, uint8_t length, bool padZeroes = false);
     
+    // Đẩy buffer ra màn hình. Sử dụng trình tự chốt duy nhất:
+    // Nghỉ ở HIGH -> Dịch data -> Xung chốt LOW rồi HIGH -> Nghỉ ở HIGH
+    // Hỗ trợ cả 2 loại chip:
+    // - Chip chuẩn (cạnh lên): HIGH khi dịch = không cạnh -> giữ data. Xung LOW->HIGH ở cuối tạo cạnh lên chốt data.
+    // - Chip ngược cực (transparent khi LOW): HIGH = hold. Xung LOW ngắn = transparent chốt data.
     void refresh();
+    
+    // Xoá sạch màn hình lập tức
     void blank();
+    
+    // Hiện gạch ngang '----' để test
     void showDashes();
+    
+    // Quét từng segment để test phần cứng
+    void autoScan(uint32_t delayMs = 1000);
 };
 
 #endif
