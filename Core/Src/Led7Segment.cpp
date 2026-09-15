@@ -115,9 +115,9 @@ void Led7Segment::sendByte(uint8_t data) {
 
 void Led7Segment::latch() {
     strobePort->BRR = strobePin;
-    for (volatile int d = 0; d < 50; d++);   // ~2µs: đủ cho output propagation
+    for (volatile int d = 0; d < 50; d++);   
     strobePort->BSRR = strobePin;
-    for (volatile int d = 0; d < 50; d++);   // ~2µs: setup time trước refresh sau
+    for (volatile int d = 0; d < 50; d++);   
 }
 
 
@@ -156,10 +156,9 @@ void Led7Segment::setNumber(uint32_t number, uint8_t startIndex, uint8_t length,
     }
 }
 
-// 3. SỬA CHUẨN CÁC HÀM REFRESH/BLANK ĐỂ HỖ TRỢ CHUẨN OE
 void Led7Segment::refresh() {
     __disable_irq(); 
-    strobePort->BSRR = strobePin; // HIGH khi dịch: Hold/không cạnh
+    strobePort->BSRR = strobePin;
     
     for (int i = numDigits - 1; i >= 0; i--) {
         uint8_t logicalSeg = displayBuffer[i];
@@ -170,7 +169,7 @@ void Led7Segment::refresh() {
         sendByte(physByte);
     }
     
-    latch(); // Chốt bằng xung HIGH -> LOW -> HIGH
+    latch(); 
     
     dataPort->BRR = dataPin;
     __enable_irq();

@@ -63,7 +63,6 @@ CAN_HandleTypeDef hcan;
 Led ledOb(GPIOB, GPIO_PIN_2);
 Buzzer buzzer(GPIOC, GPIO_PIN_15);
 Sensor cb(GPIOC, GPIO_PIN_13);
-Sensor cb2(GPIOB, GPIO_PIN_8);
 Relay relay(GPIOC, GPIO_PIN_7);
 
 volatile bool rtcErrorFlag = false;
@@ -137,10 +136,6 @@ extern "C" void EXTI15_10_IRQHandler(void) {
     cb.handleInterrupt(1 << 13);
     
 }
-extern "C" void EXTI9_5_IRQHandler(void) {
-    cb2.handleInterrupt(1 << 8);
-    
-}
 
 static void MX_GPIO_Init(void);
 static void MX_CAN_Init(void);
@@ -151,120 +146,120 @@ static void MX_CAN_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-// void testSdCardSpeedAndSendCan() {
-//     static uint8_t buffer[4096]; // Dung static de tranh tran Stack, 4KB buffer (8 block) de ep DMA chay max cong suat
-//     for (int i = 0; i < 4096; i++) buffer[i] = 0xAA;
+void testSdCardSpeedAndSendCan() {
+    static uint8_t buffer[4096]; // Dung static de tranh tran Stack, 4KB buffer (8 block) de ep DMA chay max cong suat
+    for (int i = 0; i < 4096; i++) buffer[i] = 0xAA;
     
-//     uint32_t totalBlocks = 128; // 128 blocks = 64KB
-//     uint32_t loopCount = totalBlocks / 8; // 16 loops (mỗi loop 8 block = 4KB)
+    uint32_t totalBlocks = 128; // 128 blocks = 64KB
+    uint32_t loopCount = totalBlocks / 8; // 16 loops (mỗi loop 8 block = 4KB)
     
-//     uint32_t start, timeMs, speedKBs;
-//     uint8_t frame[7] = {0};
-//     uint32_t timeout;
+    uint32_t start, timeMs, speedKBs;
+    uint8_t frame[7] = {0};
+    uint32_t timeout;
     
-//     FIL testFile;
-//     UINT bw, br;
+    FIL testFile;
+    UINT bw, br;
     
-//     // 1. TEST GHI FATFS (Tốc độ thực tế) -> 0x127
-//     if (f_open(&testFile, "speed.tst", FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
-//         start = HAL_GetTick();
-//         for (uint32_t i = 0; i < loopCount; i++) {
-//             f_write(&testFile, buffer, 4096, &bw);
-//         }
-//         f_close(&testFile);
-//         timeMs = HAL_GetTick() - start;
-//         if (timeMs == 0) timeMs = 1;
-//         speedKBs = (totalBlocks * 512 * 1000) / 1024 / timeMs;
+    // 1. TEST GHI FATFS (Tốc độ thực tế) -> 0x127
+    if (f_open(&testFile, "speed.tst", FA_WRITE | FA_CREATE_ALWAYS) == FR_OK) {
+        start = HAL_GetTick();
+        for (uint32_t i = 0; i < loopCount; i++) {
+            f_write(&testFile, buffer, 4096, &bw);
+        }
+        f_close(&testFile);
+        timeMs = HAL_GetTick() - start;
+        if (timeMs == 0) timeMs = 1;
+        speedKBs = (totalBlocks * 512 * 1000) / 1024 / timeMs;
         
-//         frame[0] = 1; // Trang_Thai = 1 (Thực tế)
-//         frame[1] = timeMs & 0xFF; frame[2] = (timeMs >> 8) & 0xFF;
-//         frame[3] = totalBlocks & 0xFF; frame[4] = (totalBlocks >> 8) & 0xFF;
-//         frame[5] = speedKBs & 0xFF; frame[6] = (speedKBs >> 8) & 0xFF;
-//     } else {
-//         frame[0] = 0; // Error
-//     }
-//     timeout = HAL_GetTick();
-//     while(!myCan.sendFrame(0x127, frame, 7)) { if (HAL_GetTick() - timeout > 5) break; }
+        frame[0] = 1; // Trang_Thai = 1 (Thực tế)
+        frame[1] = timeMs & 0xFF; frame[2] = (timeMs >> 8) & 0xFF;
+        frame[3] = totalBlocks & 0xFF; frame[4] = (totalBlocks >> 8) & 0xFF;
+        frame[5] = speedKBs & 0xFF; frame[6] = (speedKBs >> 8) & 0xFF;
+    } else {
+        frame[0] = 0; // Error
+    }
+    timeout = HAL_GetTick();
+    while(!myCan.sendFrame(0x127, frame, 7)) { if (HAL_GetTick() - timeout > 5) break; }
 
-//     // 2. TEST ĐỌC FATFS (Tốc độ thực tế) -> 0x126
-//     if (f_open(&testFile, "speed.tst", FA_READ) == FR_OK) {
-//         start = HAL_GetTick();
-//         for (uint32_t i = 0; i < loopCount; i++) {
-//             f_read(&testFile, buffer, 4096, &br);
-//         }
-//         f_close(&testFile);
-//         timeMs = HAL_GetTick() - start;
-//         if (timeMs == 0) timeMs = 1;
-//         speedKBs = (totalBlocks * 512 * 1000) / 1024 / timeMs;
+    // 2. TEST ĐỌC FATFS (Tốc độ thực tế) -> 0x126
+    if (f_open(&testFile, "speed.tst", FA_READ) == FR_OK) {
+        start = HAL_GetTick();
+        for (uint32_t i = 0; i < loopCount; i++) {
+            f_read(&testFile, buffer, 4096, &br);
+        }
+        f_close(&testFile);
+        timeMs = HAL_GetTick() - start;
+        if (timeMs == 0) timeMs = 1;
+        speedKBs = (totalBlocks * 512 * 1000) / 1024 / timeMs;
         
-//         frame[0] = 1; // Trang_Thai = 1 (Thực tế)
-//         frame[1] = timeMs & 0xFF; frame[2] = (timeMs >> 8) & 0xFF;
-//         frame[3] = totalBlocks & 0xFF; frame[4] = (totalBlocks >> 8) & 0xFF;
-//         frame[5] = speedKBs & 0xFF; frame[6] = (speedKBs >> 8) & 0xFF;
-//     } else {
-//         frame[0] = 0; // Error
-//     }
-//     timeout = HAL_GetTick();
-//     while(!myCan.sendFrame(0x126, frame, 7)) { if (HAL_GetTick() - timeout > 5) break; }
+        frame[0] = 1; // Trang_Thai = 1 (Thực tế)
+        frame[1] = timeMs & 0xFF; frame[2] = (timeMs >> 8) & 0xFF;
+        frame[3] = totalBlocks & 0xFF; frame[4] = (totalBlocks >> 8) & 0xFF;
+        frame[5] = speedKBs & 0xFF; frame[6] = (speedKBs >> 8) & 0xFF;
+    } else {
+        frame[0] = 0; // Error
+    }
+    timeout = HAL_GetTick();
+    while(!myCan.sendFrame(0x126, frame, 7)) { if (HAL_GetTick() - timeout > 5) break; }
     
-//     f_unlink("speed.tst");
+    f_unlink("speed.tst");
 
-//     // 3. TEST GHI RAW (Tốc độ phần cứng MAX) -> 0x129
+    // 3. TEST GHI RAW (Tốc độ phần cứng MAX) -> 0x129
 
-//     start = HAL_GetTick();
-//     uint8_t stat = 0;
+    start = HAL_GetTick();
+    uint8_t stat = 0;
     
-//     // Chia nhỏ 128 blocks thành các vòng lặp, mỗi vòng lặp ghi 8 blocks (4096 bytes) để vừa với buffer
-//     for (uint32_t i = 0; i < loopCount; i++) {
-//         // Tịnh tiến địa chỉ sector lên 8 sau mỗi lần ghi: 200000, 200008, 200016...
-//         if (sdCard.write(buffer, 200000 + (i * 8), 8) != 0) { 
-//             stat = 1; // Lỗi
-//             break; 
-//         }
-//     }
+    // Chia nhỏ 128 blocks thành các vòng lặp, mỗi vòng lặp ghi 8 blocks (4096 bytes) để vừa với buffer
+    for (uint32_t i = 0; i < loopCount; i++) {
+        // Tịnh tiến địa chỉ sector lên 8 sau mỗi lần ghi: 200000, 200008, 200016...
+        if (sdCard.write(buffer, 200000 + (i * 8), 8) != 0) { 
+            stat = 1; // Lỗi
+            break; 
+        }
+    }
     
-//     timeMs = HAL_GetTick() - start;
-//     if (timeMs == 0) timeMs = 1;
-//     speedKBs = (totalBlocks * 512 * 1000) / 1024 / timeMs;
+    timeMs = HAL_GetTick() - start;
+    if (timeMs == 0) timeMs = 1;
+    speedKBs = (totalBlocks * 512 * 1000) / 1024 / timeMs;
     
-//     if (stat == 0) {
-//         frame[0] = 2; // Trang_Thai = 2 (Raw)
-//         frame[1] = timeMs & 0xFF; frame[2] = (timeMs >> 8) & 0xFF;
-//         frame[3] = totalBlocks & 0xFF; frame[4] = (totalBlocks >> 8) & 0xFF;
-//         frame[5] = speedKBs & 0xFF; frame[6] = (speedKBs >> 8) & 0xFF;
-//     } else {
-//         frame[0] = 0; // Error
-//     }
-//     timeout = HAL_GetTick();
-//     while(!myCan.sendFrame(0x129, frame, 7)) { if (HAL_GetTick() - timeout > 5) break; }
+    if (stat == 0) {
+        frame[0] = 2; // Trang_Thai = 2 (Raw)
+        frame[1] = timeMs & 0xFF; frame[2] = (timeMs >> 8) & 0xFF;
+        frame[3] = totalBlocks & 0xFF; frame[4] = (totalBlocks >> 8) & 0xFF;
+        frame[5] = speedKBs & 0xFF; frame[6] = (speedKBs >> 8) & 0xFF;
+    } else {
+        frame[0] = 0; // Error
+    }
+    timeout = HAL_GetTick();
+    while(!myCan.sendFrame(0x129, frame, 7)) { if (HAL_GetTick() - timeout > 5) break; }
 
-//     // 4. TEST ĐỌC RAW (Tốc độ phần cứng MAX) -> 0x12A
-// start = HAL_GetTick();
-//     stat = 0;
+    // 4. TEST ĐỌC RAW (Tốc độ phần cứng MAX) -> 0x12A
+start = HAL_GetTick();
+    stat = 0;
     
-//     // Tương tự, đọc từng cụm 8 blocks vào buffer
-//     for (uint32_t i = 0; i < loopCount; i++) {
-//         if (sdCard.read(buffer, 200000 + (i * 8), 8) != 0) { 
-//             stat = 1; // Lỗi
-//             break; 
-//         }
-//     }
+    // Tương tự, đọc từng cụm 8 blocks vào buffer
+    for (uint32_t i = 0; i < loopCount; i++) {
+        if (sdCard.read(buffer, 200000 + (i * 8), 8) != 0) { 
+            stat = 1; // Lỗi
+            break; 
+        }
+    }
     
-//     timeMs = HAL_GetTick() - start;
-//     if (timeMs == 0) timeMs = 1;
-//     speedKBs = (totalBlocks * 512 * 1000) / 1024 / timeMs;
+    timeMs = HAL_GetTick() - start;
+    if (timeMs == 0) timeMs = 1;
+    speedKBs = (totalBlocks * 512 * 1000) / 1024 / timeMs;
     
-//     if (stat == 0) {
-//         frame[0] = 2; // Trang_Thai = 2 (Raw)
-//         frame[1] = timeMs & 0xFF; frame[2] = (timeMs >> 8) & 0xFF;
-//         frame[3] = totalBlocks & 0xFF; frame[4] = (totalBlocks >> 8) & 0xFF;
-//         frame[5] = speedKBs & 0xFF; frame[6] = (speedKBs >> 8) & 0xFF;
-//     } else {
-//         frame[0] = 0; // Error
-//     }
-//     timeout = HAL_GetTick();
-//     while(!myCan.sendFrame(0x12A, frame, 7)) { if (HAL_GetTick() - timeout > 5) break; }
-// }
+    if (stat == 0) {
+        frame[0] = 2; // Trang_Thai = 2 (Raw)
+        frame[1] = timeMs & 0xFF; frame[2] = (timeMs >> 8) & 0xFF;
+        frame[3] = totalBlocks & 0xFF; frame[4] = (totalBlocks >> 8) & 0xFF;
+        frame[5] = speedKBs & 0xFF; frame[6] = (speedKBs >> 8) & 0xFF;
+    } else {
+        frame[0] = 0; // Error
+    }
+    timeout = HAL_GetTick();
+    while(!myCan.sendFrame(0x12A, frame, 7)) { if (HAL_GetTick() - timeout > 5) break; }
+}
 /* USER CODE END 0 */
 
 /**
@@ -307,8 +302,7 @@ int main(void)
     productCount2 = BKP->DR3;
 
   ledOb.init();
-  cb.init(Sensor::RISING_EDGE);
-  cb2.init(Sensor::RISING_EDGE); 
+  cb.init(Sensor::RISING_EDGE); 
 
   dp.setSegmentMap(5, 4, 0, 1, 2, 6, 7, 3);
   dp.setReverseMask(1 << 1); // Đảo chiều digit ở vị trí index 1 (hàng chục của cụm 4 led)
@@ -321,7 +315,7 @@ int main(void)
   rfid.init();
   relay.init();
   mp3.init();
-  mp3.setPlaySpeed(2.0f);
+  mp3.setPlaySpeed(1.1f);
   mp3.setVolume(40,40);
   myCan.init();
   sdCard.init();
@@ -348,7 +342,7 @@ int main(void)
         buzzer.beep(3, 100, 100);
     } else {
         daNhanTheSD = true;
-       // testSdCardSpeedAndSendCan(); //test the sd
+       testSdCardSpeedAndSendCan(); //test the sd
     }
 
   if (rtc.isTimeLost()) {
@@ -424,7 +418,7 @@ int main(void)
                     if (stat == 0x00) { // Khởi tạo SD thành công
                         if (f_mount(&fs, USERPath, 1) == FR_OK) {
                             daNhanTheSD = true;
-                            //testSdCardSpeedAndSendCan(); //test the sd
+                            testSdCardSpeedAndSendCan(); //test the sd
                               uint32_t mountTime = HAL_GetTick() - startMount;
                           
                               // Kêu 2 tiếng ngắn báo thành công
@@ -468,18 +462,6 @@ int main(void)
     }
 
     // 1: Kiểm tra cảm biến
-    if (cb2.isDetected){
-        cb2.isDetected = false;
-        
-        productCount2++;
-        if (productCount2 > 9999) {
-            productCount2 = 0;
-        }
-        BKP->DR3 = productCount2;
-        
-        buzzer.beep(1, 50, 50, true);
-        lastUiTick = 0; // Ép vẽ lại màn hình ngay lập tức
-    }
     if (cb.isDetected) {
       cb.isDetected = false;
       
@@ -542,7 +524,7 @@ int main(void)
             }
             
             if (!rtcErrorFlag) {
-            dp.setNumber(s, 7, 2, true);
+            dp.setNumber(s, 6, 2, true);
             }
             dp.refresh();
         }
@@ -719,7 +701,7 @@ int main(void)
     }
     
 
-    //6:gui du lieu can rtc vs cam bien (Stress test: Gui lien tuc khong gioi han)
+    //6:gui du lieu can rtc vs cam bien
     {
         uint8_t frame102[6] = {0};
         uint16_t currentCount = productCount; 
@@ -767,7 +749,11 @@ int main(void)
         
         // Luôn cập nhật thời gian để không bị kẹt spam khi CAN bị ngắt
         lastCanStatsSend = currentTick;
-        myCan.sendFrame(0x128, frame128, 8);
+        
+        uint32_t timeout = HAL_GetTick();
+        while(!myCan.sendFrame(0x128, frame128, 8)) {
+            if (HAL_GetTick() - timeout > 2) break; // Ép chờ 2ms để giành được hộp thư
+        }
     }
   }
   /* USER CODE END 3 */
