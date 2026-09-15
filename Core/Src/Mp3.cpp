@@ -2,6 +2,7 @@
 #include <string.h>
 #include "stm32f1xx_hal.h"
 
+/* ==================== Địa chỉ thanh ghi SCI ==================== */
 #define SCI_MODE        0x00
 #define SCI_STATUS      0x01
 #define SCI_BASS        0x02
@@ -15,368 +16,396 @@
 #define SCI_AIADDR      0x0A
 #define SCI_VOL         0x0B
 #define SCI_AICTRL0     0x0C
-#define SCI_AICTRL1     0x0D
-#define SCI_AICTRL2     0x0E
-#define SCI_AICTRL3     0x0F
 
+/* ==================== Bit điều khiển SCI_MODE ==================== */
+#define SM_RESET        0x0004
+#define SM_SDINEW       0x0800
+#define SM_STREAM       0x0040
+#define SM_CANCEL       0x0008
 
-Mp3::Mp3(SpiBus* spi_bus,
-        GPIO_TypeDef* pwrPort, uint16_t pwrPin,
-        GPIO_TypeDef* xresetPort, uint16_t xresetPin,
-        GPIO_TypeDef* dreqPort, uint16_t dreqPin,
-        GPIO_TypeDef* xdcsPort, uint16_t xdcsPin,
-        GPIO_TypeDef* xcsPort, uint16_t xcsPin) : 
-        spi_bus(spi_bus),
-        pwrPort(pwrPort), pwrPin(pwrPin),
-        xresetPort(xresetPort), xresetPin(xresetPin),
-        dreqPort(dreqPort), dreqPin(dreqPin),
-        xdcsPort(xdcsPort), xdcsPin(xdcsPin),
-        xcsPort(xcsPort), xcsPin(xcsPin),
-        hasSavedState(false), playSpeed(1.0f), baseSampleRate(0), targetAudata(0) {}
+/* ==================== Thông số phần cứng của mạch ==================== */
+// Mạch dùng thạch anh 12.000 MHz (không phải 12.288 MHz chuẩn của VS1011E).
+// Điều này khiến chip chạy chậm hơn ~2.3% so với thiết kế gốc.
+// Ảnh hưởng nhỏ, có thể bỏ qua trong hầu hết ứng dụng.
+#define BOARD_XTAL_HZ    12000000UL
 
+/* ==================== Bảng hệ số CLOCKF hợp lệ trên VS1011E ==================== */
+// GHI CHÚ QUAN TRỌNG:
+// Bảng hệ số (SC_MULT, SC_ADD) mà anh đang dùng là của chip VS1053b/VS1003!
+// Đối với VS1011E thực thụ, cấu trúc SCI_CLOCKF là:
+// [15] = Clock Doubler (1 = bật, 0 = tắt)
+// [14:0] = SC_FREQ (Tần số XTALI ảo chia cho 4000)
+// Việc dùng cấu trúc VS1053 (0xE000) cho VS1011E sẽ vô tình thay đổi giá trị SC_FREQ thành rất lớn (24576),
+// khiến con chip tưởng thạch anh là 98MHz, dẫn tới bộ chia DAC chia rất nhỏ -> âm thanh bị chậm rì rì!
+
+/* ==================== File MP3 đang mở ==================== */
 static FIL mp3File;
 
+/* ==================== Constructor ==================== */
+Mp3::Mp3(SpiBus* spi_bus,
+         GPIO_TypeDef* pwrPort,    uint16_t pwrPin,
+         GPIO_TypeDef* xresetPort, uint16_t xresetPin,
+         GPIO_TypeDef* dreqPort,   uint16_t dreqPin,
+         GPIO_TypeDef* xdcsPort,   uint16_t xdcsPin,
+         GPIO_TypeDef* xcsPort,    uint16_t xcsPin)
+    : spi_bus(spi_bus),
+      pwrPort(pwrPort),       pwrPin(pwrPin),
+      xresetPort(xresetPort), xresetPin(xresetPin),
+      dreqPort(dreqPort),     dreqPin(dreqPin),
+      xdcsPort(xdcsPort),     xdcsPin(xdcsPin),
+      xcsPort(xcsPort),       xcsPin(xcsPin),
+      isPlaying(false),
+      hasSavedState(false),
+      playSpeed(1.0f),
+      bufferIndex(0),
+      dataInBuf(0),
+      queueHead(0), queueTail(0), queueCount(0)
+{
+    memset(currentFilename, 0, sizeof(currentFilename));
+    memset(savedFilename,   0, sizeof(savedFilename));
+    savedPosition = 0;
+}
+
+/* ==================== Chờ chip sẵn sàng (DREQ HIGH) ==================== */
 bool Mp3::waitReady() {
     uint32_t timeout = HAL_GetTick();
     while ((dreqPort->IDR & dreqPin) == 0) {
         if (HAL_GetTick() - timeout > 500) {
-            return false; 
+            return false;
         }
     }
     return true;
 }
 
+/* ==================== Ghi thanh ghi SCI ==================== */
 void Mp3::writeRegister(uint8_t address, uint16_t data) {
-    if (!waitReady()) return; 
-    xcsPort->BRR = xcsPin;                
-    
+    if (!waitReady()) return;
+
+    xcsPort->BRR = xcsPin;
+
     uint8_t cmd[4];
-    cmd[0] = 0x02; 
+    cmd[0] = 0x02;                          // Opcode ghi
     cmd[1] = address;
-    cmd[2] = (data >> 8) & 0xFF; 
-    cmd[3] = data & 0xFF;        
-    
+    cmd[2] = (data >> 8) & 0xFF;
+    cmd[3] =  data       & 0xFF;
+
     spi_bus->TransferBuffer(cmd, nullptr, 4);
-    xcsPort->BSRR = xcsPin;               
+
+    xcsPort->BSRR = xcsPin;
 }
 
+/* ==================== Đọc thanh ghi SCI ==================== */
+uint16_t Mp3::readRegister(uint8_t address) {
+    if (!waitReady()) return 0;
+
+    xcsPort->BRR = xcsPin;
+
+    uint8_t tx[4] = {0x03, address, 0xFF, 0xFF};
+    uint8_t rx[4] = {0, 0, 0, 0};
+
+    spi_bus->TransferBuffer(tx, rx, 4);
+
+    xcsPort->BSRR = xcsPin;
+
+    return (rx[2] << 8) | rx[3];
+}
+
+/* ==================== Chuyển hệ số tốc độ -> giá trị CLOCKF ==================== */
+uint16_t Mp3::speedToClockf(float speed) {
+    if (speed < 0.2f) speed = 0.2f;
+    if (speed > 5.0f) speed = 5.0f;
+
+    // Phục hồi lại công thức tính TOÁN HỌC của VS1011e chuẩn (fakeXtali / 4000)
+    uint32_t internalClock = 24000000; // 24MHz (thạch anh 12MHz * Doubler)
+    uint32_t fakeXtali = (uint32_t)(internalClock / speed);
+    uint16_t sc_freq = (uint16_t)(fakeXtali / 4000);
+
+    // Bit 15: Bật Clock Doubler (0x8000)
+    // Bits 14:0: Tần số SC_FREQ
+    return 0x8000 | (sc_freq & 0x7FFF);
+}
+
+/* ==================== Reset chip ==================== */
 void Mp3::reset() {
+    // Reset cứng
     xresetPort->BRR = xresetPin;
     HAL_Delay(20);
     xresetPort->BSRR = xresetPin;
     HAL_Delay(20);
-    
-    writeRegister(SCI_MODE, 0x0804);
+
+    // Bật SDI mới + soft reset
+    writeRegister(SCI_MODE, SM_SDINEW | SM_RESET);
     HAL_Delay(20);
     waitReady();
-    
-    writeRegister(SCI_CLOCKF, 0x9800); 
-    HAL_Delay(20);
-    
+
+    // Đặt tốc độ mặc định 1.0x
+    setPlaySpeed(1.0f);
+
     setVolume(40, 40);
-    
-    isPlaying = false;
-    bufferIndex = 0;
-    dataInBuf = 0;
-    
-    playSpeed = 1.0f;
-    baseSampleRate = 0;
-    targetAudata = 0;
+
+    isPlaying    = false;
+    bufferIndex  = 0;
+    dataInBuf    = 0;
 }
 
+/* ==================== Khởi tạo chân và chip ==================== */
 void Mp3::init() {
-    spi_bus->Init(); // Khởi tạo SPI và các chân GPIO của SPI
-    GPIO_TypeDef* ports[] = {pwrPort, xresetPort, xdcsPort, xcsPort};
-    uint16_t pins[] = {pwrPin, xresetPin, xdcsPin, xcsPin};
-    
-    for (int i = 0; i < 4; i++) {
-        if (ports[i] == GPIOA) RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
-        if (ports[i] == GPIOB) RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
-        if (ports[i] == GPIOC) RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
-        if (ports[i] == GPIOD) RCC->APB2ENR |= RCC_APB2ENR_IOPDEN;
+    spi_bus->Init();
 
+    // Cấu hình 4 chân output: PWR, XRESET, XDCS, XCS
+    GPIO_TypeDef* ports[] = {pwrPort, xresetPort, xdcsPort, xcsPort};
+    uint16_t      pins[]  = {pwrPin,  xresetPin,  xdcsPin,  xcsPin};
+
+    for (int i = 0; i < 4; i++) {
+        // Bật clock cho GPIO port
+        if      (ports[i] == GPIOA) RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
+        else if (ports[i] == GPIOB) RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
+        else if (ports[i] == GPIOC) RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
+        else if (ports[i] == GPIOD) RCC->APB2ENR |= RCC_APB2ENR_IOPDEN;
+
+        // Tìm chỉ số bit của chân
         uint32_t pinIndex = 0;
         while (!(pins[i] & (1 << pinIndex))) pinIndex++;
 
+        // Cấu hình output push-pull 50MHz
         if (pinIndex < 8) {
             ports[i]->CRL &= ~(0xF << (pinIndex * 4));
-            ports[i]->CRL |= (0x3 << (pinIndex * 4)); 
+            ports[i]->CRL |=  (0x3 << (pinIndex * 4));
         } else {
             ports[i]->CRH &= ~(0xF << ((pinIndex - 8) * 4));
-            ports[i]->CRH |= (0x3 << ((pinIndex - 8) * 4));
+            ports[i]->CRH |=  (0x3 << ((pinIndex - 8) * 4));
         }
     }
-    
+
+    // Cấu hình DREQ làm input floating (chip điều khiển chân này)
     uint32_t pinIndex = 0;
     while (!(dreqPin & (1 << pinIndex))) pinIndex++;
     if (pinIndex < 8) {
         dreqPort->CRL &= ~(0xF << (pinIndex * 4));
-        dreqPort->CRL |= (0x4 << (pinIndex * 4)); // input floating
+        dreqPort->CRL |=  (0x4 << (pinIndex * 4));
     } else {
         dreqPort->CRH &= ~(0xF << ((pinIndex - 8) * 4));
-        dreqPort->CRH |= (0x4 << ((pinIndex - 8) * 4));
+        dreqPort->CRH |=  (0x4 << ((pinIndex - 8) * 4));
     }
 
-    xcsPort->BSRR = xcsPin;
-    xdcsPort->BSRR = xdcsPin;
-    xresetPort->BSRR = xresetPin;
-    pwrPort->BRR = pwrPin; // Keo xuong LOW de mo PNP Transistor cap nguon 3V3
-    
-    HAL_Delay(100); // Cho nguon on dinh truoc khi truyen SPI
+    // Đặt mức mặc định
+    xcsPort->BSRR    = xcsPin;      // XCS HIGH
+    xdcsPort->BSRR   = xdcsPin;     // XDCS HIGH
+    xresetPort->BSRR = xresetPin;   // XRESET HIGH
+    pwrPort->BRR     = pwrPin;      // PWR LOW -> PNP mở -> cấp 3V3
+
+    HAL_Delay(100);                 // Chờ nguồn ổn định
     uint8_t dummy = 0xFF;
-    spi_bus->Transfer(dummy);
-    
+    spi_bus->Transfer(dummy);       // Xung SPI đầu tiên để wake chip
+
     reset();
     isPlaying = false;
 }
 
+/* ==================== Điều chỉnh âm lượng ==================== */
 void Mp3::setVolume(uint8_t left, uint8_t right) {
     uint16_t v = (left << 8) | right;
     writeRegister(SCI_VOL, v);
 }
 
-void Mp3::setPlaySpeed(float speedMultiplier) {
-    if (speedMultiplier <= 0.0f) speedMultiplier = 1.0f;
+/* ==================== ĐẶT TỐC ĐỘ PHÁT QUA THẠCH ANH ==================== */
+//
+// Phương pháp:
+//   - Thay vì ép tần số lấy mẫu (SCI_AUDATA), ta thay đổi hệ số nhân clock
+//     nội bộ của chip VS1011E thông qua thanh ghi SCI_CLOCKF.
+//   - Chip chạy DSP nhanh/chậm hơn -> toàn bộ chuỗi xử lý (giải mã, DAC)
+//     chạy nhanh/chậm theo -> audio phát nhanh/chậm.
+//   - CẦN LƯU Ý: cách này làm thay đổi CAO ĐỘ (pitch) tỉ lệ với tốc độ.
+//     Nếu muốn giữ nguyên pitch, cần phương pháp time-stretching khác.
+//
+// Hệ số tốc độ là LIÊN TỤC (có thể là 1.1, 1.5, 3.14, v.v...) vì thanh ghi SC_FREQ
+// có tới 32767 bước chia, cho phép tinh chỉnh tốc độ vô cùng mượt mà.
+//
+bool Mp3::setPlaySpeed(float speedMultiplier) {
+    // Giới hạn dải hợp lệ
+    if (speedMultiplier < 0.2f) speedMultiplier = 0.2f;
+    if (speedMultiplier > 5.0f) speedMultiplier = 5.0f;
+    
     playSpeed = speedMultiplier;
-    baseSampleRate = 0; // Đặt lại để process() tự nhận diện khi bắt đầu bài hát mới
-    targetAudata = 0;
-    
-    // Đảm bảo phần cứng ở trạng thái chuẩn nhất (không ép xung SCI_CLOCKF)
-    // CLOCKF = 0x9800 (Doubler ON, SC_FREQ = 0 -> XTALI = 12.288MHz mặc định)
-    writeRegister(SCI_CLOCKF, 0x9800);
-    
+
+    // Bước 1: Lấy giá trị CLOCKF tương ứng
+    uint16_t newClockf = speedToClockf(speedMultiplier);
+
+    // Bước 2: Ghi trực tiếp SCI_CLOCKF của VS1011e
+    writeRegister(SCI_CLOCKF, newClockf);
+
+    // Bước 3: Chip cần thời gian khóa lại clock mới
     uint16_t currentMode = readRegister(SCI_MODE);
-    writeRegister(SCI_MODE, currentMode | 0x0004); // SM_RESET
-    HAL_Delay(20);
+    writeRegister(SCI_MODE, currentMode | SM_RESET);
+    HAL_Delay(10);
     waitReady();
+
+    return true;
 }
 
-void Mp3::sendDataBlock(uint8_t* data, uint16_t length) {
-    if (!waitReady()) return; 
-    xdcsPort->BRR = xdcsPin;               
-    spi_bus->TransferBuffer(data, nullptr, length); 
-    xdcsPort->BSRR = xdcsPin;
-}
-
+/* ==================== Thêm file vào hàng đợi ==================== */
 bool Mp3::play(const char* filename) {
-        static FIL tempFile;
-    // Kiem tra file ton tai de tranh main.cpp bao loi
+    // Kiểm tra file có tồn tại không trước khi xếp hàng
+    static FIL tempFile;
     FRESULT fres = f_open(&tempFile, filename, FA_READ);
-    if (fres == FR_OK) {
-        f_close(&tempFile);
-        
-                if (queueCount < 5) {
-            strncpy(queue[queueTail], filename, 31);
-            queue[queueTail][31] = '\0';
-            queueTail = (queueTail + 1) % 5;
-            queueCount++;
-        }
-        return true; 
-    }
-    return false;
+    if (fres != FR_OK) return false;
+
+    f_close(&tempFile);
+
+    if (queueCount >= 5) return false;
+
+    strncpy(queue[queueTail], filename, 31);
+    queue[queueTail][31] = '\0';
+    queueTail = (queueTail + 1) % 5;
+    queueCount++;
+
+    return true;
 }
 
-uint16_t Mp3::readRegister(uint8_t address) {
-    if (!waitReady()) return 0;
-    xcsPort->BRR = xcsPin;
-    
-    uint8_t tx[4] = {0x03, address, 0xFF, 0xFF};
-    uint8_t rx[4] = {0, 0, 0, 0};
-    spi_bus->TransferBuffer(tx, rx, 4);
-    
-    xcsPort->BSRR = xcsPin;
-    
-    return (rx[2] << 8) | rx[3];
-}
-
+/* ==================== Vòng lặp chính, gọi liên tục từ main ==================== */
 void Mp3::process() {
-        if (!isPlaying) {
+    /* ---------- 1. Mở file mới nếu chưa phát ---------- */
+    if (!isPlaying) {
         if (queueCount > 0) {
             FRESULT fres = f_open(&mp3File, queue[queueHead], FA_READ);
-            
+
             if (fres == FR_OK) {
                 strncpy(currentFilename, queue[queueHead], 31);
                 currentFilename[31] = '\0';
-                bufferIndex = 0; 
-                dataInBuf = 0;
-                baseSampleRate = 0; 
-                targetAudata = 0;
-                isPlaying = true; 
+
+                bufferIndex = 0;
+                dataInBuf   = 0;
+                isPlaying   = true;
             }
-            
+
             queueHead = (queueHead + 1) % 5;
             queueCount--;
         }
         return;
     }
 
+    /* ---------- 2. Bơm dữ liệu MP3 sang chip VS1011E ---------- */
     int chunksSent = 0;
+
     while (((dreqPort->IDR & dreqPin) ? 1 : 0) == 1 && chunksSent < 64) {
-        
+
+        // Nếu bộ đệm đã gửi hết, đọc thêm từ SD
         if (bufferIndex >= dataInBuf) {
             UINT bytesRead;
-            FRESULT fres = f_read(&mp3File, audioBuffer, 512, &bytesRead);
-            dataInBuf = bytesRead;
+            FRESULT fres = f_read(&mp3File, audioBuffer, sizeof(audioBuffer), &bytesRead);
+
+            dataInBuf   = bytesRead;
             bufferIndex = 0;
 
-            if (bytesRead == 0) { 
+            if (bytesRead == 0) {
+                // Lỗi đọc (thẻ bị rút) -> lưu trạng thái để phát tiếp
                 if (fres != FR_OK) {
-                    // SD Card removed or read error -> Save state to resume later
                     saveState();
                     return;
                 }
-                
+
+                // Hết file -> đóng và gửi padding để chip xả hết buffer
                 f_close(&mp3File);
                 isPlaying = false;
-                
-                uint8_t endFillByte = 0x00; // Always 0x00 for MP3
-                
-                uint8_t endFill[32];
-                for(int i = 0; i < 32; i++) endFill[i] = endFillByte;
-                
-                for (int i = 0; i < 65; i++) { if (!waitReady()) break;
-                    xdcsPort->BRR = xdcsPin;               
-                    spi_bus->TransferDMA(endFill, nullptr, 32); 
+
+                uint8_t endFill[32] = {0};
+
+                // Gửi 65 khối padding (theo khuyến nghị VLSI)
+                for (int i = 0; i < 65; i++) {
+                    if (!waitReady()) break;
+                    xdcsPort->BRR = xdcsPin;
+                    spi_bus->TransferDMA(endFill, nullptr, 32);
                     xdcsPort->BSRR = xdcsPin;
                 }
-                
+
+                // Bật SM_CANCEL để chip dừng sạch
                 uint16_t mode = readRegister(SCI_MODE);
-                mode |= 0x0008; // SM_CANCEL
+                mode |= SM_CANCEL;
                 writeRegister(SCI_MODE, mode);
-                
-                for (int i = 0; i < 64; i++) { if (!waitReady()) break;
-                    xdcsPort->BRR = xdcsPin;               
-                    spi_bus->TransferDMA(endFill, nullptr, 32); 
+
+                // Chờ chip xác nhận đã hủy xong
+                for (int i = 0; i < 64; i++) {
+                    if (!waitReady()) break;
+                    xdcsPort->BRR = xdcsPin;
+                    spi_bus->TransferDMA(endFill, nullptr, 32);
                     xdcsPort->BSRR = xdcsPin;
-                    
+
                     mode = readRegister(SCI_MODE);
-                    if (!(mode & 0x0008)) {
-                        break; 
-                    }
+                    if (!(mode & SM_CANCEL)) break;
                 }
-                
+
                 HAL_Delay(50);
-                
-                return; // Let next process iteration check queue
+                return;
             }
         }
 
+        // Gửi 1 khối tối đa 32 byte
         uint16_t chunk = dataInBuf - bufferIndex;
         if (chunk > 32) chunk = 32;
 
-        xdcsPort->BRR = xdcsPin;               
-        spi_bus->TransferDMA(&audioBuffer[bufferIndex], nullptr, chunk); 
+        xdcsPort->BRR = xdcsPin;
+        spi_bus->TransferDMA(&audioBuffer[bufferIndex], nullptr, chunk);
         xdcsPort->BSRR = xdcsPin;
-        
+
         bufferIndex += chunk;
         chunksSent++;
-        
-        // Kỹ thuật Sample Rate Override
-        if (playSpeed > 1.01f || playSpeed < 0.99f) {
-            uint16_t currentAudata = readRegister(SCI_AUDATA);
-            uint16_t sampleRate = currentAudata & ~1;
-            
-            if (baseSampleRate == 0) {
-                // Đang bắt đầu file mới. Ta CHỜ cho đến khi Decoder phân tích xong Header
-                uint16_t hdat1 = readRegister(SCI_HDAT1);
-                if (hdat1 > 0) {
-                    uint16_t hdat0 = readRegister(SCI_HDAT0);
-                    
-                    // Bóc tách MP3 Header để lấy tần số gốc THẬT SỰ của file, 
-                    // tránh việc đọc SCI_AUDATA bị dính bộ tự động Upsample của VS1011e (ví dụ file 16k chip tự báo 24k)
-                    uint8_t mpegVersion = (hdat1 >> 3) & 0x03;
-                    uint8_t srIndex = (hdat0 >> 10) & 0x03;
-                    uint16_t nativeRate = 0;
-                    
-                    if (mpegVersion == 3) { // MPEG 1
-                        if (srIndex == 0) nativeRate = 44100;
-                        else if (srIndex == 1) nativeRate = 48000;
-                        else if (srIndex == 2) nativeRate = 32000;
-                    } else if (mpegVersion == 2) { // MPEG 2
-                        if (srIndex == 0) nativeRate = 22050;
-                        else if (srIndex == 1) nativeRate = 24000;
-                        else if (srIndex == 2) nativeRate = 16000;
-                    } else if (mpegVersion == 0) { // MPEG 2.5
-                        if (srIndex == 0) nativeRate = 11025;
-                        else if (srIndex == 1) nativeRate = 12000;
-                        else if (srIndex == 2) nativeRate = 8000;
-                    }
-                    
-                    if (nativeRate > 0) {
-                        baseSampleRate = nativeRate; // Lấy làm chuẩn
-                        
-                        uint32_t calcAudata = (uint32_t)(baseSampleRate * playSpeed);
-                        if (calcAudata > 48000) calcAudata = 48000;
-                        if (calcAudata < 8000) calcAudata = 8000;
-                        targetAudata = (uint16_t)calcAudata;
-                        
-                        // Bắt đầu ép xung
-                        writeRegister(SCI_AUDATA, targetAudata | (currentAudata & 1));
-                    }
-                }
-            } else {
-                // Đã chốt được rate gốc và đang trong quá trình ép xung.
-                // Nếu sụt áp / nhiễu EMI từ Relay làm thanh ghi AUDATA bị thay đổi sai lệch:
-                if (sampleRate != (targetAudata & ~1)) {
-                    // Cứ tự động GHI ĐÈ LẠI để giữ vững tốc độ mục tiêu, bất chấp nhiễu!
-                    if (targetAudata >= 8000) {
-                        writeRegister(SCI_AUDATA, targetAudata | (currentAudata & 1));
-                    }
-                }
-            }
-        }
     }
 }
 
+/* ==================== Phát sine test ==================== */
 void Mp3::testAudio() {
-    writeRegister(SCI_MODE, 0x0820); 
+    writeRegister(SCI_MODE, 0x0820);   // SM_TESTS | SM_SDINEW
     HAL_Delay(50);
 
-    uint8_t sineCmd[] = {0x53, 0xEF, 0x6E, 0x44, 0x00, 0x00, 0x00, 0x00};
-    
+    uint8_t sineCmd[8]    = {0x53, 0xEF, 0x6E, 0x44, 0x00, 0x00, 0x00, 0x00};
+    uint8_t exitCmd[8]    = {0x45, 0x78, 0x69, 0x74, 0x00, 0x00, 0x00, 0x00};
+
+    // Gửi lệnh sine
     waitReady();
-    xdcsPort->BRR = xdcsPin;               
-    spi_bus->TransferBuffer(sineCmd, nullptr, 8); 
+    xdcsPort->BRR = xdcsPin;
+    spi_bus->TransferBuffer(sineCmd, nullptr, 8);
     xdcsPort->BSRR = xdcsPin;
 
-    HAL_Delay(2000); 
+    HAL_Delay(2000);
 
-    uint8_t exitCmd[] = {0x45, 0x78, 0x69, 0x74, 0x00, 0x00, 0x00, 0x00};
+    // Gửi lệnh thoát
     waitReady();
     xdcsPort->BRR = xdcsPin;
     spi_bus->TransferBuffer(exitCmd, nullptr, 8);
     xdcsPort->BSRR = xdcsPin;
-    
-    writeRegister(SCI_MODE, 0x0804); 
+
+    writeRegister(SCI_MODE, SM_SDINEW);
 }
 
+/* ==================== Lưu trạng thái khi rút thẻ ---------- */
 void Mp3::saveState() {
     if (isPlaying) {
         strncpy(savedFilename, currentFilename, 31);
         savedFilename[31] = '\0';
-        savedPosition = f_tell(&mp3File);
-        hasSavedState = true;
-        
+        savedPosition     = f_tell(&mp3File);
+        hasSavedState     = true;
+
         f_close(&mp3File);
         isPlaying = false;
     }
 }
 
+/* ==================== Khôi phục trạng thái khi cắm lại thẻ ---------- */
 void Mp3::resumeState() {
     if (hasSavedState) {
         FRESULT fres = f_open(&mp3File, savedFilename, FA_READ);
+
         if (fres == FR_OK) {
             f_lseek(&mp3File, savedPosition);
+
             bufferIndex = 0;
-            dataInBuf = 0;
-            isPlaying = true;
-            
+            dataInBuf   = 0;
+            isPlaying   = true;
+
             strncpy(currentFilename, savedFilename, 31);
             currentFilename[31] = '\0';
         }
+
         hasSavedState = false;
     }
 }
-
-
-
