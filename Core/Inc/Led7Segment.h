@@ -64,11 +64,7 @@ public:
     // In số ra màn hình
     void setNumber(uint32_t number, uint8_t startIndex, uint8_t length, bool padZeroes = false);
     
-    // Đẩy buffer ra màn hình. Sử dụng trình tự chốt duy nhất:
-    // Nghỉ ở HIGH -> Dịch data -> Xung chốt LOW rồi HIGH -> Nghỉ ở HIGH
-    // Hỗ trợ cả 2 loại chip:
-    // - Chip chuẩn (cạnh lên): HIGH khi dịch = không cạnh -> giữ data. Xung LOW->HIGH ở cuối tạo cạnh lên chốt data.
-    // - Chip ngược cực (transparent khi LOW): HIGH = hold. Xung LOW ngắn = transparent chốt data.
+    // Đẩy buffer ra màn hình
     void refresh();
     
     // Xoá sạch màn hình lập tức
