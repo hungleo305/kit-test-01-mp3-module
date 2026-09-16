@@ -315,8 +315,13 @@ int main(void)
   rfid.init();
   relay.init();
   mp3.init();
-  mp3.setPlaySpeed(1.1f);
-  mp3.setVolume(40,40);
+  mp3.setPlaySpeed(1.0f);
+  mp3.setVolume(70,70);
+  
+  GPIOA->BRR = (1 << 4); // Bật Amply (Unmute) để phát âm báo
+  mp3.playBootSound(); // Phát âm thanh báo chip giải mã đã khởi tạo thành công
+  GPIOA->BSRR = (1 << 4); // Tắt lại Amply để đợi khởi tạo thẻ nhớ
+
   myCan.init();
   sdCard.init();
   
