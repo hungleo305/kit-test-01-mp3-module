@@ -19,6 +19,7 @@ public:
     void reset();
     void process();
     void testAudio();
+    void playBootSound();
 
     // Điều khiển âm thanh
     void  setVolume(uint8_t left, uint8_t right);
