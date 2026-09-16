@@ -98,7 +98,7 @@ void loop() {
 
 ## PHẦN 3: HƯỚNG DẪN TẠO VÀ PHÁT ÂM THANH TỪ FLASH (KHÔNG DÙNG THẺ NHỚ)
 
-Thư viện hỗ trợ phát trực tiếp âm thanh từ bộ nhớ Flash của vi điều khiển (thông qua hàm `playBootSound()`), rất hữu ích cho các file âm thanh ngắn (chuông báo, tiếng bip) mà không cần sử dụng hệ thống tệp thẻ nhớ. Dữ liệu âm thanh MP3/WAV cần được chuyển đổi thành mảng C/C++.
+Thư viện hỗ trợ phát trực tiếp âm thanh từ bộ nhớ Flash của vi điều khiển thông qua hàm `playMemorySound(array, length)`. Cơ chế này rất hữu ích cho các file âm thanh cảnh báo ngắn (chuông báo, tiếng bip, báo lỗi) hoặc âm thanh khởi động (có sẵn hàm bọc `playBootSound()`) mà không cần phụ thuộc vào hệ thống tệp trên thẻ nhớ. Dữ liệu âm thanh MP3/WAV cần được chuyển đổi thành mảng byte C/C++.
 
 ### 3.1 Chuyển đổi file MP3 sang file Header (C-array)
 Dự án đã có sẵn một script Python (`convert_mp3.py`) để tự động hóa quá trình này.
@@ -111,48 +111,19 @@ Dự án đã có sẵn một script Python (`convert_mp3.py`) để tự độn
 3. Script sẽ tự động biên dịch file MP3 và tạo ra mảng byte lưu trong file `Core/Inc/BootSound.h`.
    *(Lưu ý: Kích thước file gốc nên được nén tối đa hoặc cắt ngắn để không làm tràn dung lượng Flash giới hạn của vi điều khiển).*
 
-### 3.2 Tích hợp mảng âm thanh vào hàm thư viện
-Trong file `Core/Src/Mp3.cpp`, hãy đảm bảo đã `#include "BootSound.h"` ở đầu file. Bên trong hàm `playBootSound()`, dữ liệu sẽ được đọc trực tiếp từ mảng `bootSoundArray`:
+### 3.2 Tích hợp mảng âm thanh vào mã nguồn của bạn
+Giả sử bạn vừa tạo ra file `WarningSound.h` chứa mảng `warningSoundArray` và biến chiều dài `warningSoundLength`. Để phát âm thanh này ở bất kỳ đâu trong chương trình, bạn chỉ cần include file header đó và gọi hàm `playMemorySound`:
 
 ```cpp
-void Mp3::playBootSound() {
-    // 1. Đồng bộ tốc độ về 1.0x để đảm bảo cao độ chuẩn
-    float oldSpeed = this->playSpeed;
-    setPlaySpeed(1.0f);
+#include "WarningSound.h"
 
-    uint32_t remaining = bootSoundLength; // Lấy từ file BootSound.h
-    uint32_t offset = 0;
-
-    writeRegister(SCI_MODE, SM_SDINEW);
-    HAL_Delay(10);
-
-    // 2. Bơm mảng dữ liệu từ Flash vào VS1011E
-    while (remaining > 0) {
-        if (!waitReady()) break;
-
-        uint16_t chunk = (remaining > 32) ? 32 : remaining;
-        
-        xdcsPort->BRR = xdcsPin;
-        spi_bus->TransferBuffer((uint8_t*)&bootSoundArray[offset], nullptr, chunk);
-        xdcsPort->BSRR = xdcsPin;
-
-        offset += chunk;
-        remaining -= chunk;
-    }
-
-    // 3. Padding xả buffer nội bộ
-    uint8_t endFill[32] = {0};
-    for (int i = 0; i < 65; i++) {
-        if (!waitReady()) break;
-        xdcsPort->BRR = xdcsPin;
-        spi_bus->TransferBuffer(endFill, nullptr, 32);
-        xdcsPort->BSRR = xdcsPin;
-    }
-
-    // Khôi phục tốc độ cũ
-    setPlaySpeed(oldSpeed);
+// Hàm phát tiếng bíp cảnh báo
+void baoLoiHeThong() {
+    mp3.playMemorySound(warningSoundArray, warningSoundLength);
 }
 ```
+
+*(Lưu ý: Đối với riêng âm thanh khởi động có sẵn trong file `BootSound.h`, thư viện đã cung cấp sẵn hàm tiện ích `mp3.playBootSound()` để bạn gọi thẳng mà không cần truyền tham số).*
 
 ### 3.3 Gọi hàm phát âm thanh trong main
 Để phát âm thanh ngay lập tức sau khi mạch cấp nguồn, hãy gọi hàm ở khối khởi tạo hệ thống trong `main.cpp`, chú ý cấp lệnh ngắt Mute (chân PA4) tương ứng với phần cứng:
