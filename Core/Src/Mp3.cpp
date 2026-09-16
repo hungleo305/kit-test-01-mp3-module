@@ -364,27 +364,27 @@ void Mp3::testAudio() {
     writeRegister(SCI_MODE, SM_SDINEW);
 }
 
-/* ==================== Phát âm thanh khởi động ==================== */
-void Mp3::playBootSound() {
-    // Lưu tốc độ hiện tại và ép về 1.0 để âm thanh khởi động không bị nhanh/chậm
+/* ==================== Phát âm thanh từ mảng Flash bất kỳ ==================== */
+void Mp3::playMemorySound(const uint8_t* audioData, uint32_t length) {
+    // Lưu tốc độ hiện tại và ép về 1.0 để âm thanh không bị nhanh/chậm
     float oldSpeed = this->playSpeed;
     setPlaySpeed(1.0f);
 
-    uint32_t remaining = bootSoundLength;
+    uint32_t remaining = length;
     uint32_t offset = 0;
 
     // Khôi phục về chế độ bình thường (không dùng SM_TESTS)
     writeRegister(SCI_MODE, SM_SDINEW);
     HAL_Delay(10);
 
-    // Bơm dữ liệu file WAV 1s (trong mảng BootSound) vào chip
+    // Bơm dữ liệu file WAV/MP3 vào chip
     while (remaining > 0) {
         if (!waitReady()) break;
 
         uint16_t chunk = (remaining > 32) ? 32 : remaining;
         
         xdcsPort->BRR = xdcsPin;
-        spi_bus->TransferBuffer((uint8_t*)&bootSoundArray[offset], nullptr, chunk);
+        spi_bus->TransferBuffer((uint8_t*)&audioData[offset], nullptr, chunk);
         xdcsPort->BSRR = xdcsPin;
 
         offset += chunk;
@@ -402,6 +402,11 @@ void Mp3::playBootSound() {
 
     // Khôi phục lại tốc độ cũ (như cài đặt ở main)
     setPlaySpeed(oldSpeed);
+}
+
+/* ==================== Phát âm thanh khởi động ==================== */
+void Mp3::playBootSound() {
+    playMemorySound(bootSoundArray, bootSoundLength);
 }
 
 /* ==================== Lưu trạng thái khi rút thẻ ---------- */

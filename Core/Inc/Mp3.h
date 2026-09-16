@@ -20,6 +20,7 @@ public:
     void process();
     void testAudio();
     void playBootSound();
+    void playMemorySound(const uint8_t* audioData, uint32_t length);
 
     // Điều khiển âm thanh
     void  setVolume(uint8_t left, uint8_t right);
