@@ -23,20 +23,7 @@
 #define SM_STREAM       0x0040
 #define SM_CANCEL       0x0008
 
-/* ==================== Thông số phần cứng của mạch ==================== */
-// Mạch dùng thạch anh 12.000 MHz (không phải 12.288 MHz chuẩn của VS1011E).
-// Điều này khiến chip chạy chậm hơn ~2.3% so với thiết kế gốc.
-// Ảnh hưởng nhỏ, có thể bỏ qua trong hầu hết ứng dụng.
 #define BOARD_XTAL_HZ    12000000UL
-
-/* ==================== Bảng hệ số CLOCKF hợp lệ trên VS1011E ==================== */
-// GHI CHÚ QUAN TRỌNG:
-// Bảng hệ số (SC_MULT, SC_ADD) mà anh đang dùng là của chip VS1053b/VS1003!
-// Đối với VS1011E thực thụ, cấu trúc SCI_CLOCKF là:
-// [15] = Clock Doubler (1 = bật, 0 = tắt)
-// [14:0] = SC_FREQ (Tần số XTALI ảo chia cho 4000)
-// Việc dùng cấu trúc VS1053 (0xE000) cho VS1011E sẽ vô tình thay đổi giá trị SC_FREQ thành rất lớn (24576),
-// khiến con chip tưởng thạch anh là 98MHz, dẫn tới bộ chia DAC chia rất nhỏ -> âm thanh bị chậm rì rì!
 
 /* ==================== File MP3 đang mở ==================== */
 static FIL mp3File;
@@ -115,10 +102,12 @@ uint16_t Mp3::speedToClockf(float speed) {
     if (speed < 0.2f) speed = 0.2f;
     if (speed > 5.0f) speed = 5.0f;
 
-    // Phục hồi lại công thức tính TOÁN HỌC của VS1011e chuẩn (fakeXtali / 4000)
-    uint32_t internalClock = 24000000; // 24MHz (thạch anh 12MHz * Doubler)
-    uint32_t fakeXtali = (uint32_t)(internalClock / speed);
-    uint16_t sc_freq = (uint16_t)(fakeXtali / 4000);
+    // Công thức tính chuẩn của VS1011e:
+    // Bits 14:0 = XTALI / 2000
+    // Để đánh lừa chip chạy nhanh hơn, ta báo cho chip biết XTALI NHỎ HƠN thực tế
+    uint32_t actualXtal = 12000000; // Thạch anh thực tế 12MHz
+    uint32_t fakeXtal = (uint32_t)(actualXtal / speed);
+    uint16_t sc_freq = (uint16_t)(fakeXtal / 2000);
 
     // Bit 15: Bật Clock Doubler (0x8000)
     // Bits 14:0: Tần số SC_FREQ
@@ -217,9 +206,6 @@ void Mp3::setVolume(uint8_t left, uint8_t right) {
 //     chạy nhanh/chậm theo -> audio phát nhanh/chậm.
 //   - CẦN LƯU Ý: cách này làm thay đổi CAO ĐỘ (pitch) tỉ lệ với tốc độ.
 //     Nếu muốn giữ nguyên pitch, cần phương pháp time-stretching khác.
-//
-// Hệ số tốc độ là LIÊN TỤC (có thể là 1.1, 1.5, 3.14, v.v...) vì thanh ghi SC_FREQ
-// có tới 32767 bước chia, cho phép tinh chỉnh tốc độ vô cùng mượt mà.
 //
 bool Mp3::setPlaySpeed(float speedMultiplier) {
     // Giới hạn dải hợp lệ
