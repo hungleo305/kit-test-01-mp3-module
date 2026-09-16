@@ -1,8 +1,18 @@
 import sys
 import os
+import re
 
 def convert(input_file):
-    output_file = "Core/Inc/BootSound.h"
+    base_name = os.path.basename(input_file)
+    name_no_ext = os.path.splitext(base_name)[0]
+    
+    # Chuẩn hóa tên (bỏ ký tự đặc biệt, biến thành camelCase hoặc giữ nguyên dạng an toàn)
+    safe_name = re.sub(r'\W|^(?=\d)', '_', name_no_ext)
+    
+    output_file = f"Core/Inc/{safe_name}.h"
+    array_name = f"{safe_name}Array"
+    length_name = f"{safe_name}Length"
+    macro_name = f"{safe_name.upper()}_H"
     
     if not os.path.exists(input_file):
         print(f"Lỗi: Không tìm thấy file {input_file}")
@@ -19,11 +29,11 @@ def convert(input_file):
         print("Mẹo: Hãy dùng phần mềm giảm bitrate của file MP3 xuống khoảng 8kbps hoặc 16kbps Mono.")
 
     with open(output_file, "w") as f:
-        f.write("#ifndef BOOTSOUND_H\n")
-        f.write("#define BOOTSOUND_H\n\n")
+        f.write(f"#ifndef {macro_name}\n")
+        f.write(f"#define {macro_name}\n\n")
         f.write("#include <stdint.h>\n\n")
-        f.write(f"const uint32_t bootSoundLength = {len(data)};\n")
-        f.write("const uint8_t bootSoundArray[] = {\n")
+        f.write(f"const uint32_t {length_name} = {len(data)};\n")
+        f.write(f"const uint8_t {array_name}[] = {{\n")
         
         for i, b in enumerate(data):
             if i % 12 == 0:
@@ -33,9 +43,9 @@ def convert(input_file):
                 f.write("\n")
                 
         f.write("\n};\n\n")
-        f.write("#endif // BOOTSOUND_H\n")
+        f.write(f"#endif // {macro_name}\n")
 
-    print(f"Đã tạo file {output_file} thành công! Bạn có thể biên dịch lại code.")
+    print(f"Đã tạo file {output_file} thành công! Tên mảng là: {array_name}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
