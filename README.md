@@ -18,7 +18,10 @@ Dự án mạch Kit STM32F103RCT6 điều khiển đa năng giao tiếp CAN Bus,
 ```Text
 kit-test-01-mp3-module/
 ├── Core/
-│   ├── Inc/                # Header thư viện C++ (.h)
+│   ├── Inc/                # Header hệ thống do CubeMX sinh ra (main.h, stm32...)
+│   └── Src/                # Source code hệ thống (main.c/cpp, stm32_it.c...)
+├── UserLibs/               # BỘ THƯ VIỆN C++ ĐỘC LẬP DÙNG CHUNG
+│   ├── Inc/                # Header thư viện (.h)
 │   │   ├── Buzzer.h        # Còi chip 
 │   │   ├── CanBus.h        # Mạng CAN 
 │   │   ├── Led7Segment.h   # LED 7 đoạn CD4094
@@ -28,11 +31,11 @@ kit-test-01-mp3-module/
 │   │   ├── Rtc.h           # Thời gian DS1307
 │   │   ├── SdCard.h        # Thẻ nhớ
 │   │   ├── Sensor.h        # Cảm biến đếm
-│   └── Src/                # Source code C/C++ (.cpp / .c)
-│       ├── main.cpp        # Chương trình chính
-│       ├── Sensor.cpp      
-│       ├── stm32f1xx_it.c  # File chứa các ngắt hệ thống (SysTick, HardFault)
-│       └── *.cpp           # (Các file mã nguồn tương ứng cho thư viện trong thư mục Inc/)
+│   │   └── SpiBus.h        # Giao tiếp SPI
+│   └── Src/                # Source code thư viện (.cpp)
+│       ├── Buzzer.cpp      
+│       ├── CanBus.cpp      
+│       └── ...             
 ├── Drivers/                # Thư viện phần cứng (HAL) chính thức của hãng ST
 ├── EWARM/                  # Không gian làm việc (Workspace) của phần mềm IAR
 │   └── Project.eww         # Mở file này bằng IAR để lập trình & biên dịch
@@ -146,7 +149,40 @@ Cắm mạch vào máy tính qua bộ chuyển đổi CAN. Mở phần mềm **C
 
 ---
 
-## 4. HƯỚNG DẪN SỬ DỤNG THƯ VIỆN CHO LẬP TRÌNH
+## 4. HƯỚNG DẪN TẠO VÀ XÂY DỰNG DỰ ÁN MỚI
+
+Khi bạn cần tạo một dự án (project) mới hoàn toàn hoặc nâng cấp phần cứng và muốn bê toàn bộ thư viện sang dự án mới, hãy tuân thủ chặt chẽ quy trình sau đây để tránh mọi lỗi biên dịch và xung đột với CubeMX:
+
+### Bước 1: Khởi tạo Project bằng STM32CubeMX
+1. Mở CubeMX, chọn đúng chip MCU (ví dụ STM32F103RCT6).
+2. Cấu hình Clock, GPIO, SPI, I2C, CAN... theo thiết kế phần cứng của dự án.
+3. Ở tab **Project Manager -> Code Generator**:
+   - Tick chọn **"Generate peripheral initialization as a pair of '.c/.h' files per peripheral"** (Bắt buộc: Giúp file `main.c` gọn gàng, tách biệt các file cấu hình phần cứng ra riêng).
+   - Tick chọn **"Backup previously generated files..."** và **"Keep User Code..."**.
+4. Ở phần **User Actions**, nếu bạn muốn dùng tính năng tự đổi tên (Cách 2):
+   - **Before Code Generation:** Điền `ren Core\Src\main.cpp main.c`
+   - **After Code Generation:** Điền `ren Core\Src\main.c main.cpp`
+5. Nhấn **Generate Code**.
+
+### Bước 2: Bê bộ thư viện `UserLibs` sang Project mới
+1. Copy nguyên folder **`UserLibs`** từ dự án mẫu này, dán sang vị trí ngang hàng với folder **`Core`** của dự án mới. 
+*(Toàn bộ code trong `UserLibs` đã được viết chuẩn hóa, không phụ thuộc vào `main.h` của từng dự án).*
+
+### Bước 3: Cấu hình IDE (IAR EWARM)
+1. Mở file `.eww` bằng IAR.
+2. **Add Source Code:** Chuột phải vào tên Project ở cột Workspace -> **Add Group...** đặt tên là `UserLibs`. Tiếp tục chuột phải vào Group `UserLibs` vừa tạo -> **Add Files...** -> Đi vào thư mục `UserLibs/Src` bôi đen và add toàn bộ các file đuôi `.cpp` vào IAR.
+3. **Cấu hình Include Path:** Nhấn chuột phải vào Project -> **Options (Alt+F7)** -> **C/C++ Compiler** -> Tab **Preprocessor**. Thêm 1 đường dẫn này vào ô *Additional include directories*: `$PROJ_DIR$\..\UserLibs\Inc`
+4. **Cấu hình Biên dịch C++ (Cực kỳ quan trọng nếu không dùng Script Rename):** 
+   - Nếu bạn quyết định giữ tên file là `main.c` cho CubeMX dễ quản lý, bạn **bắt buộc** phải ép IAR dịch file này dưới dạng C++.
+   - Chuột phải **vào riêng file `main.c`** ở cột Workspace -> Chọn **Options**.
+   - Tick vào **"Override inherited settings"**, ở Tab **Language 1**, mục Language tick chọn **C++**. Nhấn OK.
+
+### Bước 4: Viết code Logic
+Mở file `main.c` (hoặc `main.cpp`), gõ lệnh `#include "Mp3.h"`, `#include "SpiBus.h"`... và tiến hành khởi tạo các class đối tượng. Nhấn F7 để Build. Từ lúc này trở đi, bạn được quyền thay đổi phần cứng trong CubeMX rồi ấn Gen Code bao nhiêu lần tùy thích mà code không bao giờ bị lỗi.
+
+---
+
+## 5. HƯỚNG DẪN SỬ DỤNG THƯ VIỆN CHO LẬP TRÌNH
 
 Mã nguồn được viết theo cấu trúc Hướng đối tượng (OOP) C++. Các tác vụ liên tục trong vòng lặp chính (như kiểm tra cảm biến, nháy LED) dùng hàm `HAL_GetTick()` để không chặn chương trình (Non-blocking). Hàm `HAL_Delay()` vẫn được dùng ở các tác vụ ngắn hoặc khi khởi tạo thiết bị.
 
@@ -155,7 +191,7 @@ Mã nguồn được viết theo cấu trúc Hướng đối tượng (OOP) C++.
 ---
 
 
-### 4.1. Bắt Đầu Nhanh
+### 5.1. Bắt Đầu Nhanh
 **Bước 1: Mở phần mềm lập trình**
 - Cài đặt phần mềm **IAR Embedded Workbench**.
 -Vào thư mục EWARM, click đúp chuột vào file **Project.eww** để mở dự án.
@@ -172,7 +208,7 @@ Mã nguồn được viết theo cấu trúc Hướng đối tượng (OOP) C++.
 
 ---
 
-### 4.3. Cấu hình Hệ thống & Xung nhịp (System Core & Clock Tree)
+### 5.2. Cấu hình Hệ thống & Xung nhịp (System Core & Clock Tree)
 Để vi điều khiển hoạt động chính xác với các giao thức tốc độ cao (như CAN, SPI), bắt buộc phải cấu hình xung nhịp gốc trong STM32CubeMX như sau:
 - **Chuẩn nạp (SYS):** Cấu hình Serial Wire (`PA13` - SWDIO, `PA14` - SWCLK).
 - **Thạch anh (RCC):** Kích hoạt High Speed Clock (HSE) ở dạng Crystal/Ceramic Resonator.
@@ -189,7 +225,7 @@ Mã nguồn được viết theo cấu trúc Hướng đối tượng (OOP) C++.
 
 ---
 
-### 4.3. Thư viện `Buzzer` (Còi Chip)
+### 5.3. Thư viện `Buzzer` (Còi Chip)
 Thư viện quản lý còi thông qua hàng chờ (Queue), cho phép đẩy nhiều tín hiệu bíp mà không làm treo hệ thống.
 
 **Cách hoạt động:** Khi gọi lệnh kêu, thư viện chỉ lưu số liệu vào mảng hàng chờ. Hàm `update()` được đặt ngầm trong bộ đếm ngắt sẽ liên tục trừ lùi thời gian để điều khiển điện áp ngõ ra (Bật/Tắt).
@@ -219,6 +255,17 @@ int main(void) {
     // Nếu dùng force=true, tiếng bíp này sẽ cắt ngang tiếng bíp ở trên!
     // buzzer.beep(1, 100, 0, true); 
     
+    while (1) {
+        // Vòng lặp chính
+    }
+}
+
+/* --- Phải đặt hàm update vào ngắt Timer hoặc Systick --- */
+extern "C" void HAL_IncTick(void) {
+    uwTick += uwTickFreq;
+    buzzer.update(); // BẮT BUỘC để đếm thời gian thực cho còi
+}
+    
     while(1) { /* Main rảnh rỗi */ }
 }
 
@@ -240,7 +287,7 @@ Việc đặt `buzzer.update()` vào trong hàm ngắt này có ý nghĩa cực 
 
 ---
 
-### 4.4. Kiến trúc cốt lõi SPI Đa năng (`SpiBus`)
+### 5.4. Kiến trúc cốt lõi SPI Đa năng (`SpiBus`)
 Thư viện `SpiBus` là nền tảng cốt lõi quản lý toàn bộ giao tiếp SPI của hệ thống.
 **A. Các chế độ khởi tạo SPI:**
 - **Chế độ 1 - Dùng cấu hình CubeMX:** Giao toàn quyền cho CubeMX cấu hình clock và chân cắm.
@@ -274,7 +321,7 @@ Thư viện SpiBus hỗ trợ truyền dữ liệu tốc độ cao bằng DMA (h
   2. Dùng hàm `spi_bus.TransferDMA(tx_buf, rx_buf, size);` thay cho `TransferBuffer()` để truyền mảng dữ liệu lớn.
 ---
 
-### 4.5. Thư viện `Mp3` (IC Giải mã VS1011e) & Thẻ nhớ (`SdCard`)
+### 5.5. Thư viện `Mp3` (IC Giải mã VS1011e) & Thẻ nhớ (`SdCard`)
 
 > **[📝 Xem tài liệu Hướng Dẫn Sử Dụng Thư viện SdCard và FatFs đầy đủ tại đây](README_SdCard.md)**
 
@@ -415,7 +462,7 @@ int main(void) {
 
 ---
 
-### 4.6. Thư viện `Rfid` (MFRC522)
+### 5.6. Thư viện `Rfid` (MFRC522)
 Giao tiếp thẻ từ tần số 13.56 MHz (MIFARE). 
 
 **Hàm API chi tiết:**
@@ -475,7 +522,7 @@ int main(void) {
 
 ---
 
-### 4.7. Thư viện `Sensor` (Ngắt Ngoại vi) & `Relay`
+### 5.7. Thư viện `Sensor` (Ngắt Ngoại vi) & `Relay`
 Giúp đọc tín hiệu từ cảm biến nhanh chóng mặt nhờ hệ thống Ngắt Phần Cứng (EXTI).
 
 **Thư viện `Relay`:** Đảo trạng thái Output đơn giản.
@@ -522,7 +569,7 @@ int main(void) {
 
 ---
 
-### 4.8. Giao thức I2C (`I2cBus`), Module Thời gian thực DS1307 (`Rtc`) & Thanh ghi Sao lưu (BKP)
+### 5.8. Giao thức I2C (`I2cBus`), Module Thời gian thực DS1307 (`Rtc`) & Thanh ghi Sao lưu (BKP)
 
 **Quy trình 4 bước để làm chủ thư viện `I2cBus`:**
 
@@ -604,7 +651,7 @@ BKP->DR1 = ++savedCount;
 
 ---
 
-### 4.9. Thư viện `CanBus`
+### 5.9. Thư viện `CanBus`
 Giao tiếp mạng theo chuẩn Data Frame chống nhiễu tốt. Sử dụng ngắt `FIFO0` tối ưu.
 
 **1. Hướng dẫn cấu hình CAN trên CubeMX (Tốc độ 500kbps):**
@@ -673,7 +720,7 @@ int main() {
 
 ---
 
-### 4.10. Thư viện `Led7Segment` (CD4094)
+### 5.10. Thư viện `Led7Segment` (CD4094)
 
 > **[📝 Xem tài liệu Hướng Dẫn Sử Dụng Thư viện Led7Segment đầy đủ tại đây](README_Led7Segment.md)**
 

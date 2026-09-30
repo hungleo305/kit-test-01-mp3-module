@@ -1,7 +1,6 @@
 Led7Segment.pbi: \
-  F:\tts\ vnatech\kit-test-01-mp3-module\Core\Src\Led7Segment.cpp \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\Led7Segment.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc/main.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Src\Led7Segment.cpp \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\Led7Segment.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc\stm32f1xx_hal.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\stm32f1xx_hal_conf.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc\stm32f1xx_hal_rcc.h \

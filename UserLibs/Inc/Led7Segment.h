@@ -1,7 +1,7 @@
 #ifndef LED7SEGMENT_H
 #define LED7SEGMENT_H
 
-#include "main.h"
+#include "stm32f1xx_hal.h"
 #include <stdint.h>
 
 class Led7Segment {

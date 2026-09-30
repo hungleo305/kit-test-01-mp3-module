@@ -1,5 +1,5 @@
-CanBus.pbi: F:\tts\ vnatech\kit-test-01-mp3-module\Core\Src\CanBus.cpp \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\CanBus.h \
+CanBus.pbi: F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Src\CanBus.cpp \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\CanBus.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc\stm32f1xx_hal.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\stm32f1xx_hal_conf.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc\stm32f1xx_hal_rcc.h \

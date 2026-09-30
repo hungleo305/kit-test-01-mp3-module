@@ -1,4 +1,4 @@
-main.pbi: F:\tts\ vnatech\kit-test-01-mp3-module\Core\Src\main.cpp \
+main.pbi: F:\tts\ vnatech\kit-test-01-mp3-module\Core\Src\main.c \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\main.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc\stm32f1xx_hal.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\stm32f1xx_hal_conf.h \
@@ -45,18 +45,17 @@ main.pbi: F:\tts\ vnatech\kit-test-01-mp3-module\Core\Src\main.cpp \
   C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\string.h \
   C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\DLib_Product_string.h \
   C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\stdio.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\Led.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\Buzzer.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\Sensor.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\Led7Segment.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc/main.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\Rtc.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc/I2cBus.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\Rfid.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc/SpiBus.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\Relay.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\Mp3.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\CanBus.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\SpiBus.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\I2cBus.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\SdCard.h
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\Led.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\Buzzer.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\Sensor.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\Led7Segment.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\Rtc.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc/I2cBus.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\Rfid.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc/SpiBus.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\Relay.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\Mp3.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\CanBus.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\SpiBus.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\I2cBus.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\SdCard.h

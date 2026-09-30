@@ -1,9 +1,6 @@
-Mp3.pbi: F:\tts\ vnatech\kit-test-01-mp3-module\Core\Src\Mp3.cpp \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\Mp3.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc\stm32f1xx_hal.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\stm32f1xx_hal_conf.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc\stm32f1xx_hal_rcc.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_def.h \
+Mp3.pbi: F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Src\Mp3.cpp \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\Mp3.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc/SpiBus.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/CMSIS/Device/ST/STM32F1xx/Include\stm32f1xx.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/CMSIS/Device/ST/STM32F1xx/Include/stm32f103xe.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/CMSIS/Include\core_cm3.h \
@@ -18,6 +15,10 @@ Mp3.pbi: F:\tts\ vnatech\kit-test-01-mp3-module\Core\Src\Mp3.cpp \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/CMSIS/Include\cmsis_iccarm.h \
   C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\iccarm_builtin.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/CMSIS/Device/ST/STM32F1xx/Include/system_stm32f1xx.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc\stm32f1xx_hal.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\stm32f1xx_hal_conf.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc\stm32f1xx_hal_rcc.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_def.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy/stm32_hal_legacy.h \
   C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\stddef.h \
   C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\ysizet.h \
@@ -33,16 +34,10 @@ Mp3.pbi: F:\tts\ vnatech\kit-test-01-mp3-module\Core\Src\Mp3.cpp \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc/stm32f1xx_hal_flash_ex.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc\stm32f1xx_hal_pwr.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/STM32F1xx_HAL_Driver/Inc\stm32f1xx_hal_spi.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../FATFS/App\fatfs.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Middlewares/Third_Party/FatFs/src\ff.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Middlewares/Third_Party/FatFs/src/integer.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../FATFS/Target\ffconf.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\main.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Middlewares/Third_Party/FatFs/src\ff_gen_drv.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Middlewares/Third_Party/FatFs/src/diskio.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Middlewares/Third_Party/FatFs/src/ff.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../FATFS/Target\user_diskio.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Middlewares/Third_Party/FatFs/src\diskio.h \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc/SpiBus.h \
   C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\string.h \
-  C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\DLib_Product_string.h
+  C:\Program\ Files\ (x86)\IAR\ Systems\Embedded\ Workbench\ 8.3\arm\inc\c\DLib_Product_string.h \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\BootSound.h

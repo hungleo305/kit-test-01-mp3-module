@@ -1198,76 +1198,10 @@
             <group>
                 <name>Core</name>
                 <file>
-                    <name>$PROJ_DIR$\..\Core\Src\Buzzer.cpp</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Inc\Buzzer.h</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Src\CanBus.cpp</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Inc\CanBus.h</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Src\I2cBus.cpp</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Inc\I2cBus.h</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Src\Led.cpp</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Inc\Led.h</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Src\Led7Segment.cpp</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Inc\Led7Segment.h</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Src\main.cpp</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Src\Mp3.cpp</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Inc\Mp3.h</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Src\Relay.cpp</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Inc\Relay.h</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Src\Rfid.cpp</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Inc\Rfid.h</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Src\Rtc.cpp</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Inc\Rtc.h</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Src\SdCard.cpp</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Inc\SdCard.h</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Src\Sensor.cpp</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Inc\Sensor.h</name>
-                </file>
-                <file>
-                    <name>$PROJ_DIR$\..\Core\Src\SpiBus.cpp</name>
+                    <name>$PROJ_DIR$\..\Core\Src\main.c</name>
+                    <configuration>
+                        <name>Firmware</name>
+                    </configuration>
                 </file>
                 <file>
                     <name>$PROJ_DIR$\..\Core\Src\stm32f1xx_hal_msp.c</name>
@@ -1361,5 +1295,44 @@
                 <name>$PROJ_DIR$\..\Middlewares\Third_Party\FatFs\src\option\syscall.c</name>
             </file>
         </group>
+    </group>
+    <group>
+        <name>UserLibs</name>
+        <file>
+            <name>$PROJ_DIR$\..\UserLibs\Src\Buzzer.cpp</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\UserLibs\Src\CanBus.cpp</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\UserLibs\Src\I2cBus.cpp</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\UserLibs\Src\Led.cpp</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\UserLibs\Src\Led7Segment.cpp</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\UserLibs\Src\Mp3.cpp</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\UserLibs\Src\Relay.cpp</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\UserLibs\Src\Rfid.cpp</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\UserLibs\Src\Rtc.cpp</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\UserLibs\Src\SdCard.cpp</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\UserLibs\Src\Sensor.cpp</name>
+        </file>
+        <file>
+            <name>$PROJ_DIR$\..\UserLibs\Src\SpiBus.cpp</name>
+        </file>
     </group>
 </project>

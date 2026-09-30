@@ -1,5 +1,5 @@
-Sensor.pbi: F:\tts\ vnatech\kit-test-01-mp3-module\Core\Src\Sensor.cpp \
-  F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Core/Inc\Sensor.h \
+Sensor.pbi: F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Src\Sensor.cpp \
+  F:\tts\ vnatech\kit-test-01-mp3-module\UserLibs\Inc\Sensor.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/CMSIS/Device/ST/STM32F1xx/Include\stm32f1xx.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/CMSIS/Device/ST/STM32F1xx/Include/stm32f103xe.h \
   F:\tts\ vnatech\kit-test-01-mp3-module\EWARM/../Drivers/CMSIS/Include\core_cm3.h \
