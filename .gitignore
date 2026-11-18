@@ -1,0 +1,35 @@
+# IAR Embedded Workbench build outputs & local IDE state
+EWARM/Firmware/
+EWARM/Debug/
+EWARM/Release/
+EWARM/settings/
+EWARM/*.dep
+*.ewt
+*.pbd
+*.pbi
+*.pbw
+*.xcl
+*.o
+*.out
+*.hex
+*.bin
+*.sim
+*.map
+
+# Large media / demo videos
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak

@@ -32,10 +32,15 @@ kit-test-01-mp3-module/
 │   │   ├── SdCard.h        # Thẻ nhớ
 │   │   ├── Sensor.h        # Cảm biến đếm
 │   │   └── SpiBus.h        # Giao tiếp SPI
-│   └── Src/                # Source code thư viện (.cpp)
-│       ├── Buzzer.cpp      
-│       ├── CanBus.cpp      
-│       └── ...             
+│   ├── Src/                # Source code thư viện (.cpp)
+│   │   ├── Buzzer.cpp      
+│   │   ├── CanBus.cpp      
+│   │   └── ...             
+│   └── docs/               # Tài liệu hướng dẫn chi tiết từng thư viện
+│       ├── README_Led7Segment.md
+│       ├── README_Mp3.md
+│       ├── README_Rfid.md
+│       └── README_SdCard.md
 ├── Drivers/                # Thư viện phần cứng (HAL) chính thức của hãng ST
 ├── EWARM/                  # Không gian làm việc (Workspace) của phần mềm IAR
 │   └── Project.eww         # Mở file này bằng IAR để lập trình & biên dịch
@@ -323,7 +328,9 @@ Thư viện SpiBus hỗ trợ truyền dữ liệu tốc độ cao bằng DMA (h
 
 ### 5.5. Thư viện `Mp3` (IC Giải mã VS1011e) & Thẻ nhớ (`SdCard`)
 
-> **[📝 Xem tài liệu Hướng Dẫn Sử Dụng Thư viện SdCard và FatFs đầy đủ tại đây](README_SdCard.md)**
+> **[📝 Xem tài liệu Hướng Dẫn Sử Dụng Thư viện SdCard và FatFs đầy đủ tại đây](UserLibs/docs/README_SdCard.md)**
+>
+> **[📝 Xem tài liệu Hướng Dẫn Sử Dụng Thư viện Mp3 (VS1011e) đầy đủ tại đây](UserLibs/docs/README_Mp3.md)**
 
 Sự kết hợp giữa `SdCard` (đọc thẻ vật lý) và `Mp3` (giải mã tín hiệu số). Quá trình diễn ra như sau: Vi điều khiển (MCU) đọc luồng Byte từ thẻ nhớ (SPI) vào bộ đệm (Buffer) trong RAM, sau đó MCU bơm liên tục dữ liệu từ bộ đệm này sang chip giải mã VS1011 (SPI)."
 
@@ -463,6 +470,9 @@ int main(void) {
 ---
 
 ### 5.6. Thư viện `Rfid` (MFRC522)
+
+> **[📝 Xem tài liệu Hướng Dẫn Sử Dụng Thư viện Rfid (MFRC522) đầy đủ tại đây](UserLibs/docs/README_Rfid.md)**
+
 Giao tiếp thẻ từ tần số 13.56 MHz (MIFARE). 
 
 **Hàm API chi tiết:**
@@ -722,7 +732,7 @@ int main() {
 
 ### 5.10. Thư viện `Led7Segment` (CD4094)
 
-> **[📝 Xem tài liệu Hướng Dẫn Sử Dụng Thư viện Led7Segment đầy đủ tại đây](README_Led7Segment.md)**
+> **[📝 Xem tài liệu Hướng Dẫn Sử Dụng Thư viện Led7Segment đầy đủ tại đây](UserLibs/docs/README_Led7Segment.md)**
 
 Thư viện quét với IC thanh ghi dịch 3 chân (Data, Clock, Strobe/Latch).
 
